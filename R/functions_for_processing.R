@@ -91,7 +91,7 @@ between <- function(x, range, inclusive = TRUE, na.action = FALSE) {
 }
 
 equivalent.factors <- function(f1, f2) {
-  return(nunique(f1) == nunique(paste(f1, f2)))
+  return(nunique(f1) == nunique(interaction(f1, f2)))
 }
 
 text.box.plot <- function(range.list, width = 12) {
@@ -122,16 +122,23 @@ round_df <- function(df, digits) {
   return(df)
 }
 
-check.package <- function(package.name) {
-  if (!requireNamespace(package.name, quietly = TRUE)) {
+check.package <- function(package.name, alternative = FALSE) {
+  package.is.intalled <- any(.packages(all.available = TRUE) == package.name)
+  if (!package.is.intalled && !alternative) {
     stop(paste0("Package \"", package.name, "\" needed for this function to work. Please install it."),
          call. = FALSE)
   }
+  return(invisible(package.is.intalled))
 }
 
 make.smaller <- function(x) {
   m <- max(x)
   ndigits <- floor(log10(m))
+  return(x/(10^ndigits))
+}
+
+make.closer.to.1 <- function(x) {
+  ndigits <- round(mean(floor(log10(abs(x[abs(x) > sqrt(.Machine$double.eps)])))))
   return(x/(10^ndigits))
 }
 

@@ -21,7 +21,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
     }
     if (is.character(ps) && length(ps)==1) {
       if (ps %in% names(data)) {
-        ps <- data[, ps]
+        ps <- data[[ps]]
       }
       else stop("The name supplied to ps is not the name of a variable in data.", call. = FALSE)
     }
@@ -51,12 +51,13 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
   if (is.na(match(rownames(attr(tt, "factors"))[1], names(data)))) {
     stop(paste0("The given response variable, \"", rownames(attr(tt, "factors"))[1], "\", is not a variable in data."))
   }
+  vars.mentioned <- unlist(lapply(attr(tt, "variables")[-1], function(x) if (length(x) > 1) paste(x[-1]) else paste(x)))
   m.try <- try({mf <- model.frame(tt, data)}, TRUE)
   if (class(m.try) == "try-error") {
     stop(paste0(c("All variables of formula must be variables in data.\nVariables not in data: ",
                   paste(attr(tt, "term.labels")[is.na(match(attr(tt, "term.labels"), names(data)))], collapse=", "))), call. = FALSE)}
   treat <- model.response(mf)
-  covs <- data[, !is.na(match(names(data), attr(tt, "term.labels"))), drop = FALSE]
+  covs <- data[!is.na(match(names(data), vars.mentioned[vars.mentioned != rownames(attr(tt, "factors"))[1]]))]
 
   n <- nrow(data)
 
@@ -81,7 +82,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
     }
     if (is.character(s.weights) && length(s.weights)==1) {
       if (s.weights %in% names(data)) {
-        s.weights <- data[, s.weights]
+        s.weights <- data[[s.weights]]
       }
       else stop("The name supplied to s.weights is not the name of a variable in data.", call. = FALSE)
     }
@@ -100,7 +101,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
   if (missing(exact)) exact.factor <- factor(rep(1, n))
   else if (!is.atomic(exact)) bad.exact <- TRUE
   else if (is.character(exact) && all(exact %in% acceptable.exacts)) {
-    exact.factor <- factor(apply(data[, exact, drop = FALSE], 1, paste, collapse = "|"))
+    exact.factor <- factor(apply(data[exact], 1, paste, collapse = "|"))
     exact.vars <- exact
   }
   else if (length(exact) == n) {
@@ -111,7 +112,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
 
   if (bad.exact) stop("exact must be the quoted names of variables in data for which weighting is to occur within strata or the variable itself.", call. = FALSE)
 
-  if (any(sapply(levels(exact), function(x) nunique(treat) != nunique(treat[exact == x])))) {
+  if (any(sapply(levels(exact.factor), function(x) nunique(treat) != nunique(treat[exact.factor == x])))) {
     stop("Not all the groups formed by exact contain all treatment levels. Consider coarsening exact.", call. = FALSE)
   }
 
@@ -177,7 +178,8 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                               s.weights = s.weights,
                               estimand = estimand,
                               subset = exact.factor == i,
-                              verbose = verbose, ...)
+                              stabilize = stabilize,
+                              ...)
         }
         else if (treat.type == "multinomial") {
           estimand <- process.estimand(estimand, c("ATT", "ATE"), method, treat.type)
@@ -187,7 +189,8 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                                     estimand = estimand,
                                     focal = focal,
                                     subset = exact.factor == i,
-                                    verbose = verbose, ...)
+                                    stabilize = stabilize,
+                                    ...)
         }
         else stop("Generalized boosted modeling is not compatible with continuous treatments.", call. = FALSE)
 
@@ -199,8 +202,8 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                                data = data,
                                subset = exact.factor == i,
                                estimand = estimand,
-                               verbose = verbose,
                                s.weights = s.weights,
+                               stabilize = stabilize,
                                ...)
 
         }
@@ -210,7 +213,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                                      data = data,
                                      subset = exact.factor == i,
                                      s.weights = s.weights,
-                                     verbose = verbose,
+                                     stabilize = stabilize,
                                      ...)
         }
         else if (treat.type == "continuous") {
@@ -218,7 +221,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                                     data = data,
                                     subset = exact.factor == i,
                                     s.weights = s.weights,
-                                    verbose = verbose,
+                                    stabilize = stabilize,
                                     ...)
 
         }
@@ -232,7 +235,6 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
           obj <- weightit2npcbps(formula = formula,
                                  data = data,
                                  subset = exact.factor == i,
-                                 verbose = verbose,
                                  ...)
         }
         else if (treat.type == "multinomial") {
@@ -240,14 +242,12 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
           obj <- weightit2npcbps.multi(formula = formula,
                                        data = data,
                                        subset = exact.factor == i,
-                                       verbose = verbose,
                                        ...)
         }
         else if (treat.type == "continuous") {
           obj <- weightit2npcbps.cont(formula = formula,
                                       data = data,
                                       subset = exact.factor == i,
-                                      verbose = verbose,
                                       ...)
         }
 
@@ -261,7 +261,6 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                                subset = exact.factor == i,
                                estimand = estimand,
                                stabilize = stabilize,
-                               verbose = verbose,
                                ...)
         }
         else if (treat.type == "multinomial") {
@@ -273,14 +272,31 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
                                      estimand = estimand,
                                      focal = focal,
                                      stabilize = stabilize,
-                                     verbose = verbose,
                                      ...)
         }
         else stop("Entropy balancing is not compatible with continuous treatments.", call. = FALSE)
 
       }
       else if (method == "sbw") {
-        stop("Stable Balancing Weights are not yet available.", call. = FALSE)
+        if (treat.type == "binary") {
+          estimand <- process.estimand(estimand, c("ATT", "ATC", "ATE"), method, treat.type)
+          obj <- weightit2sbw(formula = formula,
+                               data = data,
+                               s.weights = s.weights,
+                               subset = exact.factor == i,
+                               estimand = estimand,
+                               ...)
+        }
+        else if (treat.type == "multinomial") {
+          estimand <- process.estimand(estimand, c("ATT", "ATE"), method, treat.type)
+          obj <- weightit2sbw.multi(formula = formula,
+                              data = data,
+                              s.weights = s.weights,
+                              subset = exact.factor == i,
+                              estimand = estimand,
+                              focal = focal,
+                              ...)
+        }
       }
       else if (method == "ebcw") {
         if (s.weights.specified) stop(paste0("Sampling weights cannot be used with ", method.to.phrase(method), "."),
@@ -360,7 +376,7 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
               method = method,
               ps = if (all(is.na(p.score))) NULL else p.score,
               s.weights = s.weights,
-              discarded = NULL,
+              #discarded = NULL,
               treat.type = treat.type,
               focal = focal)
   class(out) <- "weightit"

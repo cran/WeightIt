@@ -1,7 +1,9 @@
-0f817c942f3de477a674f6785bcd2ab3 *DESCRIPTION
-dd93a4a361a6f0ecf57e8d98acfa84fb *NAMESPACE
-3e5c0800a1226f7be65c600cc7f1c2d9 *R/functions_for_processing.R
-38352589d24202e07135d1dd423b5484 *R/weightit.R
-62f8d214f2797d46741f94e37f58a101 *R/weightit2method.R
+409c879aa803b04cdc5f4e82bf9ea3e2 *DESCRIPTION
+9f4e614931338845b7e45dc279a8d8d6 *NAMESPACE
+34b329b9b7489e5773d71ead2f79a850 *NEWS.md
+1a3bc9594f746a600dbb023bc6627081 *R/functions_for_processing.R
+0764585b0c0d176b34b0747ea3049a19 *R/weightit.R
+a4d97cc735ff127ac72855b7882e885f *R/weightit2method.R
+8fe811549782c8a827beb4eb0126b09c *README.md
 96c1681fa75221e5c9ebb039db225881 *man/summary.weightit.Rd
-9507613cba21e8cfb1fbc5fe24ef9ddb *man/weightit.Rd
+917e634b11d07a1c3e97f403b7d690ab *man/weightit.Rd
