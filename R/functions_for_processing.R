@@ -75,6 +75,22 @@ process.estimand <- function(estimand, allowable.estimands, method, treat.type) 
 
 }
 
+process.focal <- function(focal, estimand, treat) {
+  if (estimand == "ATT") {
+    if (length(focal) == 0) {
+      stop("When estimand = \"ATT\" for multinomial treatments, an argument must be supplied to focal.", call. = FALSE)
+    }
+    if (length(focal) > 1 || !any(unique(treat) == focal)) {
+      stop("The argument supplied to focal must be the name of a level of treat.", call. = FALSE)
+    }
+  }
+  else {
+    if (length(focal) > 0) {
+      warning(paste(estimand, "is not compatible with focal. Ignoring focal."), call. = FALSE)
+    }
+  }
+}
+
 between <- function(x, range, inclusive = TRUE, na.action = FALSE) {
   if (!all(is.numeric(x))) stop("x must be a numeric vector.", call. = FALSE)
   if (length(range) != 2) stop("range must be of length 2.", call. = FALSE)
@@ -122,6 +138,49 @@ round_df <- function(df, digits) {
   return(df)
 }
 
+round_df_char <- function(df, digits, pad = "0") {
+  nas <- is.na(df)
+  if (!is.data.frame(df)) df <- as.data.frame(df, stringsAsFactors = FALSE)
+  rn <- rownames(df)
+  cn <- colnames(df)
+  df <- as.data.frame(lapply(df, function(col) {
+    if (suppressWarnings(all(!is.na(as.numeric(as.character(col)))))) {
+      as.numeric(as.character(col))
+    } else {
+      col
+    }
+  }), stringsAsFactors = FALSE)
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+  df[nums] <- round(df[nums], digits = digits)
+  df[nas] <- ""
+
+  df <- as.data.frame(lapply(df, as.character), stringsAsFactors = FALSE)
+
+  for (i in which(nums)) {
+    if (any(grepl(".", df[[i]], fixed = TRUE))) {
+      s <- strsplit(df[[i]], ".", fixed = TRUE)
+      lengths <- lengths(s)
+      digits.r.of.. <- sapply(seq_along(s), function(x) {
+        if (lengths[x] > 1) nchar(s[[x]][lengths[x]])
+        else 0 })
+      df[[i]] <- sapply(seq_along(df[[i]]), function(x) {
+        if (df[[i]][x] == "") ""
+        else if (lengths[x] <= 1) {
+          paste0(c(df[[i]][x], rep(".", pad == 0), rep(pad, max(digits.r.of..) - digits.r.of..[x] + as.numeric(pad != 0))),
+                 collapse = "")
+        }
+        else paste0(c(df[[i]][x], rep(pad, max(digits.r.of..) - digits.r.of..[x])),
+                    collapse = "")
+      })
+    }
+  }
+
+  if (length(rn) > 0) rownames(df) <- rn
+  if (length(cn) > 0) names(df) <- cn
+
+  return(df)
+}
+
 check.package <- function(package.name, alternative = FALSE) {
   package.is.intalled <- any(.packages(all.available = TRUE) == package.name)
   if (!package.is.intalled && !alternative) {
@@ -131,15 +190,29 @@ check.package <- function(package.name, alternative = FALSE) {
   return(invisible(package.is.intalled))
 }
 
-make.smaller <- function(x) {
-  m <- max(x)
-  ndigits <- floor(log10(m))
-  return(x/(10^ndigits))
-}
-
 make.closer.to.1 <- function(x) {
   ndigits <- round(mean(floor(log10(abs(x[abs(x) > sqrt(.Machine$double.eps)])))))
   return(x/(10^ndigits))
+}
+
+remove.collinearity <- function(mat) {
+  keep <- rep(TRUE, ncol(mat))
+  for (i in seq_along(keep)) {
+    keep. <- keep; keep.[i] <- FALSE
+    if (qr(mat[, keep., drop = FALSE])$rank == qr(mat[, keep, drop = FALSE])$rank) {
+      keep[i] <- FALSE
+    }
+  }
+  return(mat[,keep, drop = FALSE])
+}
+
+is.formula <- function(f, sides = NULL) {
+    res <- is.name(f[[1]])  && deparse(f[[1]]) %in% c( '~', '!') &&
+      length(f) >= 2
+    if (length(sides) > 0 && is.numeric(sides) && sides %in% c(1,2)) {
+      res <- res && length(f) == sides + 1
+    }
+    return(res)
 }
 
 #To pass CRAN checks:

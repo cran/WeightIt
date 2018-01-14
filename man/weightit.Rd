@@ -29,7 +29,7 @@ a string of length 1 containing the name of the method that will be used to esti
 the desired estimand. For binary treatments, can be "ATE", "ATT", "ATC", and, for some methods, "ATO". For multinomial treatments, can be "ATE" or "ATT". The default for both is "ATE". This argument is ignored for continuous treatments.
 }
   \item{stabilize}{
-\code{logical}; whether or not to stabilize the weights. For the methods that involve estimatign propensity scores, this involves multiplying each unit's weight by the sum of the weights in that unit's treatment group. For the \code{"ebal"} method, this involves using \code{ebalance.trim()} to reduce the variance of the weights. Default is \code{FALSE}.
+\code{logical}; whether or not to stabilize the weights. For the methods that involve estimating propensity scores, this involves multiplying each unit's weight by the sum of the weights in that unit's treatment group. For the \code{"ebal"} method, this involves using \code{ebalance.trim()} to reduce the variance of the weights. Default is \code{FALSE}.
 }
   \item{focal}{
 when multinomial treatments are used and the "ATT" is requested, which group to consider the "treated" or focal group. This group will not be weighted, and the other groups will be weighted to be more like the focal group.
@@ -87,11 +87,66 @@ The primary purpose of \code{weightit()} is as a dispatcher to other functions i
 }
 
 \author{
-Noah Greifer \email{noah@unc.edu}
+Noah Greifer
 }
 
 \references{
+
+\strong{Binary treatments}
+
+\code{method = "ps"}
+
+ - \code{estimand = "ATO"}
+
 Li, F., Morgan, K. L., & Zaslavsky, A. M. (2016). Balancing Covariates via Propensity Score Weighting. Journal of the American Statistical Association, 0(ja), 0–0.
+
+ - Other estimands
+
+Austin, P. C. (2011). An Introduction to Propensity Score Methods for Reducing the Effects of Confounding in Observational Studies. Multivariate Behavioral Research, 46(3), 399–424. \doi{10.1080/00273171.2011.568786}
+
+\code{method = "gbm"}
+
+McCaffrey, D. F., Ridgeway, G., & Morral, A. R. (2004). Propensity Score Estimation With Boosted Regression for Evaluating Causal Effects in Observational Studies. Psychological Methods, 9(4), 403–425. \doi{10.1037/1082-989X.9.4.403}
+
+\code{method = "cbps"}
+
+Imai, K., & Ratkovic, M. (2014). Covariate balancing propensity score. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 76(1), 243–263.
+
+\code{method = "npcbps"}
+
+Fong, Christian, Chad Hazlett, and Kosuke Imai (2015). Parametric and Nonparametric Covariate Balancing Propensity Score for General Treatment Regimes. Unpublished Manuscript. <\url{http://imai.princeton.edu/research/files/CBGPS.pdf}>
+
+\code{method = "ebal"}
+
+Hainmueller, J. (2012). Entropy Balancing for Causal Effects: A Multivariate Reweighting Method to Produce Balanced Samples in Observational Studies. Political Analysis, 20(1), 25–46. \doi{10.1093/pan/mpr025}
+
+\code{method = "sbw"}
+
+Zubizarreta, J. R. (2015). Stable Weights that Balance Covariates for Estimation With Incomplete Outcome Data. Journal of the American Statistical Association, 110(511), 910–922. \doi{10.1080/01621459.2015.1023805}
+
+\code{method = "ebcw"}
+
+Chan, K. C. G., Yam, S. C. P., & Zhang, Z. (2016). Globally efficient non-parametric inference of average treatment effects by empirical balancing calibration weighting. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 78(3), 673–700. \doi{10.1111/rssb.12129}
+
+\strong{Multinomial Treatments}
+
+\code{method = "ps"}
+
+McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand, R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for Multiple Treatments Using Generalized Boosted Models. Statistics in Medicine, 32(19), 3388–3414. \doi{10.1002/sim.5753}
+
+\code{method = "gbm"}
+
+McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand, R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for Multiple Treatments Using Generalized Boosted Models. Statistics in Medicine, 32(19), 3388–3414. \doi{10.1002/sim.5753}
+
+\strong{Continuous treatments}
+
+\code{method = "ps"}
+
+Robins, J. M., Hernán, M. Á., & Brumback, B. (2000). Marginal Structural Models and Causal Inference in Epidemiology. Epidemiology, 11(5), 550–560.
+
+\code{method = "cbps"}
+
+Fong, Christian, Chad Hazlett, and Kosuke Imai (2015). Parametric and Nonparametric Covariate Balancing Propensity Score for General Treatment Regimes. Unpublished Manuscript. <\url{http://imai.princeton.edu/research/files/CBGPS.pdf}>
 
 }
 
@@ -111,22 +166,20 @@ data("lalonde", package = "cobalt")
                 nodegree + re74, data = lalonde,
                 method = "ps", estimand = "ATT"))
 summary(W1)
-bal.tab(W1)
+#bal.tab(W1)
 
 #Balancing covariates among races (3-level)
 (W2 <- weightit(race ~ age + educ + married +
                 nodegree + re74, data = lalonde,
-                method = "cbps", estimand = "ATE",
-                over = FALSE))
+                method = "ebal", estimand = "ATE"))
 summary(W2)
-bal.tab(W2)
+#bal.tab(W2)
 
 #Balancing covariates with respect to re78 (continuous)
-(W3 <- weightit(re78 ~ age + educ + married +
+(W3 <- weightit(re75 ~ age + educ + married +
                 nodegree + re74, data = lalonde,
-                method = "ps", num.formula = ~ age +
-                educ + married))
+                method = "cbps", over = FALSE))
 summary(W3)
-bal.tab(W3)
+#bal.tab(W3)
 
 }

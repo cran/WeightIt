@@ -66,14 +66,16 @@ weightit2ps.multi <- function(formula, data, s.weights, subset, estimand, focal,
   else {
     if (A$link %in% c("logit", "probit")) {
       if (check.package("mlogit", alternative = TRUE) && (length(A$use.mlogit) == 0 ||
-          (length(A$use.mlogit) > 0 && A$use.mlogit != FALSE))) {
+                                                          (length(A$use.mlogit) > 0 && A$use.mlogit != FALSE))) {
         message(paste0("Using multinomial ", A$link, " regression."))
         covs <- model.matrix(tt, data=mf)[,-1, drop = FALSE]
         mult <- mlogit::mlogit.data(data.frame(.t = t, covs, .s.weights = s.weights[subset]), varying = NULL, shape = "wide", sep = "", choice = ".t")
-        fit <- mlogit::mlogit(as.formula(paste0(".t ~ 1 | ", paste(colnames(covs), collapse = " + "),
+        tryCatch({fit <- mlogit::mlogit(as.formula(paste0(".t ~ 1 | ", paste(colnames(covs), collapse = " + "),
                                                 " | 1")), data = mult, estimate = TRUE,
-                              probit = ifelse(A$link == "probit", TRUE, FALSE),
-                              weights = .s.weights, ...)
+                              probit = ifelse(A$link[1] == "probit", TRUE, FALSE),
+                              weights = .s.weights, ...)},
+                 error = function(e) {stop(paste0("There was a problem fitting the multinomial ", A$link, " regressions with mlogit().\n       Try again with use.mlogit = FALSE."), call. = FALSE)}
+        )
         ps <- fitted(fit, outcome = FALSE)
       }
       else {
@@ -98,6 +100,9 @@ weightit2ps.multi <- function(formula, data, s.weights, subset, estimand, focal,
       check.package("MNP")
       fit <- MNP::mnp(formula, data[subset,], verbose = TRUE)
       ps <- MNP::predict.mnp(fit, type = "prob")$p
+    }
+    else {
+      stop('link must be "logit", "probit", or "bayes.probit".', call. = FALSE)
     }
   }
   #ps should be matrix of probs for each treat
@@ -143,9 +148,7 @@ weightit2ps.cont <- function(formula, data, s.weights, subset, stabilize, ps, ..
 
   stabilize <- TRUE
 
-  if (length(ps) > 0) {
-  }
-  else {
+  if (length(ps) == 0) {
     fit <- glm(formula, data = data.frame(data, .s.weights = s.weights)[subset,],
                weights = .s.weights,
                family = A$family,
@@ -157,7 +160,7 @@ weightit2ps.cont <- function(formula, data, s.weights, subset, stabilize, ps, ..
     if (stabilize) {
       if (length(A$num.formula) == 0) A$num.formula <- ~ 1
       num.fit <- glm(update.formula(A$num.formula, .t ~ .),
-                     data = data.frame(.t =t, data, .s.weights = s.weights)[subset,],
+                     data = data.frame(.t = t, data, .s.weights = s.weights)[subset,],
                      weights = .s.weights,
                      family = A$family,
                      control = list(), ...)
@@ -193,12 +196,13 @@ weightit2gbm <- function(formula, data, s.weights, estimand, subset, stabilize, 
   mf <- model.frame(tt, data[subset,], drop.unused.levels = TRUE)
   treat <- model.response(mf)
   covs <- apply(model.matrix(tt, data=mf)[,-1, drop = FALSE], 2, make.closer.to.1)
-  new.data <- data.frame(treat = treat, covs)
 
   if (estimand == "ATC") {
     treat <- 1 - treat
     estimand <- "ATT"
   }
+
+  new.data <- data.frame(treat = treat, covs)
 
   check.package("twang")
   fit <- do.call(twang::ps, c(list(formula = formula(new.data),
@@ -207,15 +211,14 @@ weightit2gbm <- function(formula, data, s.weights, estimand, subset, stabilize, 
                                    verbose = TRUE, print.level = 2), A))
 
   s <- names(fit$ps)[1]
-
-  w <- cobalt::get.w(fit, stop.method = s)[[1]]
+  w <- cobalt::get.w(fit, stop.method = s)
 
   if (stabilize) {
     w <- w * sapply(t, function(x) sum(t==x) / sum(1*(t==x)*w))
   }
 
   obj <- list(w = w,
-              ps = fit$ps[,s])
+              ps = fit$ps[[s]])
 
   return(obj)
 }
@@ -273,8 +276,6 @@ weightit2cbps <- function(formula, data, subset, estimand, s.weights, stabilize,
                     sample.weights = s.weights[subset],
                     ...)
 
-
-
   w <- cobalt::get.w(fit, estimand = switch(estimand, ATE = "ate", "att"))
 
   if (stabilize) {
@@ -297,8 +298,8 @@ weightit2cbps.multi <- function(formula, data, subset, s.weights, stabilize, ...
 
   check.package("CBPS")
   if (nunique(treat) <= 4) {
-      fit <- CBPS::CBPS(formula(new.data),
-                        data = new.data,
+    fit <- CBPS::CBPS(formula(new.data),
+                      data = new.data,
                       method = ifelse(length(A$over) == 0 || isTRUE(A$over), "over", "exact"),
                       standardize = FALSE,
                       sample.weights = s.weights[subset],
@@ -321,14 +322,33 @@ weightit2cbps.multi <- function(formula, data, subset, s.weights, stabilize, ...
     }
   }
 
-
   if (stabilize) {
     w <- w * sapply(t, function(x) sum(t==x) / sum(1*(t==x)*w))
   }
 
   obj <- list(w = w)
 }
-weightit2cbps.cont <- weightit2cbps.multi
+weightit2cbps.cont <- function(formula, data, subset, s.weights, ...) {
+  A <- list(...)
+
+  tt <- terms(formula)
+  mf <- model.frame(tt, data[subset,], drop.unused.levels = TRUE)
+  treat <- model.response(mf)
+  covs <- apply(model.matrix(tt, data=mf)[,-1, drop = FALSE], 2, make.closer.to.1)
+  new.data <- data.frame(treat = treat, covs)
+
+  check.package("CBPS")
+  fit <- CBPS::CBPS(formula(new.data),
+                    data = new.data,
+                    method = ifelse(length(A$over) == 0 || isTRUE(A$over), "over", "exact"),
+                    standardize = FALSE,
+                    sample.weights = s.weights[subset],
+                    ...)
+
+  w <- cobalt::get.w(fit)
+
+  obj <- list(w = w)
+}
 weightit2npcbps <- function(formula, data, subset, ...) {
   A <- list(...)
 
@@ -389,9 +409,10 @@ weightit2ebal <- function(formula, data, s.weights, subset, estimand, stabilize,
   A <- list(...)
 
   tt <- terms(formula)
-  mf <- model.frame(tt, data[subset,], drop.unused.levels = TRUE)
+  mf <- model.frame(tt, data[subset, , drop = FALSE], drop.unused.levels = TRUE)
   treat <- model.response(mf)
-  covs <- apply(model.matrix(tt, data=mf)[,-1, drop = FALSE], 2, make.closer.to.1)
+  covs <- apply(model.matrix(tt, data=mf)[, -1, drop = FALSE], 2, make.closer.to.1)
+  #covs <- model.matrix(tt, data=mf)[, -1, drop = FALSE]
 
   #covs <- covs * replicate(ncol(covs), s.weights)
 
@@ -399,6 +420,8 @@ weightit2ebal <- function(formula, data, s.weights, subset, estimand, stabilize,
   if (estimand %in% c("ATT", "ATC")) {
     if (estimand == "ATC" ) treat_ <- 1 - treat
     else treat_ <- treat
+
+    covs <- covs[, Reduce("intersect", lapply(unique(treat_, nmax = 2), function(j) colnames(remove.collinearity(covs[treat_ == j, , drop = FALSE])))), drop = FALSE]
 
     ebal.out <- ebal::ebalance(Treatment = treat_, X = covs,
                                print.level = 3,
@@ -414,15 +437,16 @@ weightit2ebal <- function(formula, data, s.weights, subset, estimand, stabilize,
 
     for (i in unique(treat)) {
       #Reweight controls to be like total (need treated to look like total)
-      covs_i <- rbind(covs, covs[treat==i,])
+
+      covs_i <- rbind(covs, covs[treat==i, , drop = FALSE])
       treat_i <- c(rep(1, nrow(covs)), rep(0, sum(treat==i)))
+
+      covs_i <- covs_i[, Reduce("intersect", lapply(unique(treat_i, nmax = 2), function(j) colnames(remove.collinearity(covs_i[treat_i == j, , drop = FALSE]))))]
 
       ebal.out_i <- ebal::ebalance(Treatment = treat_i, X = covs_i,
                                    base.weight = s.weights[subset][treat==i],
                                    print.level = 3, ...)
       if (stabilize) ebal.out_i <- ebal::ebalance.trim(ebal.out_i, ...)
-
-
 
       w[treat == i] <- ebal.out_i$w
     }
@@ -448,7 +472,10 @@ weightit2ebal.multi <- function(formula, data, s.weights, subset, estimand, foca
 
     for (i in control.levels) {
       treat_ <- ifelse(treat[treat %in% c(focal, i)] == i, 0, 1)
-      covs_ <- covs[treat %in% c(focal, i),]
+      covs_ <- covs[treat %in% c(focal, i), , drop = FALSE]
+
+      covs_ <- covs_[, Reduce("intersect", lapply(unique(treat_, nmax = 2), function(j) colnames(remove.collinearity(covs_[treat_ == j, , drop = FALSE]))))]
+
       ebal.out <- ebal::ebalance(Treatment = treat_, X = covs_,
                                  base.weight = s.weights[subset][treat == i],
                                  print.level = 3, ...)
@@ -461,8 +488,10 @@ weightit2ebal.multi <- function(formula, data, s.weights, subset, estimand, foca
     w <- rep(1, length(treat))
 
     for (i in levels(treat)) {
-      covs_i <- rbind(covs, covs[treat==i,])
+      covs_i <- rbind(covs, covs[treat==i, , drop = FALSE])
       treat_i <- c(rep(1, nrow(covs)), rep(0, sum(treat==i)))
+
+      covs_i <- covs_i[, Reduce("intersect", lapply(unique(treat_i, nmax = 2), function(j) colnames(remove.collinearity(covs_i[treat_i == j, , drop = FALSE]))))]
 
       ebal.out_i <- ebal::ebalance(Treatment = treat_i, X = covs_i,
                                    base.weight = s.weights[subset][treat == i],
@@ -484,6 +513,7 @@ weightit2sbw <- function(formula, data, s.weights, subset, estimand, ...) {
   A <- list(...)
 
   check.package("sbw")
+  check.package("slam"); requireNamespace("slam")
 
   if (length(A$l_norm) == 0) A$l_norm <- "l_2"
   if (length(A$solver) == 0) A$solver <- "quadprog"
@@ -493,12 +523,14 @@ weightit2sbw <- function(formula, data, s.weights, subset, estimand, ...) {
   if (length(A$gap_stop) == 0) A$gap_stop <- TRUE
   if (length(A$adaptive_rho) == 0) A$adaptive_rho <- TRUE
 
+  check.package(A$solver); require(A$solver, character.only = TRUE)
+
   tt <- terms(formula)
   mf <- model.frame(tt, data[subset,], drop.unused.levels = TRUE)
   treat <- model.response(mf)
   covs0 <- model.matrix(tt, data=mf,
                         contrasts.arg = lapply(mf[sapply(mf, is.factor)],
-                                             contrasts, contrasts=FALSE))[,-1, drop = FALSE]
+                                               contrasts, contrasts=FALSE))[,-1, drop = FALSE]
   covs <- apply(covs0, 2, make.closer.to.1)
   new.data <- setNames(data.frame(treat, covs), as.character(seq_len(1+ncol(covs))))
 
@@ -596,6 +628,9 @@ weightit2sbw <- function(formula, data, s.weights, subset, estimand, ...) {
 weightit2sbw.multi <- function(formula, data, s.weights, subset, estimand, focal, ...) {
   A <- list(...)
 
+  check.package("sbw")
+  check.package("slam"); requireNamespace("slam")
+
   if (length(A$l_norm) == 0) A$l_norm <- "l_2"
   if (length(A$solver) == 0) A$solver <- "quadprog"
   if (length(A$max_iter) == 0) A$max_iter <- 100000
@@ -634,7 +669,6 @@ weightit2sbw.multi <- function(formula, data, s.weights, subset, estimand, focal
     message("Using bal_tols_sd = TRUE.")
   }
 
-  check.package("sbw")
   if (estimand == "ATT") {
     control.levels <- levels(treat)[levels(treat) != focal]
     w <- rep(1, length(treat))

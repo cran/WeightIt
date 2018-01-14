@@ -1,9 +1,12 @@
 importFrom("stats", "terms", "glm", "setNames", "sd", "model.frame", "model.response",
            "update.formula", "as.formula", "quantile", "model.matrix", "binomial",
-           "gaussian", "dnorm", "fitted", "contrasts")
+           "gaussian", "dnorm", "fitted", "contrasts", "na.pass")
 importFrom("utils", "data")
 
-export(weightit)
+export(weightit, weightitMSM)
 S3method(print, weightit)
 S3method(summary, weightit)
 S3method(print, summary.weightit)
+S3method(print, weightitMSM)
+S3method(summary, weightitMSM)
+S3method(print, summary.weightitMSM)
