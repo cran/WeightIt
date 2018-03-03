@@ -62,7 +62,6 @@ method.to.phrase <- function(method) {
   else if (method %in% c("ebcw", "ate")) return("empirical balancing calibration weighting")
   else return("the chosen method of weighting")
 }
-
 process.estimand <- function(estimand, allowable.estimands, method, treat.type) {
   if (!toupper(estimand) %in% toupper(allowable.estimands)) {
     stop(paste0("\"", estimand, "\" is not an allowable estimand for ", method.to.phrase(method),
@@ -74,7 +73,6 @@ process.estimand <- function(estimand, allowable.estimands, method, treat.type) 
   }
 
 }
-
 process.focal <- function(focal, estimand, treat) {
   if (estimand == "ATT") {
     if (length(focal) == 0) {
@@ -90,7 +88,6 @@ process.focal <- function(focal, estimand, treat) {
     }
   }
 }
-
 between <- function(x, range, inclusive = TRUE, na.action = FALSE) {
   if (!all(is.numeric(x))) stop("x must be a numeric vector.", call. = FALSE)
   if (length(range) != 2) stop("range must be of length 2.", call. = FALSE)
@@ -105,11 +102,9 @@ between <- function(x, range, inclusive = TRUE, na.action = FALSE) {
 
   return(out)
 }
-
 equivalent.factors <- function(f1, f2) {
   return(nunique(f1) == nunique(interaction(f1, f2)))
 }
-
 text.box.plot <- function(range.list, width = 12) {
   full.range <- range(unlist(range.list))
   ratio = diff(full.range)/(width+1)
@@ -131,13 +126,11 @@ text.box.plot <- function(range.list, width = 12) {
   }
   return(d)
 }
-
 round_df <- function(df, digits) {
   nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
   df[, nums] <- round(df[, nums], digits = digits)
   return(df)
 }
-
 round_df_char <- function(df, digits, pad = "0") {
   nas <- is.na(df)
   if (!is.data.frame(df)) df <- as.data.frame(df, stringsAsFactors = FALSE)
@@ -180,7 +173,6 @@ round_df_char <- function(df, digits, pad = "0") {
 
   return(df)
 }
-
 check.package <- function(package.name, alternative = FALSE) {
   package.is.intalled <- any(.packages(all.available = TRUE) == package.name)
   if (!package.is.intalled && !alternative) {
@@ -189,12 +181,10 @@ check.package <- function(package.name, alternative = FALSE) {
   }
   return(invisible(package.is.intalled))
 }
-
 make.closer.to.1 <- function(x) {
   ndigits <- round(mean(floor(log10(abs(x[abs(x) > sqrt(.Machine$double.eps)])))))
   return(x/(10^ndigits))
 }
-
 remove.collinearity <- function(mat) {
   keep <- rep(TRUE, ncol(mat))
   for (i in seq_along(keep)) {
@@ -205,7 +195,6 @@ remove.collinearity <- function(mat) {
   }
   return(mat[,keep, drop = FALSE])
 }
-
 is.formula <- function(f, sides = NULL) {
     res <- is.name(f[[1]])  && deparse(f[[1]]) %in% c( '~', '!') &&
       length(f) >= 2

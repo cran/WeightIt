@@ -17,7 +17,7 @@ weightitMSM(formula.list,
 
 }
 \description{
-\code{weightitMSM()} allows for the easy generation of balancing weights for marginal structural models for time-varying treatments using a variety of available methods for binary, continuous, and multinomial treatments. Many of these methods exist in other packages, which \code{weightit()} calls; these packages must be installed to use the desired method. Also included are \code{print} and \code{summary} methods for examining the output.
+\code{weightitMSM()} allows for the easy generation of balancing weights for marginal structural models for time-varying treatments using a variety of available methods for binary, continuous, and multinomial treatments. Many of these methods exist in other packages, which \code{\link[=weightit]{weightit()}} calls; these packages must be installed to use the desired method. Also included are \code{print} and \code{summary} methods for examining the output.
 
 Currently only "wide" data sets, where each row corresponds to a unit's entire variable history, are supported. You can use \code{\link{reshape}} or other functions to transform your data into this format; see example below.
 }
@@ -60,7 +60,7 @@ a \code{weightitMSM} object; the output of a call to \code{weightitMSM()}.
   \item{treat.list}{A list of the values of the time-varying treatment variables.}
   \item{covs.list}{A list of the covariates used in the fitting at each time point. Only includes the raw covariates, which may have been altered in the fitting process.}
   \item{data}{The data.frame originally entered to \code{weightitMSM()}.}
-  \item{estimand}{"ATE", currently the only estimand for MSMs.}
+  \item{estimand}{"ATE", currently the only estimand for MSMs with binary or multinomial treatments.}
   \item{method}{The weight estimation method specified.}
   \item{ps.list}{A list of the estimated propensity scores (if any) at each time point.}
   \item{s.weights}{The provided sampling weights.}
@@ -86,13 +86,13 @@ Cole, S. R., & Hernan, M. A. (2008). Constructing Inverse Probability Weights fo
 \examples{
 library("twang"); library("cobalt")
 data("iptwExWide")
-W <- weightitMSM(list(tx1 ~ age + gender + use0,
+(W <- weightitMSM(list(tx1 ~ age + gender + use0,
                       tx2 ~ tx1 + use1 + age + gender + use0,
                       tx3 ~ tx2 + use2 + tx1 + use1 + age + gender + use0),
                  data = iptwExWide,
-                 method = "ps")
-W
+                 method = "ps"))
 summary(W)
+bal.tab(W)
 
 ##Going from long to wide data
 data("iptwExLong")
@@ -103,13 +103,12 @@ wide_data <- reshape(iptwExLong$covariates,    #long data
                      direction = "wide",
                      sep = "")
 
-W2 <- weightitMSM(list(tx1 ~ age + gender + use1,
+(W2 <- weightitMSM(list(tx1 ~ age + gender + use1,
                       tx2 ~ tx1 + use2 + age + gender + use1,
                       tx3 ~ tx2 + use3 + tx1 + use2 + age +
                           gender + use1),
                  data = wide_data,
-                 method = "ps")
-W2
+                 method = "ps"))
 summary(W2)
 
 all.equal(get.w(W), get.w(W2))

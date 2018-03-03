@@ -314,13 +314,11 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
         }
       }
       else if (method == "ebcw") {
-        if (s.weights.specified) stop(paste0("Sampling weights cannot be used with ", method.to.phrase(method), "."),
-                                      call. = FALSE)
         if (treat.type == "binary") {
           estimand <- process.estimand(estimand, c("ATT", "ATC", "ATE"), method, treat.type)
           obj <- weightit2ebcw(formula = formula,
                                data = data,
-                               #s.weights = s.weights,
+                               s.weights = s.weights,
                                subset = exact.factor == i,
                                estimand = estimand,
                                #stabilize = stabilize,
@@ -331,9 +329,10 @@ weightit <- function(formula, data, method, estimand = "ATE", stabilize = FALSE,
           process.focal(focal, estimand, treat)
           obj <- weightit2ebcw.multi(formula = formula,
                                data = data,
-                               #s.weights = s.weights,
+                               s.weights = s.weights,
                                subset = exact.factor == i,
                                estimand = estimand,
+                               focal = focal,
                                #stabilize = stabilize,
                                ...)
         }
@@ -440,6 +439,8 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
 
   }
   else if (object$treat.type == "binary") {
+    top0 <- c(treated = min(top, sum(t == 1)),
+              control = min(top, sum(t == 0)))
     out$weight.range <- list(treated = c(min(w[w > 0 & t == 1]),
                                          max(w[w > 0 & t == 1])),
                              control = c(min(w[w > 0 & t == 0]),
@@ -447,10 +448,13 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
     out$weight.ratio <- c(treated = out$weight.range$treated[2]/out$weight.range$treated[1],
                           control = out$weight.range$control[2]/out$weight.range$control[1],
                           overall = max(unlist(out$weight.range)/min(unlist(out$weight.range))))
-    top.weights <- list(treated = sort(w[t == 1], decreasing = TRUE)[seq_len(top)],
-                        control = sort(w[t == 0], decreasing = TRUE)[seq_len(top)])
-    out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w[t == ifelse(x == "control", 0, 1)] %in% top.weights[[x]])[seq_len(top)]))),
+    top.weights <- list(treated = sort(w[t == 1], decreasing = TRUE)[seq_len(top0["treated"])],
+                        control = sort(w[t == 0], decreasing = TRUE)[seq_len(top0["control"])])
+    out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w %in% top.weights[[x]] & t == {if (x == "control") 0 else 1})[seq_len(top0[x])]))),
                                names(top.weights))
+    top.weights <- list(treated = sort(w[t == 1], decreasing = TRUE)[seq_len(top0["treated"])],
+                        control = sort(w[t == 0], decreasing = TRUE)[seq_len(top0["control"])])
+
     out$coef.of.var <- c(treated = sd(w[t==1])/mean(w[t==1]),
                          control = sd(w[t==0])/mean(w[t==0]),
                          overall = sd(w)/mean(w))
@@ -476,7 +480,7 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
                           c(levels(t), "overall"))
     top.weights <- setNames(lapply(levels(t), function(x) sort(w[t == x], decreasing = TRUE)[seq_len(top)]),
                             levels(t))
-    out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w[t == x] %in% top.weights[[x]])[seq_len(top)]))),
+    out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w %in% top.weights[[x]] & t == x)[seq_len(top)]))),
                                names(top.weights))
     out$coef.of.var <- c(sapply(levels(t), function(x) sd(w[t==x])/mean(w[t==x])),
                          overall = sd(w)/mean(w))
@@ -499,15 +503,15 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
   return(out)
 }
 print.summary.weightit <- function(x, ...) {
+  top <- max(lengths(x$weight.top))
   cat("Summary of weights:\n\n")
   cat("- Weight ranges:\n")
   print.data.frame(round_df_char(text.box.plot(x$weight.range, 28), 4), ...)
-
   df <- setNames(data.frame(do.call("c", lapply(names(x$weight.top), function(x) c(" ", x))),
-                   matrix(do.call("c", lapply(x$weight.top, function(x) c(names(x), round(x, 4)))),
+                   matrix(do.call("c", lapply(x$weight.top, function(x) c(names(x), rep("", top - length(x)), round(x, 4), rep("", top - length(x))))),
                byrow = TRUE, nrow = 2*length(x$weight.top))),
-               rep("", 1 + length(x$weight.top[[1]])))
-  cat(paste("\n- Units with", length(x$weight.top[[1]]), "greatest weights by group:\n"))
+               rep("", 1 + top))
+  cat(paste("\n- Units with", top, "greatest weights by group:\n"))
   print.data.frame(df, row.names = FALSE)
   cat("\n")
   print.data.frame(round_df_char(as.data.frame(matrix(c(x$weight.ratio, x$coef.of.var), ncol = 2,

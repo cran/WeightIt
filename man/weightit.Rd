@@ -38,7 +38,7 @@ when multinomial treatments are used and the "ATT" is requested, which group to 
 a vector or the names of variables in data for which weighting is to be done within catgories. For example, if \code{exact = "gender"}, weights will be generated seperately within each level of the variable \code{"gender"}.
 }
   \item{s.weights}{
-A vector of sampling weights or the name of a variable in \code{data} that contains sampling weights. These are ignored for some methods. These can also be matching weights if weighting is to be used on matched data.
+A vector of sampling weights or the name of a variable in \code{data} that contains sampling weights. These can also be matching weights if weighting is to be used on matched data.
 }
   \item{ps}{
 A vector of propensity scores or the name of a variable in \code{data} containing propensity scores. If not \code{NULL}, \code{method} is ignored, and the propensity scores will be used to create weights. \code{formula} must include the treatment variable in \code{data}, but the listed covariates will play no role in the weight estimation.
@@ -70,7 +70,7 @@ a \code{weightit} object; the output of a call to \code{weightit()}.
 \details{
 The primary purpose of \code{weightit()} is as a dispatcher to other functions in other packages that perform the estimation of balancing weights. These functions are identified by a name, which is used in \code{method} to request them. Each method has some slight distinctions in how it is called, but in general, simply entering the method will cause \code{weightit()} to generate the weights correctly using the function. To use each method, the package containing the function must be installed, or else an error will appear. Below are the methods allowed and some information about each.
 \describe{
-\item{\code{"ps"}}{\strong{Propensity score weighting using GLM.} For binary treatments, this method estimates the propensity scores using \code{glm()}. An additional argument is \code{link}, which uses the same options as \code{link} in \code{\link{family}}. The default link is "logit", but others, including "probit", are allowed. The weights for the ATE, ATT, and ATC are computed from the estimated propensity scores using the standard formulas, and the weights for the ATO are computed as in Li, Morgan, & Zaslavsky (2016). For multinomial treatments, the propensity scores are estimated using multinomial regression from one of two functions depending on the requested link: for logit (\code{"logit"}) and probit (\code{"probit"}) links, \code{mlogit()} from the \pkg{mlogit} package is used, and for the Bayesian probit  (\code{"bayes.probit"}) link, \code{MNP()} from the \pkg{MNP} package is used. If \code{mlogit} in not installed, a series of binary regressions using \code{glm()} will be run instead, with estimated propensities normalized to sum to 1. These are the only three links allowed for multinomial treatmets at this time. (These methods can fail to converge, yielding errors that may seem foreign.) For continuous treatments, the generalized propensity score is estimated using linear regression with a normal density, but other families and links are allowed, such as poisson for count data, using the \code{family} and \code{link} arguments. An additional argument, \code{num.formula}, may be specified, containing the stabilization variables on the right hand side. For all treatment types except multinomial treatments with a Bayesian probit link, sampling weights are supported, but a warning message from \code{glm()} may appear.}
+\item{\code{"ps"}}{\strong{Propensity score weighting using GLM.} For binary treatments, this method estimates the propensity scores using \code{glm()}. An additional argument is \code{link}, which uses the same options as \code{link} in \code{\link{family}}. The default link is "logit", but others, including "probit", are allowed. The weights for the ATE, ATT, and ATC are computed from the estimated propensity scores using the standard formulas, and the weights for the ATO are computed as in Li, Morgan, & Zaslavsky (2016). For multinomial treatments, the propensity scores are estimated using multinomial regression from one of two functions depending on the requested link: for logit (\code{"logit"}) and probit (\code{"probit"}) links, \code{mlogit()} from the \pkg{mlogit} package is used, and for the Bayesian probit  (\code{"bayes.probit"}) link, \code{MNP()} from the \pkg{MNP} package is used. If \code{mlogit} in not installed, a series of binary regressions using \code{glm()} will be run instead, with estimated propensities normalized to sum to 1. These are the only three links allowed for multinomial treatments at this time. (These methods can fail to converge, yielding errors that may seem foreign.) For continuous treatments, the generalized propensity score is estimated using linear regression with a normal density, but other families and links are allowed, such as poisson for count data, using the \code{family} and \code{link} arguments. An additional argument, \code{num.formula}, may be specified, containing the stabilization variables on the right hand side. For all treatment types except multinomial treatments with a Bayesian probit link, sampling weights are supported, but a warning message from \code{glm()} may appear.}
 
 \item{\code{"gbm"}}{\strong{Propensity score weighting using generalized boosted modeling.} This method, which can also be requested as \code{"gbr"} or \code{"twang"}, uses functions from the \pkg{twang} package to perform generalized boosted modeling to estimate propensity scores that yield balance on the requested covariates. For binary treatments, \code{ps()} is used, and the ATE, ATT, and ATC can be requested. For multinomial treatments, \code{mnps()} is used, and the ATE or ATT can be requested. For both, the \code{weightit()} argument \code{s.weights} corresponds to the \code{ps()} and \code{mnps()} argument \code{sampw}. The \code{weightit()} argument \code{focal} corresponds to the \code{mnps()} argument \code{treatATT}. For both, a single stop method must be supplied to \code{stop.method}; only one can be entered at a time. The other arguments to \code{ps()} and \code{mnps} can be specified in the call to \code{weightit()}. See \code{\link[twang]{ps}} and \code{\link[twang]{mnps}} for details.}
 
@@ -80,7 +80,7 @@ The primary purpose of \code{weightit()} is as a dispatcher to other functions i
 
 \item{\code{"ebal"}}{\strong{Entropy balancing.} This method uses the \code{ebalance()} function from the \pkg{ebal} package to estimate weights. It works with binary and multinomial treatments. For binary treatments, the ATE, ATT, and ATC can be requested. For multinomial treatments, the ATE and ATT can be requested. If the ATT is requetsed with a mutlinomial treatment, one treatment level must be entered to \code{focal} to serve as the "treated". Sampling weights are supported and are automatically entered into \code{base.weight} in \code{ebal()}. When \code{stabilize = TRUE}, \code{ebalance.trim()} is used to trim and reduce the variance of the weights. The other arguments to \code{ebalance()} can be specified in the call to \code{weightit()}. See \code{\link[ebal]{ebalance}} for details.}
 
-\item{\code{"sbw"}}{\strong{Stable balancing weights.}. This method uses the \code{sbw()} function from the \pkg{sbw} package to estimate weights. For binary treatments, the ATE, ATT, and ATC can be requested. For multinomial treatments, the ATE and ATT can be requested. If the ATT is requetsed with a mutlinomial treatment, one treatment level must be entered to \code{focal} to serve as the "treated". Sampling weights are not supported. The other arguments to \code{sbw()} can be specified in the call to \code{weightit()}. See \code{sbw} for details. There are some slight difference between the default options in \code{weightit()} and \code{sbw()}; importantly, in \code{weightit()} when \code{bal_tols_sd} is \code{TRUE} (the default), the standardized mean difference is not used for categorical variables, and the demoninator of the standardized mean difference corresponds to the standard deviation of the target group (e.g., for the ATT, the denominator is the standard deviation of the treated group).}
+\item{\code{"sbw"}}{\strong{Stable balancing weights.} This method uses the \code{sbw()} function from the \pkg{sbw} package to estimate weights. For binary treatments, the ATE, ATT, and ATC can be requested. For multinomial treatments, the ATE and ATT can be requested. If the ATT is requested with a multinomial treatment, one treatment level must be entered to \code{focal} to serve as the "treated". Sampling weights are not supported. The other arguments to \code{sbw()} can be specified in the call to \code{weightit()}. See \code{sbw} for details. There are some slight difference between the default options in \code{weightit()} and \code{sbw()}; importantly, in \code{weightit()} when \code{bal_tols_sd} is \code{TRUE} (the default), the standardized mean difference is not used for categorical variables, and the demoninator of the standardized mean difference corresponds to the standard deviation of the target group (e.g., for the ATT, the denominator is the standard deviation of the treated group).}
 
 \item{\code{"ebcw"}}{\strong{Empirical balancing calibration weighting.} This method uses the \code{ATE()} function from the \pkg{ATE} package to estimate weights. It works with binary and multinomial treatments. For binary treatments, the ATE, ATT, and ATC can be requested. For multinomial treatments, only the ATE can be requested. Sampling weights are not supported. The other arguments to \code{ATE()} can be specified in the call to \code{weightit()}. See \code{\link[ATE]{ATE}} for details.}
 }
@@ -166,20 +166,20 @@ data("lalonde", package = "cobalt")
                 nodegree + re74, data = lalonde,
                 method = "ps", estimand = "ATT"))
 summary(W1)
-#bal.tab(W1)
+bal.tab(W1)
 
-#Balancing covariates among races (3-level)
+#Balancing covariates with respect to re75 (continuous)
 (W2 <- weightit(race ~ age + educ + married +
                 nodegree + re74, data = lalonde,
                 method = "ebal", estimand = "ATE"))
 summary(W2)
-#bal.tab(W2)
+bal.tab(W2)
 
-#Balancing covariates with respect to re78 (continuous)
+\dontrun{
+#Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
                 nodegree + re74, data = lalonde,
                 method = "cbps", over = FALSE))
 summary(W3)
-#bal.tab(W3)
-
-}
+bal.tab(W3)
+}}

@@ -1,5 +1,14 @@
 WeightIt News and Updates
 ======
+
+Version 0.3.1
+
+* Edits to code and help files to protect against missing `CBPS` package.
+
+* Corrected sampling weights functionality so they work correctly. Also expanded sampling weights to be able to be used with all methods, including those that do not natively allow for sampling weights (e.g., `sbw` and `ATE`)
+
+* Minor bug fixes and spelling corrections.
+
 Version 0.3.0
 
 * Added `weightitMSM()` function (and supporting `print()` and `summary()` functions) to estimate weights for marginal structural models with time-varying treatments and covariates.
@@ -8,7 +17,7 @@ Version 0.3.0
 
 Version 0.2.0
 
-* Added `method = "sbw"` for stabilized balancing weights
+* Added `method = "sbw"` for stable balancing weights
 
 * Allowed for estimation of multinomial propensity scores using multiple binary regressions if `mlogit` is not installed
 
