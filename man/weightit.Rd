@@ -4,9 +4,18 @@
 \alias{print.weightit}
 \title{Generate Balancing Weights}
 \usage{
-weightit(formula, data, method, estimand = "ATE",
-         stabilize = FALSE, focal = NULL, exact = NULL,
-         s.weights = NULL, ps = NULL, verbose = FALSE,
+weightit(formula,
+         data,
+         method = "ps",
+         estimand = "ATE",
+         stabilize = FALSE,
+         focal = NULL,
+         exact = NULL,
+         s.weights = NULL,
+         ps = NULL,
+         moments = 1,
+         int = FALSE,
+         verbose = FALSE,
          ...)
 
 \method{print}{weightit}(x, ...)
@@ -42,6 +51,12 @@ A vector of sampling weights or the name of a variable in \code{data} that conta
 }
   \item{ps}{
 A vector of propensity scores or the name of a variable in \code{data} containing propensity scores. If not \code{NULL}, \code{method} is ignored, and the propensity scores will be used to create weights. \code{formula} must include the treatment variable in \code{data}, but the listed covariates will play no role in the weight estimation.
+}
+  \item{moments}{
+\code{numeric}; for entropy balancing, empirical balancing callibration weights, and stable balancing weights, the greatest moment of the covariate distribution to be balanced. For example, if \code{moments = 3}, for all non-categorical covariates, the mean, second moment (variance), and third moments (skew) of the covariates will be balanced. This argument is ignored for other methods; to balance powers of the covariates, appropriate functions must be entered in \code{formula}.
+}
+  \item{int}{
+\code{logical}; for entropy balancing, empirical balancing callibration weights, and stable balancing weights, whether first-order interactons of the covariates are to be balanced (essentially balancing the covariances between covariates). This argument is ignored for other methods; to balance interactions between the variables, appropriate functions must be entered in \code{formula}.
 }
   \item{verbose}{
 whether to print additional information output by the fitting function.
@@ -175,11 +190,10 @@ bal.tab(W1)
 summary(W2)
 bal.tab(W2)
 
-\dontrun{
 #Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
                 nodegree + re74, data = lalonde,
                 method = "cbps", over = FALSE))
 summary(W3)
 bal.tab(W3)
-}}
+}

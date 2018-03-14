@@ -1,10 +1,10 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-\#WeightIt
+# WeightIt
 
-[![CRAN\_Status\_Badge](http://r-pkg.org/badges/version-last-release/WeightIt)](https://cran.r-project.org/package=WeightIt)
-[![CRAN\_Downloads\_Badge](http://cranlogs.r-pkg.org/badges/Month/WeightIt)](https://cran.r-project.org/package=WeightIt)
+[![CRAN\_Status\_Badge](http://r-pkg.org/badges/version-last-release/WeightIt?color=0047ab)](https://cran.r-project.org/package=WeightIt)
+[![CRAN\_Downloads\_Badge](http://cranlogs.r-pkg.org/badges/WeightIt?color=0047ab)](https://cran.r-project.org/package=WeightIt)
 
 `WeightIt` is a one-stop package to generate balancing weights for point
 and longitudinal treatments in observational studies. Contained within
@@ -44,7 +44,7 @@ print(W)
      - sampling weights: none
      - treatment: 2-category
      - estimand: ATE
-     - covariates: age, educ, race, married, nodegree, re74, re75
+     - covariates: age, educ, nodegree, married, race, re74, re75
 
 Evaluating weights has two components: evaluating the covariate balance
 produces by the weights, and evaluating whether the weights will allow
@@ -68,11 +68,11 @@ Balance Measures:
 prop.score  Distance  1.7569   0.1360
 age          Contin. -0.2419  -0.1676
 educ         Contin.  0.0448   0.1296
+nodegree      Binary  0.1114  -0.0547
+married       Binary -0.3236  -0.0944
 race_black    Binary  0.6404   0.0499
 race_hispan   Binary -0.0827   0.0047
 race_white    Binary -0.5577  -0.0546
-married       Binary -0.3236  -0.0944
-nodegree      Binary  0.1114  -0.0547
 re74         Contin. -0.5958  -0.2740
 re75         Contin. -0.2870  -0.1579
 
@@ -143,6 +143,6 @@ packages.
 | \-              | Covariate Balancing PS (`"cbps"`)                                  | `CBPS()`     | `CBPS`   |
 | \-              | Non-Parametric Covariate Balancing PS (`"npcbps"`)                 | `npCBPS()`   | `CBPS`   |
 
-If you would like to see your package integrated into `WeightIt`, or for
-any other questions or comments about `WeightIt`, please contact Noah
-Greifer at <noah.greifer@gmail.com>.
+If you would like to see your package or method integrated into
+`WeightIt`, or for any other questions or comments about `WeightIt`,
+please contact Noah Greifer at <noah.greifer@gmail.com>.
