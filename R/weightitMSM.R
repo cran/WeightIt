@@ -1,200 +1,223 @@
-weightitMSM <- function(formula.list, data, method = "ps", stabilize = FALSE, exact = NULL, s.weights = NULL,
-                        num.formula = NULL, moments = 1L, int = FALSE, verbose = FALSE, ...) {
+weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FALSE, exact = NULL, s.weights = NULL,
+                        num.formula = NULL, moments = 1L, int = FALSE,
+                        verbose = FALSE, ...) {
 
   A <- list(...)
+  A[["estimand"]] <- NULL
   estimand <- "ATE"
-
-  n <- nrow(data)
-
-  #Process s.weights
-  if (length(s.weights) > 0) {
-    if (!(is.character(s.weights) && length(s.weights) == 1) && !is.numeric(s.weights)) {
-      stop("The argument to s.weights must be a vector or data frame of sampling weights or the (quoted) names of variables in data that contain sampling weights.", call. = FALSE)
-    }
-    if (is.character(s.weights) && length(s.weights)==1) {
-      if (s.weights %in% names(data)) {
-        s.weights <- data[[s.weights]]
-      }
-      else stop("The name supplied to s.weights is not the name of a variable in data.", call. = FALSE)
-    }
-    s.weights.specified <- TRUE
-  }
-  else {
-    s.weights.specified <- FALSE
-    s.weights <- rep(1, n)
-  }
 
   call <- match.call()
 
-  treat.type.vec <- character(length(formula.list))
-  covs.list <- treat.list <- w.list <- ps.list <- vector("list", length(formula.list))
-  for (i in seq_along(formula.list)) {
-    #Process treat and covs from formula and data
-    tt <- terms(formula.list[[i]])
-    attr(tt, "intercept") <- 0
-    if (is.na(match(all.vars(tt[[2]]), names(data)))) {
-      stop(paste0("The given response variable, \"", all.vars(tt[[2]]), "\", is not a variable in data."))
-    }
-    vars.mentioned <- all.vars(tt)
-    tryCatch({mf <- model.frame(tt, data, na.action = na.pass)}, error = function(e) {
-      stop(paste0(c("All variables of formula ", i, " in formula.list must be variables in data.\nVariables not in data: ",
-                    paste(vars.mentioned[is.na(match(vars.mentioned, names(data)))], collapse=", "))), call. = FALSE)})
+  ## Checks and processing ----
 
-    treat.list[[i]] <- model.response(mf)
-    names(treat.list)[i] <- all.vars(tt[[2]])
-    covs.list[[i]] <- data[!is.na(match(names(data), vars.mentioned[vars.mentioned != all.vars(tt[[2]])]))]
+  #Checks
 
-    if (any(is.na(covs.list[[i]]))) {
-      stop("No missing values are allowed in the covariates.", call. = FALSE)
-    }
-    if (any(is.na(treat.list[[i]]))) {
-      stop(paste0("No missing values are allowed in the treatment variable. Missing values found in ", names(treat.list[i])), call. = FALSE)
-    }
+  ##Process method
+  bad.method <- FALSE
+  acceptable.methods <- c("ps",
+                          "gbm", "twang", "gbr",
+                          "cbps",
+                          "npcbps",
+                          "ebal", "entropy", "ebalance",
+                          "sbw",
+                          "ebcw", "ate")
 
-    #Get weights into a list
-    weightit_obj <- weightit(formula.list[[i]],
-                             data = data,
-                             method = method,
-                             estimand = estimand,
-                             stabilize = FALSE,
-                             exact = exact,
-                             s.weights = s.weights,
-                             verbose = verbose,
-                             moments = moments,
-                             int = int, ...)
-    w.list[[i]] <- cobalt::get.w(weightit_obj)
-    if (length(weightit_obj$ps) > 0) ps.list[[i]] <- weightit_obj$ps
-    treat.type.vec[i] <- weightit_obj$treat.type
-  }
+  if (is_null(method) || length(method) > 1) bad.method <- TRUE
+  else if (!is.character(method)) bad.method <- TRUE
+  else if (tolower(method) %nin% acceptable.methods) bad.method <- TRUE
 
-  w <- Reduce("*", w.list)
+  if (bad.method) stop("method must be a string of length 1 containing the name of an acceptable weighting method.", call. = FALSE)
+  method <- method.to.proper.method(tolower(method))
 
-  if (length(num.formula) > 0) {
+  #Process moments and int
+  moments.int <- check.moments.int(method, moments, int)
+  moments <- moments.int["moments"]; int <- moments.int["int"]
+
+  s.weights <- process.s.weights(s.weights, data)
+
+  if (is_not_null(num.formula)) {
     if (!stabilize) {
       message("Setting stabilize to TRUE based on num.formula input.")
     }
     stabilize <- TRUE
   }
   if (stabilize) {
-    stabilization.formula.list <- sw.list <- vector("list", length(formula.list))
-    if (length(num.formula) > 0) {
-      bad.num.formula <- FALSE
-      if (is.list(num.formula)) {
-        if (!all(sapply(num.formula, is.formula, sides = 2)) || length(num.formula) != length(formula.list)) {
-          bad.num.formula <- TRUE
-        }
-        else if (!all(sapply(seq_along(num.formula), function(i) all.vars(num.formula[[i]][[2]]) == names(treat.list)[i]))) {
-          stop("The response variable in each formula in num.formula must be the treatment variable at the same time point.", call. = FALSE)
-        }
-        else {
-          for (i in seq_along(num.formula)) {
-            tt <- terms(num.formula[[i]])
-            attr(tt, "intercept") <- 0
-            if (is.na(match(all.vars(tt[[2]]), names(data)))) {
-              stop(paste0("The given response variable of formula ", i, " in num.formula, \"", all.vars(tt[[2]]), "\", is not a variable in data."))
-            }
-            vars.mentioned <- all.vars(tt)
-            tryCatch({mf <- model.frame(tt, data)}, error = function(e) {
-              stop(paste0(c("All variables of formula ", i, " in num.formula must be variables in data.\nVariables not in data: ",
-                            paste(vars.mentioned[is.na(match(vars.mentioned, names(data)))], collapse=", "))), call. = FALSE)})
-          }
-          stabilization.formula.list <- num.formula
-        }
-      }
-      else if (is.formula(num.formula)) {
+    if (is_not_null(num.formula)) {
+      if (is.formula(num.formula)) {
         if (is.formula(num.formula, sides = 1)) {
-          if (!all(all.vars(num.formula) %in% names(data))) {
-            stop(paste0(c("All variables in num.formula must be variables in data.\nVariables not in data: ",
-                          paste(all.vars(num.formula)[is.na(match(all.vars(num.formula), names(data)))], collapse=", "))), call. = FALSE)
-          }
-          else {
-            for (i in seq_along(formula.list)) {
-              if (i == 1) {
-                stabilization.formula.list[[i]] <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")), as.formula(paste(paste(num.formula, collapse = ""), "+ .")))
-              }
-              else {
-                stabilization.formula.list[[i]] <- update.formula(as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * "))), as.formula(paste(num.formula, "+ .")))
-              }
-            }
+          rhs.vars.mentioned.lang <- attr(terms(num.formula), "variables")[-1]
+          rhs.vars.mentioned <- sapply(rhs.vars.mentioned.lang, deparse)
+          rhs.vars.failed <- sapply(rhs.vars.mentioned.lang, function(v) {
+            null.or.error(try(eval(v, c(data, .GlobalEnv)), silent = TRUE))
+          })
+
+          if (any(rhs.vars.failed)) {
+            stop(paste0(c("All variables in formula must be variables in data or objects in the global environment.\nMissing variables: ",
+                          paste(rhs.vars.mentioned[rhs.vars.failed], collapse=", "))), call. = FALSE)
           }
         }
         else {
-          stop("The argument to num.formula must have rigt hand side variables but not a response variable (e.g., ~ V1 + V2).", call. = FALSE)
+          stop("The argument to num.formula must have right hand side variables but not a response variable (e.g., ~ V1 + V2).", call. = FALSE)
         }
       }
       else {
-        bad.num.formula <- TRUE
-      }
-
-      if (bad.num.formula) {
-        stop("The argument to num.formula must be a list of stabilization formulas for each time point or a single formula with no response variable and with the stabilization factors on the right hand side.", call. = FALSE)
+        stop("The argument to num.formula must be a single formula with no response variable and with the stabilization factors on the right hand side.", call. = FALSE)
       }
     }
-    else {
-      for (i in seq_along(formula.list)) {
+  }
+
+  reported.covs.list <- covs.list <- treat.list <- w.list <- ps.list <-
+    stabout <- sw.list <- vector("list", length(formula.list))
+
+  for (i in seq_along(formula.list)) {
+
+    #Process treat and covs from formula and data
+    t.c <- get.covs.and.treat.from.formula(formula.list[[i]], data)
+    reported.covs.list[[i]] <- t.c[["reported.covs"]]
+    covs.list[[i]] <- t.c[["model.covs"]]
+    treat.list[[i]] <- t.c[["treat"]]
+    treat.name <- t.c[["treat.name"]]
+    names(treat.list)[i] <- treat.name
+
+    if (is_null(covs.list[[i]])) stop("No covariates were specified in the ", ordinal(i), " formula.", call. = FALSE)
+    if (is_null(treat.list[[i]])) stop("No treatment variable was specified in the ", ordinal(i), " formula.", call. = FALSE)
+
+    n <- length(treat.list[[i]])
+
+    if (any(is.na(reported.covs.list[[i]])) || nrow(reported.covs.list[[i]]) != n) {
+      warning("Missing values are present in the covariates. See ?weightit for information on how these are handled.", call. = FALSE)
+      #stop("No missing values are allowed in the covariates.", call. = FALSE)
+    }
+    if (any(is.na(treat.list[[i]]))) {
+      stop(paste0("No missing values are allowed in the treatment variable. Missing values found in ", treat.name, "."), call. = FALSE)
+    }
+
+    treat.list[[i]] <- get.treat.type(treat.list[[i]])
+    treat.type <- attr(treat.list[[i]], "treat.type")
+
+    #Recreate data and formula
+    # w.data <- data.frame(treat.list[[i]], covs.list[[i]])
+    # w.formula <- formula(w.data)
+
+    processed.exact <- process.exact(exact = exact, data = data,
+                                       treat = treat.list[[i]],
+                                       treat.name = treat.name)
+
+    if (is_null(s.weights)) s.weights_i <- rep(1, n)
+
+    ## Running models ----
+
+    if (verbose) eval.verbose <- base::eval
+    else eval.verbose <- utils::capture.output
+
+    eval.verbose({
+      #Returns weights (w) and propensty score (ps)
+      obj <- do.call("weightit.fit", c(list(covs = covs.list[[i]],
+                                            treat = treat.list[[i]],
+                                            treat.type = treat.type,
+                                            s.weights = s.weights_i,
+                                            exact.factor = processed.exact[["exact.factor"]],
+                                            estimand = estimand,
+                                            focal = NULL,
+                                            stabilize = FALSE,
+                                            method = method,
+                                            moments = moments,
+                                            int = int,
+                                            ps = NULL), A))
+    })
+    w.list[[i]] <- obj[["w"]]
+    ps.list[[i]] <- obj[["ps"]]
+
+    if (stabilize) {
+      #Process sabilization formulas and get stab weights
+      if (is.formula(num.formula)) {
         if (i == 1) {
-          stabilization.formula.list[[i]] <- as.formula(paste(names(treat.list)[i], "~ 1"))
+          stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")), as.formula(paste(paste(num.formula, collapse = ""), "+ .")))
         }
         else {
-          stabilization.formula.list[[i]] <- as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * ")))
+          stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * "))), as.formula(paste(num.formula, "+ .")))
         }
       }
-    }
-    for (i in seq_along(formula.list)) {
+      else {
+        if (i == 1) {
+          stab.f <- as.formula(paste(names(treat.list)[i], "~ 1"))
+        }
+        else {
+          stab.f <- as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * ")))
+        }
+      }
+      stab.t.c_i <- get.covs.and.treat.from.formula(stab.f, data)
+      stab.covs_i <- stab.t.c_i[["model.covs"]]
 
-      sw_obj <- weightit(stabilization.formula.list[[i]],
-                         data = data,
-                         method = "ps",
-                         estimand = estimand,
-                         stabilize = FALSE,
-                         exact = exact,
-                         s.weights = s.weights,
-                         verbose = verbose,
-                         ...)
-      sw.list[[i]] <- 1/cobalt::get.w(sw_obj)
+      eval.verbose({
+        sw_obj <- do.call("weightit.fit", c(list(covs = stab.covs_i,
+                                                 treat = treat.list[[i]],
+                                                 treat.type = treat.type,
+                                                 s.weights = s.weights_i,
+                                                 exact.factor = processed.exact[["exact.factor"]],
+                                                 estimand = estimand,
+                                                 focal = NULL,
+                                                 stabilize = FALSE,
+                                                 method = "ps",
+                                                 moments = NULL,
+                                                 int = FALSE,
+                                                 ps = NULL), A))
+      })
+      sw.list[[i]] <- 1/sw_obj[["w"]]
+      stabout[[i]] <- stab.f[-2]
 
     }
+
+  }
+
+  w <- Reduce("*", w.list)
+
+  if (stabilize) {
     sw <- Reduce("*", sw.list)
     w <- w*sw
 
-    stabout <- lapply(stabilization.formula.list, function(x) x[-2])
     unique.stabout <- unique(stabout)
     if (length(unique.stabout) <= 1) stabout <- unique.stabout
   }
   else stabout <- NULL
 
-  #if (nunique(treat.type.vec) == 1) treat.type.vec <- unique(treat.type.vec)
+  if (all_the_same(w)) stop(paste0("All weights are ", w[1], "."), call. = FALSE)
+  if (all(sapply(ps.list, is_null))) ps.list <- NULL
 
   ## Assemble output object----
   out <- list(weights = w,
               treat.list = treat.list,
-              covs.list = covs.list,
-              data = data,
+              covs.list = reported.covs.list,
+              #data = data,
               estimand = estimand,
               method = method,
               ps.list = ps.list,
               s.weights = s.weights,
               #discarded = NULL,
-              treat.type = treat.type.vec,
+              exact = processed.exact[["exact.components"]],
               call = call,
               stabilization = stabout
   )
+
   class(out) <- c("weightitMSM", "weightit")
 
   return(out)
+  ####----
 }
 
 print.weightitMSM <- function(x, ...) {
+  treat.types <- sapply(x[["treat.list"]], function(y) attr(y, "treat.type"))
+  trim <- attr(x[["weights"]], "trim")
+
   cat("A weightitMSM object\n")
-  cat(paste0(" - method: \"", x$method, "\" (", method.to.phrase(x$method), ")\n"))
-  cat(paste0(" - number of obs.: ", length(x$weights), "\n"))
-  cat(paste0(" - sampling weights: ", ifelse(max(x$s.weights) - min(x$s.weights) < sqrt(.Machine$double.eps),
-                                             "none", "present"), "\n"))
-  cat(paste0(" - number of time points: ", length(x$treat.list), " (", paste(names(x$treat.list), collapse = ", "), ")\n"))
+  cat(paste0(" - method: \"", x[["method"]], "\" (", method.to.phrase(x[["method"]]), ")\n"))
+  cat(paste0(" - number of obs.: ", length(x[["weights"]]), "\n"))
+  cat(paste0(" - sampling weights: ", ifelse(all_the_same(x[["s.weights"]]), "none", "present"), "\n"))
+  cat(paste0(" - number of time points: ", length(x[["treat.list"]]), " (", paste(names(x[["treat.list"]]), collapse = ", "), ")\n"))
   cat(paste0(" - treatment: \n",
              paste0(sapply(1:length(x$covs.list), function(i) {
 
-               paste0("    + time ", i, ": ", ifelse(x$treat.type[i] == "continuous", "continuous", paste0(nunique(x$treat.list[[i]]), "-category", ifelse(x$treat.type[i] == "multinomial", paste0(" (", paste(levels(x$treat.list[[i]]), collapse = ", "), ")"), ""))), "\n")
+               paste0("    + time ", i, ": ", ifelse(treat.types[i] == "continuous", "continuous", paste0(nunique(x[["treat.list"]][[i]]), "-category", ifelse(treat.types[i] == "multinomial", paste0(" (", paste(levels(x[["treat.list"]][[i]]), collapse = ", "), ")"), ""))), "\n")
 
              }), collapse = ""), collapse = "\n"))
   cat(paste0(" - covariates: \n",
@@ -206,32 +229,53 @@ print.weightitMSM <- function(x, ...) {
                  paste0("    + after time ", i-1, ": ", paste(names(x$covs.list[[i]])[!names(x$covs.list[[i]]) %in% c(names(x$treat.list)[i-1], names(x$covs.list[[i-1]]))], collapse = ", "), "\n")
                }
              }), collapse = ""), collapse = "\n"))
-  if (length(x$stabilization) > 0) cat(paste0(" - stabilization factors: ", if (length(x$stabilization) == 1) paste0(all.vars(x$stabilization[[1]]), collapse = ", ")
-                                              else {
-                                                paste0("\n", sapply(1:length(x$stabilization), function(i) {
-                                                  if (i == 1) {
-                                                    paste0("    + baseline: ", paste(all.vars(x$stabilization[[i]]), collapse = ", "))
-                                                  }
-                                                  else {
-                                                    paste0("    + after time ", i-1, ": ", paste(all.vars(x$stabilization[[i]]), collapse = ", "))
-                                                  }
-                                                }), collapse = "")
-                                              }))
+  if (is_not_null(x[["exact"]])) {
+    cat(paste0(" - exact: ", paste(names(x[["exact"]]), collapse = ", "), "\n"))
+  }
+  if (is_not_null(x$stabilization)) {
+    cat(" - stabilized")
+    if (any(sapply(x$stabilization, function(s) is_not_null(all.vars(s))))) {
+      cat(paste0("; stabilization factors:\n", if (length(x$stabilization) == 1) paste0("      ", paste0(attr(terms(x[["stabilization"]][[1]]), "term.labels"), collapse = ", "))
+                 else {
+                   paste0("\n", sapply(1:length(x$stabilization), function(i) {
+                     if (i == 1) {
+                       paste0("    + baseline: ", paste(attr(terms(x[["stabilization"]][[i]]), "term.labels"), collapse = ", "))
+                     }
+                     else {
+                       paste0("    + after time ", i-1, ": ", paste(attr(terms(x[["stabilization"]][[i]]), "term.labels"), collapse = ", "))
+                     }
+                   }), collapse = "")
+                 }))
+    }
+  }
+
+  if (is_not_null(trim)) {
+    if (trim < 1) {
+      if (attr(x[["weights"]], "trim.lower")) trim <- c(1 - trim, trim)
+      cat(paste(" - weights trimmed at", word.list(paste0(round(100*trim, 2), "%")), "\n"))
+    }
+    else {
+      if (attr(x[["weights"]], "trim.lower")) t.b <- "top and bottom" else t.b <- "top"
+      cat(paste(" - weights trimmed at the", t.b, trim, "\n"))
+    }
+  }
   invisible(x)
 }
 summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
   outnames <- c("weight.range", "weight.top","weight.ratio",
-                "coef.of.var",
+                "coef.of.var", "weight.mean",
                 "effective.sample.size")
   out.list <- setNames(vector("list", length(object$treat.list)),
                        names(object$treat.list))
 
-  if (ignore.s.weights) sw <- rep(1, length(object$weights))
+  if (ignore.s.weights || is_null(object$s.weights)) sw <- rep(1, length(object$weights))
   else sw <- object$s.weights
   w <- object$weights*sw
+  treat.types <- sapply(object[["treat.list"]], function(y) attr(y, "treat.type"))
+  stabilized <- is_not_null(object[["stabilization"]])
 
   for (ti in seq_along(object$treat.list)) {
-    if (object$treat.type[ti] == "continuous") {
+    if (treat.types[ti] == "continuous") {
       out <- setNames(vector("list", length(outnames)), outnames)
       out$weight.range <- list(all = c(min(w[w > 0]),
                                        max(w[w > 0])))
@@ -239,6 +283,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       top.weights <- sort(w, decreasing = TRUE)[seq_len(top)]
       out$weight.top <- list(all = sort(setNames(top.weights, which(w %in% top.weights)[seq_len(top)])))
       out$coef.of.var <- c(all = sd(w)/mean(w))
+      out$weight.mean <- if (stabilized) mean(w) else NULL
 
       nn <- as.data.frame(matrix(0, ncol = 1, nrow = 2))
       nn[1, ] <- (sum(sw)^2)/sum(sw^2)
@@ -250,7 +295,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       out.list[[ti]] <- out
 
     }
-    else if (object$treat.type[ti] == "binary") {
+    else if (treat.types[ti] == "binary") {
       out <- setNames(vector("list", length(outnames)), outnames)
       t <- object$treat.list[[ti]]
       out$weight.range <- list(treated = c(min(w[w > 0 & t == 1]),
@@ -267,6 +312,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       out$coef.of.var <- c(treated = sd(w[t==1])/mean(w[t==1]),
                            control = sd(w[t==0])/mean(w[t==0]),
                            overall = sd(w)/mean(w))
+      out$weight.mean <- if (stabilized) mean(w) else NULL
 
       #dc <- weightit$discarded
 
@@ -283,7 +329,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       out.list[[ti]] <- out
 
     }
-    else if (object$treat.type[ti] == "multinomial") {
+    else if (treat.types[ti] == "multinomial") {
 
       out <- setNames(vector("list", length(outnames)), outnames)
       t <- object$treat.list[[ti]]
@@ -299,6 +345,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
                                  names(top.weights))
       out$coef.of.var <- c(sapply(levels(t), function(x) sd(w[t==x])/mean(w[t==x])),
                            overall = sd(w)/mean(w))
+      out$weight.mean <- if (stabilized) mean(w) else NULL
 
       nn <- as.data.frame(matrix(0, nrow = 2, ncol = nunique(t)))
       for (i in seq_len(nunique(t))) {
@@ -311,7 +358,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       out$effective.sample.size <- nn
       out.list[[ti]] <- out
     }
-    else if (object$treat.type[ti] == "ordinal") {
+    else if (treat.types[ti] == "ordinal") {
       warning("Sneaky, sneaky! Ordinal coming soon :)", call. = FALSE)
     }
   }
@@ -327,9 +374,9 @@ print.summary.weightitMSM <- function(x, ...) {
 
   cat("Summary of weights:\n\n")
   for (ti in seq_along(x)) {
-    if (!only.one) cat(paste0(" - - - - - - - - - - Time ", ti, " - - - - - - - - - -\n"))
+    if (!only.one) cat(paste(" - - - - - - - - - - Time", ti, "- - - - - - - - - -\n"))
     cat("- Weight ranges:\n")
-    print.data.frame(round_df(text.box.plot(x[[ti]]$weight.range, 28), 4))
+    print.data.frame(round_df_char(text.box.plot(x[[ti]]$weight.range, 28), 4))
 
     df <- setNames(data.frame(do.call("c", lapply(names(x[[ti]]$weight.top), function(y) c(" ", y))),
                               matrix(do.call("c", lapply(x[[ti]]$weight.top, function(y) c(names(y), round(y, 4)))),
@@ -338,11 +385,14 @@ print.summary.weightitMSM <- function(x, ...) {
     cat(paste("\n- Units with", length(x[[ti]]$weight.top[[1]]), "greatest weights by group:\n"))
     print.data.frame(df, row.names = FALSE)
     cat("\n")
-    print.data.frame(as.data.frame(round(matrix(c(x[[ti]]$weight.ratio, x[[ti]]$coef.of.var), ncol = 2,
+    print.data.frame(round_df_char(as.data.frame(matrix(c(x[[ti]]$weight.ratio, x[[ti]]$coef.of.var), ncol = 2,
                                                 dimnames = list(names(x[[ti]]$weight.ratio),
-                                                                c("Ratio", "Coef of Var"))), 4)))
+                                                                c("Ratio", "Coef of Var")))), 4))
+
+    if (is_not_null(x[[ti]][["weight.mean"]])) cat("\n- Mean of Weights =", round(x[[ti]][["weight.mean"]], 4), "\n")
+
     cat("\n- Effective Sample Sizes:\n")
-    print.data.frame(round(x[[ti]]$effective.sample.size, 3))
+    print.data.frame(round_df_char(x[[ti]]$effective.sample.size, 3))
     cat("\n")
     if (only.one) break
   }

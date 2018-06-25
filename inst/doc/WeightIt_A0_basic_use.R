@@ -30,7 +30,7 @@ summary(W.out)
 ## ------------------------------------------------------------------------
 bal.tab(W.out, m.threshold = .1, disp.v.ratio = TRUE)
 
-## ------------------------------------------------------------------------
+## ---- message=FALSE------------------------------------------------------
 library("survey")
 d.w <- svydesign(ids = ~1, weights = get.w(W.out),
                      data = lalonde)
@@ -43,7 +43,7 @@ library("jtools")
 summ(fit, confint = TRUE, model.info = FALSE, 
      model.fit = FALSE) 
 
-## ------------------------------------------------------------------------
+## ---- warning=FALSE, message=FALSE---------------------------------------
 #Bootstrapping
 library("boot")
 est.fun <- function(data, index) {
@@ -79,7 +79,7 @@ summary(Wmsm.out)
 ## ------------------------------------------------------------------------
 bal.tab(Wmsm.out, m.threshold = .1, disp.v.ratio = TRUE, which.time = NA)
 
-## ------------------------------------------------------------------------
+## ---- message=FALSE------------------------------------------------------
 library("survey")
 d.w.msm <- svydesign(ids = ~1, weights = get.w(Wmsm.out),
                      data = iptwExWide)
