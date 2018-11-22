@@ -1,4 +1,5 @@
 method.to.proper.method <- function(method) {
+  method <- tolower(method)
   if (method %in% c("ps")) return("ps")
   else if (method %in% c("gbm", "gbr", "twang")) return("gbm")
   else if (method %in% c("cbps")) return("cbps")
@@ -6,17 +7,39 @@ method.to.proper.method <- function(method) {
   else if (method %in% c("entropy", "ebal", "ebalance")) return("ebal")
   else if (method %in% c("sbw")) return("sbw")
   else if (method %in% c("ebcw", "ate")) return("ebcw")
+  else if (method %in% c("optweight", "opt")) return("optweight")
+  else if (method %in% c("super", "superlearner")) return("super")
   else return(method)
 }
+check.user.method <- function(method) {
+  #Check to make sure it accepts treat and covs
+  if (all(c("covs", "treat") %in% names(formals(method)))) {
+    #attr(method, "is.MSM.method") <- FALSE
+  }
+  else if (all(c("covs.list", "treat.list") %in% names(formals(method)))) {
+    #attr(method, "is.MSM.method") <- TRUE
+  }
+  else {
+    stop("The user-provided function to method must contain \"covs\" and \"treat\" as named parameters.", call. = FALSE)
+  }
+  return(method)
+}
 method.to.phrase <- function(method) {
-  if (method %in% c("ps")) return("propensity score weighting")
-  else if (method %in% c("gbm", "gbr", "twang")) return("generalized boosted modeling")
-  else if (method %in% c("cbps")) return("covariate balancing propensity score weighting")
-  else if (method %in% c("npcbps")) return("non-parametric covariate balancing propensity score weighting")
-  else if (method %in% c("entropy", "ebal", "ebalance")) return("entropy balancing")
-  else if (method %in% c("sbw")) return("stable balancing weights")
-  else if (method %in% c("ebcw", "ate")) return("empirical balancing calibration weighting")
-  else return("the chosen method of weighting")
+
+  if (is.function(method)) return("a user-defined method")
+  else {
+    method <- tolower(method)
+    if (method %in% c("ps")) return("propensity score weighting")
+    else if (method %in% c("gbm", "gbr", "twang")) return("generalized boosted modeling")
+    else if (method %in% c("cbps")) return("covariate balancing propensity score weighting")
+    else if (method %in% c("npcbps")) return("non-parametric covariate balancing propensity score weighting")
+    else if (method %in% c("entropy", "ebal", "ebalance")) return("entropy balancing")
+    else if (method %in% c("sbw")) return("stable balancing weights")
+    else if (method %in% c("ebcw", "ate")) return("empirical balancing calibration weighting")
+    else if (method %in% c("optweight", "opt")) return("targeted stable balancing weights")
+    else if (method %in% c("super", "superlearner")) return("propensity score weighting with SuperLearner")
+    else return("the chosen method of weighting")
+  }
 }
 process.s.weights <- function(s.weights, data = NULL) {
   #Process s.weights
@@ -44,16 +67,21 @@ process.estimand <- function(estimand, method, treat.type) {
                            npcbps = c("ATE"),
                            ebal = c("ATT", "ATC", "ATE"),
                            sbw = c("ATT", "ATC", "ATE"),
-                           ebcw = c("ATT", "ATC", "ATE")),
+                           ebcw = c("ATT", "ATC", "ATE"),
+                           optweight = c("ATT", "ATC", "ATE"),
+                           super = c("ATT", "ATC", "ATE", "ATO", "ATM")),
              multinomial = list(ps = c("ATT", "ATE", "ATO"),
                                 gbm = c("ATT", "ATE"),
                                 cbps = c("ATT", "ATE"),
                                 npcbps = c("ATE"),
                                 ebal = c("ATT", "ATE"),
                                 sbw = c("ATT", "ATE"),
-                                ebcw = c("ATT", "ATE")))
+                                ebcw = c("ATT", "ATE"),
+                                optweight = c("ATT", "ATE"),
+                                super = c("ATT", "ATE")))
 
-  if (treat.type != "continuous" && toupper(estimand) %nin% AE[[treat.type]][[method]]) {
+  if (treat.type != "continuous" && !is.function(method) &&
+      toupper(estimand) %nin% AE[[treat.type]][[method]]) {
     stop(paste0("\"", estimand, "\" is not an allowable estimand for ", method.to.phrase(method),
                 " with ", treat.type, " treatments. Only ", word.list(AE[[treat.type]][[method]], quotes = TRUE, and.or = "and", is.are = TRUE),
                 " allowed."), call. = FALSE)
@@ -106,37 +134,37 @@ process.focal.and.estimand <- function(focal, estimand, treat, treat.type) {
               estimand = estimand,
               reported.estimand = reported.estimand))
 }
-process.exact <- function(exact, data, treat, treat.name = NULL) {
+process.by <- function(by, data, treat, treat.name = NULL) {
 
-  ##Process exact
-  bad.exact <- FALSE
-  acceptable.exacts <- names(data)
-  exact.vars <- character(0)
-  exact.components <- NULL
+  ##Process by
+  bad.by <- FALSE
+  acceptable.bys <- names(data)
+  by.vars <- character(0)
+  by.components <- NULL
   n <- length(treat)
 
-  if (missing(exact) || is_null(exact)) exact.factor <- factor(rep(1, n))
-  else if (!is.atomic(exact)) bad.exact <- TRUE
-  else if (is.character(exact) && all(exact %in% acceptable.exacts)) {
-    exact.components <- data[exact]
-    exact.factor <- factor(apply(exact.components, 1, paste, collapse = "|"))
-    exact.vars <- exact
+  if (missing(by) || is_null(by)) by.factor <- factor(rep(1, n))
+  else if (!is.atomic(by)) bad.by <- TRUE
+  else if (is.character(by) && all(by %in% acceptable.bys)) {
+    by.components <- data[by]
+    by.factor <- factor(apply(by.components, 1, paste, collapse = "|"))
+    by.vars <- by
   }
-  else if (length(exact) == n) {
-    exact.components <- setNames(data.frame(exact), deparse(substitute(exact)))
-    exact.factor <- factor(exact.components[[1]])
-    exact.vars <- acceptable.exacts[sapply(acceptable.exacts, function(x) equivalent.factors(exact, data[[x]]))]
+  else if (length(by) == n) {
+    by.components <- setNames(data.frame(by), deparse(substitute(by)))
+    by.factor <- factor(by.components[[1]])
+    by.vars <- acceptable.bys[vapply(acceptable.bys, function(x) equivalent.factors(by, data[[x]]), logical(1L))]
   }
-  else bad.exact <- TRUE
+  else bad.by <- TRUE
 
-  if (bad.exact) stop("exact must be the quoted names of variables in data for which weighting is to occur within strata or the variable itself.", call. = FALSE)
+  if (bad.by) stop("by must be the quoted names of variables in data for which weighting is to occur within strata or the variable itself.", call. = FALSE)
 
-  if (any(sapply(levels(exact.factor), function(x) nunique(treat) != nunique(treat[exact.factor == x])))) {
-    stop("Not all the groups formed by exact contain all treatment levels", if (is_not_null(treat.name)) paste("in", treat.name) else "", ". Consider coarsening exact.", call. = FALSE)
+  if (any(vapply(levels(by.factor), function(x) nunique(treat) != nunique(treat[by.factor == x]), logical(1L)))) {
+    stop("Not all the groups formed by by contain all treatment levels", if (is_not_null(treat.name)) paste("in", treat.name) else "", ". Consider coarsening by.", call. = FALSE)
   }
 
-  return(list(exact.components = exact.components,
-              exact.factor = exact.factor))
+  return(list(by.components = by.components,
+              by.factor = by.factor))
 }
 get.treat.type <- function(treat) {
   #Returns treat with treat.type attribute
@@ -158,23 +186,46 @@ get.treat.type <- function(treat) {
   return(treat)
 }
 check.moments.int <- function(method, moments, int) {
-  if (method %in% c("ebal", "ebcw", "sbw")) {
-    if (length(int) != 1 || !is.logical(int)) {
-      stop("int must be a logical (TRUE/FALSE) of length 1.", call. = FALSE)
+  if (!is.function(method)) {
+    if (method %in% c("ebal", "ebcw", "sbw", "optweight")) {
+      if (length(int) != 1 || !is.logical(int)) {
+        stop("int must be a logical (TRUE/FALSE) of length 1.", call. = FALSE)
+      }
+      if (length(moments) != 1 || !is.numeric(moments) ||
+          !check_if_zero(moments - round(moments)) ||
+          moments < 1) {
+        stop("moments must be a positive integer of length 1.", call. = FALSE)
+      }
     }
-    if (length(moments) != 1 || !is.numeric(moments) ||
-        !check_if_zero(moments - round(moments)) ||
-        moments < 1) {
-      stop("moments must be a positive integer of length 1.", call. = FALSE)
+    else if (any(mi0 <- c(as.integer(moments) != 1L, int))) {
+      warning(paste0(word.list(c("moments", "int")[mi0], and.or = "and", is.are = TRUE),
+                     " not compatible with ", method.to.phrase(method), ". Ignoring ", word.list(c("moments", "int")[mi0], and.or = "and"), "."), call. = FALSE)
+      moments <- 1
+      int <- FALSE
     }
-  }
-  else if (any(mi0 <- c(as.integer(moments) != 1L, int))) {
-    warning(paste0(word.list(c("moments", "int")[mi0], and.or = "and", is.are = TRUE),
-                   " not compatible with ", method.to.phrase(method), ". Ignoring ", word.list(c("moments", "int")[mi0], and.or = "and"), "."), call. = FALSE)
-    moments <- 1
-    int <- FALSE
   }
   return(c(moments = as.integer(moments), int = int))
+}
+check.MSM.method <- function(method, is.MSM.method) {
+  methods.with.MSM <- c("optweight")
+  if (is.function(method)) {
+    if (isTRUE(is.MSM.method)) stop("Currently, only user-defined methods that work with is.MSM.method = FALSE are allowed.", call. = FALSE)
+    is.MSM.method <- FALSE
+  }
+  else if (method %in% methods.with.MSM) {
+    if (is_null(is.MSM.method)) is.MSM.method <- TRUE
+    else if (!isTRUE(is.MSM.method)) {
+      message(paste0(method.to.phrase(method), " can be used with a single model when multiple time points are present.\nUsing a seperate model for each time point. To use a single model, set is.MSM.method to TRUE."))
+    }
+  }
+  else {
+    if (isTRUE(is.MSM.method)) warning(paste0(method.to.phrase(method), " cannot be used with a single model when multiple time points are present.\nUsing a seperate model for each time point."),
+                                       call. = FALSE, immediate. = TRUE)
+    is.MSM.method <- FALSE
+  }
+
+  return(is.MSM.method)
+
 }
 text.box.plot <- function(range.list, width = 12) {
   full.range <- range(unlist(range.list))
@@ -184,8 +235,8 @@ text.box.plot <- function(range.list, width = 12) {
   d <- as.data.frame(matrix(NA_character_, ncol = 3, nrow = length(range.list),
                             dimnames = list(names(range.list), c("Min", paste(rep(" ", width + 1), collapse = ""), "Max"))),
                      stringsAsFactors = FALSE)
-  d[,"Min"] <- sapply(range.list, function(x) x[1])
-  d[,"Max"] <- sapply(range.list, function(x) x[2])
+  d[,"Min"] <- vapply(range.list, function(x) x[1], numeric(1L))
+  d[,"Max"] <- vapply(range.list, function(x) x[2], numeric(1L))
   for (i in seq_len(nrow(d))) {
     spaces1 <- rescaled.range.list[[i]][1] - rescaled.full.range[1]
     #|
@@ -216,7 +267,10 @@ make.closer.to.1 <- function(x) {
     else return(x)
   }
 }
-remove.collinearity <- function(mat, with.intercept = TRUE) {
+make.full.rank <- function(mat, with.intercept = TRUE) {
+
+  if (!all(apply(mat, 2, is.numeric))) stop("All columns in mat must be numeric.", call. = FALSE)
+
   keep <- setNames(rep(TRUE, ncol(mat)), colnames(mat))
 
   #Variables that have only 1 value can be removed
@@ -243,6 +297,43 @@ remove.collinearity <- function(mat, with.intercept = TRUE) {
 
   return(mat[, keep, drop = FALSE])
 }
+int.poly.f <- function(mat, ex=NULL, int=FALSE, poly=1, center = FALSE, sep = " * ") {
+  #Adds to data frame interactions and polynomial terms; interaction terms will be named "v1 * v2" and polynomials will be named "v1_2"
+  #mat=matrix input
+  #ex=matrix of variables to exclude in interactions and polynomials; a subset of df
+  #int=whether to include interactions or not; currently only 2-way are supported
+  #poly=degree of polynomials to include; will also include all below poly. If 1, no polynomial will be included
+  #nunder=number of underscores between variables
+
+  if (is_not_null(ex)) d <- mat[, colnames(mat) %nin% colnames(ex), drop = FALSE]
+  else d <- mat
+  binary.vars <- apply(d, 2, is_binary)
+  if (center) {
+    d[,!binary.vars] <- center(d[, !binary.vars, drop = FALSE])
+  }
+  nd <- ncol(d)
+  nrd <- nrow(d)
+  no.poly <- binary.vars
+  npol <- nd - sum(no.poly)
+  new <- matrix(0, ncol = (poly-1)*npol + int*(.5*(nd)*(nd-1)), nrow = nrd)
+  nc <- ncol(new)
+  new.names <- character(nc)
+  if (poly > 1 && npol != 0) {
+    for (i in 2:poly) {
+      new[, (1 + npol*(i - 2)):(npol*(i - 1))] <- apply(d[, !no.poly, drop = FALSE], 2, function(x) x^i)
+      new.names[(1 + npol*(i - 2)):(npol*(i - 1))] <- paste0(colnames(d)[!no.poly], num_to_superscript(i))
+    }
+  }
+  if (int && nd > 1) {
+    new[,(nc - .5*nd*(nd-1) + 1):nc] <- matrix(t(apply(d, 1, combn, 2, prod)), nrow = nrd)
+    new.names[(nc - .5*nd*(nd-1) + 1):nc] <- combn(colnames(d), 2, paste, collapse = sep)
+  }
+
+  single.value <- apply(new, 2, all_the_same)
+  colnames(new) <- new.names
+
+  return(new[, !single.value, drop = FALSE])
+}
 
 #Shared with cobalt
 word.list <- function(word.list = NULL, and.or = c("and", "or"), is.are = FALSE, quotes = FALSE) {
@@ -250,7 +341,7 @@ word.list <- function(word.list = NULL, and.or = c("and", "or"), is.are = FALSE,
   #or "a, b, and c"
   #If is.are, adds "is" or "are" appropriately
   L <- length(word.list)
-  if (quotes) word.list <- sapply(word.list, function(x) paste0("\"", x, "\""))
+  if (quotes) word.list <- vapply(word.list, function(x) paste0("\"", x, "\""), character(1L))
   if (L == 0) {
     out <- ""
     attr(out, "plural") = FALSE
@@ -296,40 +387,6 @@ binarize <- function(variable) {
   newvar[nas] <- NA
   return(newvar)
 }
-int.poly.f <- function(mat, ex=NULL, int=FALSE, poly=1, nunder=1, ncarrot=1) {
-  #Adds to data frame interactions and polynomial terms; interaction terms will be named "v1_v2" and polynomials will be named "v1_2"
-  #Only to be used in base.bal.tab; for general use see int.poly()
-  #mat=matrix input
-  #ex=matrix of variables to exclude in interactions and polynomials; a subset of df
-  #int=whether to include interactions or not; currently only 2-way are supported
-  #poly=degree of polynomials to include; will also include all below poly. If 1, no polynomial will be included
-  #nunder=number of underscores between variables
-
-  if (is_not_null(ex)) d <- mat[, colnames(mat) %nin% colnames(ex), drop = FALSE]
-  else d <- mat
-  nd <- ncol(d)
-  nrd <- nrow(d)
-  no.poly <- apply(d, 2, is_binary)
-  npol <- nd - sum(no.poly)
-  new <- matrix(0, ncol = (poly-1)*npol + int*(.5*(nd)*(nd-1)), nrow = nrd)
-  nc <- ncol(new)
-  new.names <- character(nc)
-  if (poly > 1 && npol != 0) {
-    for (i in 2:poly) {
-      new[, (1 + npol*(i - 2)):(npol*(i - 1))] <- apply(d[, !no.poly, drop = FALSE], 2, function(x) x^i)
-      new.names[(1 + npol*(i - 2)):(npol*(i - 1))] <- paste0(colnames(d)[!no.poly], num_to_superscript(i))
-    }
-  }
-  if (int && nd > 1) {
-    new[,(nc - .5*nd*(nd-1) + 1):nc] <- matrix(t(apply(d, 1, combn, 2, prod)), nrow = nrd)
-    new.names[(nc - .5*nd*(nd-1) + 1):nc] <- combn(colnames(d), 2, paste, collapse=paste0(replicate(nunder, "_"), collapse = ""))
-  }
-
-  single.value <- apply(new, 2, all_the_same)
-  colnames(new) <- new.names
-  #new <- setNames(data.frame(new), new.names)[!single.value]
-  return(new[, !single.value, drop = FALSE])
-}
 num_to_superscript <- function(x) {
   nums <- setNames(c("\u2070",
                      "\u00B9",
@@ -362,9 +419,9 @@ get.covs.and.treat.from.formula <- function(f, data = NULL, env = .GlobalEnv, ..
   #Check if response exists
   if (is.formula(tt, 2)) {
     resp.vars.mentioned <- as.character(tt)[2]
-    resp.vars.failed <- sapply(resp.vars.mentioned, function(v) {
+    resp.vars.failed <- vapply(resp.vars.mentioned, function(v) {
       null.or.error(try(eval(parse(text = v), c(data, env)), silent = TRUE))
-    })
+    }, logical(1L))
 
     if (any(resp.vars.failed)) {
       if (is_null(A[["treat"]])) stop(paste0("The given response variable, \"", as.character(tt)[2], "\", is not a variable in ", word.list(c("data", "the global environment")[c(data.specified, TRUE)], "or"), "."), call. = FALSE)
@@ -392,10 +449,10 @@ get.covs.and.treat.from.formula <- function(f, data = NULL, env = .GlobalEnv, ..
   #Check if RHS variables exist
   tt.covs <- delete.response(tt)
   rhs.vars.mentioned.lang <- attr(tt.covs, "variables")[-1]
-  rhs.vars.mentioned <- sapply(rhs.vars.mentioned.lang, deparse)
-  rhs.vars.failed <- sapply(rhs.vars.mentioned.lang, function(v) {
+  rhs.vars.mentioned <- vapply(rhs.vars.mentioned.lang, deparse, character(1L))
+  rhs.vars.failed <- vapply(rhs.vars.mentioned.lang, function(v) {
     null.or.error(try(eval(v, c(data, env)), silent = TRUE))
-  })
+  }, logical(1L))
 
   if (any(rhs.vars.failed)) {
     stop(paste0(c("All variables in formula must be variables in data or objects in the global environment.\nMissing variables: ",
@@ -406,9 +463,9 @@ get.covs.and.treat.from.formula <- function(f, data = NULL, env = .GlobalEnv, ..
   rhs.term.labels <- attr(tt.covs, "term.labels")
   rhs.term.orders <- attr(tt.covs, "order")
 
-  rhs.df <- sapply(rhs.vars.mentioned.lang, function(v) {
+  rhs.df <- vapply(rhs.vars.mentioned.lang, function(v) {
     is.data.frame(try(eval(v, c(data, env)), silent = TRUE))
-  })
+  }, logical(1L))
 
   if (any(rhs.df)) {
     if (any(rhs.vars.mentioned[rhs.df] %in% unlist(sapply(rhs.term.labels[rhs.term.orders > 1], function(x) strsplit(x, ":", fixed = TRUE))))) {
@@ -434,8 +491,11 @@ get.covs.and.treat.from.formula <- function(f, data = NULL, env = .GlobalEnv, ..
   mf.covs <- quote(stats::model.frame(tt.covs, data,
                                       drop.unused.levels = TRUE,
                                       na.action = "na.pass"))
+
   tryCatch({covs <- eval(mf.covs, c(data, env))},
            error = function(e) {stop(conditionMessage(e), call. = FALSE)})
+
+  if (is_not_null(treat.name) && treat.name %in% names(covs)) stop("The variable on the left side of the formula appears on the right side too.", call. = FALSE)
 
   if (is_null(rhs.vars.mentioned)) {
     covs <- data.frame(Intercept = rep(1, if (is_null(treat)) 1 else length(treat)))
@@ -444,7 +504,7 @@ get.covs.and.treat.from.formula <- function(f, data = NULL, env = .GlobalEnv, ..
 
   #Get full model matrix with interactions too
   covs.matrix <- model.matrix(tt.covs, data = covs,
-                              contrasts.arg = lapply(covs[sapply(covs, is.factor)],
+                              contrasts.arg = lapply(Filter(is.factor, covs),
                                                      contrasts, contrasts=FALSE))
   attr(covs, "terms") <- NULL
 
@@ -476,9 +536,9 @@ round_df_char <- function(df, digits, pad = "0", na_vals = "") {
     if (any(grepl(".", df[[i]], fixed = TRUE))) {
       s <- strsplit(df[[i]], ".", fixed = TRUE)
       lengths <- lengths(s)
-      digits.r.of.. <- sapply(seq_along(s), function(x) {
+      digits.r.of.. <- vapply(seq_along(s), function(x) {
         if (lengths[x] > 1) nchar(s[[x]][lengths[x]])
-        else 0 })
+        else 0 }, numeric(1L))
       df[[i]] <- sapply(seq_along(df[[i]]), function(x) {
         if (df[[i]][x] == "") ""
         else if (lengths[x] <= 1) {
@@ -530,7 +590,7 @@ is.formula <- function(f, sides = NULL) {
   }
   return(res)
 }
-check_if_zero_base <- function(x) {
+check_if_zero <- function(x) {
   # this is the default tolerance used in all.equal
   tolerance <- .Machine$double.eps^0.5
   # If the absolute deviation between the number and zero is less than
@@ -539,10 +599,29 @@ check_if_zero_base <- function(x) {
   # -3.20469e-16 or some such.
   abs(x - 0) < tolerance
 }
-check_if_zero <- Vectorize(check_if_zero_base)
 is_binary <- function(x) !nunique.gt(x, 2)
 is_null <- function(x) length(x) == 0L
 is_not_null <- function(x) !is_null(x)
+probably.a.bug <- function() {
+  fun <- paste(deparse(sys.call(-1)), collapse = "\n")
+  stop(paste0("An error was produced and is likely a bug. Please let the maintainer know a bug was produced by the function\n",
+              fun), call. = FALSE)
+}
+ESS <- function(w) {
+  sum(w)^2/sum(w^2)
+}
+center <- function(x, na.rm = TRUE, at = NULL) {
+  if (!is.numeric(x)) warning("x is not numeric and will not be centered.")
+  else {
+    if (is.matrix(x)) x <- apply(x, 2, center, na.rm = na.rm, at = at)
+    else {
+      if (is_null(at)) at <- mean(x, na.rm = na.rm)
+      else if (!is.numeric(at)) stop("at must be numeric.")
+      x <- x - at
+    }
+  }
+  return(x)
+}
 
 #Other helpful tools
 ##Check if value is between other values

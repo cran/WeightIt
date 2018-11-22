@@ -40,8 +40,7 @@ coef(fit)
 ## ------------------------------------------------------------------------
 #Robust standard errors and confidence intervals
 library("jtools")
-summ(fit, confint = TRUE, model.info = FALSE, 
-     model.fit = FALSE) 
+summ(fit, confint = TRUE) 
 
 ## ---- warning=FALSE, message=FALSE---------------------------------------
 #Bootstrapping
@@ -92,6 +91,5 @@ cum.fit <- svyglm(outcome ~ I(tx1+tx2+tx3), design = d.w.msm)
 anova(main.effects.fit, cum.fit)
 
 ## ------------------------------------------------------------------------
-summ(cum.fit, confint = TRUE, model.info = FALSE, 
-     model.fit = FALSE) 
+summ(cum.fit, confint = TRUE) 
 

@@ -1,12 +1,14 @@
 weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stabilize = FALSE, focal = NULL,
-                     exact = NULL, s.weights = NULL, ps = NULL, moments = 1L, int = FALSE,
-                     verbose = FALSE, ...) {
+                     by = NULL, s.weights = NULL, ps = NULL, moments = 1L, int = FALSE,
+                     verbose = FALSE, include.obj = FALSE, ...) {
 
   ## Checks and processing ----
 
+  A <- list(...)
+
   #Checks
   if (is_null(ps)) {
-    if (is_null(formula) || is_null(class(formula))) {
+    if (is_null(formula) || is_null(class(formula)) || !is.formula(formula, 2)) {
       stop("formula must be a formula relating treatment to covariates.", call. = FALSE)
     }
   }
@@ -30,21 +32,35 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
                           "npcbps",
                           "ebal", "entropy", "ebalance",
                           "sbw",
-                          "ebcw", "ate")
-  if (missing(method) || is_not_null(ps)) method <- "ps"
-  else if (!is.character(method)) bad.method <- TRUE
-  else if (is_null(method) || length(method) > 1) bad.method <- TRUE
-  else if (tolower(method) %nin% acceptable.methods) bad.method <- TRUE
+                          "ebcw", "ate",
+                          "optweight", "opt",
+                          "super", "superlearner")
 
-  if (bad.method) stop("method must be a string of length 1 containing the name of an acceptable weighting method.", call. = FALSE)
-  method <- method.to.proper.method(tolower(method))
+  if (missing(method) || is_not_null(ps)) method <- "ps"
+  else if (is_null(method) || length(method) > 1) bad.method <- TRUE
+  else if (is.character(method)) {
+    if (tolower(method) %nin% acceptable.methods) bad.method <- TRUE
+  }
+  else if (!is.function(method)) bad.method <- TRUE
+
+  if (bad.method) stop("method must be a string of length 1 containing the name of an acceptable weighting method or a function that produces weights.", call. = FALSE)
+
+  if (is.character(method)) {
+    method <- method.to.proper.method(method)
+    attr(method, "name") <- method
+  }
+  else if (is.function(method)) {
+    method.name <- paste(deparse(substitute(method)))
+    method <- check.user.method(method)
+    attr(method, "name") <- method.name
+  }
 
   #Process treat and covs from formula and data
   t.c <- get.covs.and.treat.from.formula(formula, data)
   reported.covs <- t.c[["reported.covs"]]
   covs <- t.c[["model.covs"]]
   treat <- t.c[["treat"]]
-  treat.name <- t.c[["treat.name"]]
+  # treat.name <- t.c[["treat.name"]]
 
   if (is_null(covs)) stop("No covariates were specified.", call. = FALSE)
   if (is_null(treat)) stop("No treatment variable was specified.", call. = FALSE)
@@ -63,7 +79,6 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   treat <- get.treat.type(treat)
   treat.type <- attr(treat, "treat.type")
 
-
   #Process estimand and focal
   estimand <- process.estimand(estimand, method, treat.type)
   f.e.r <- process.focal.and.estimand(focal, estimand, treat, treat.type)
@@ -76,20 +91,19 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   if (is_null(s.weights)) s.weights <- rep(1, n)
 
-  ##Process exact
-  processed.exact <- process.exact(exact = exact, data= data,
-                                   treat = treat)
-
-  # #Recreate data and formula
-  # w.data <- data.frame(treat, covs)
-  # w.formula <- formula(w.data)
+  ##Process by
+  if (is_not_null(A[["exact"]]) && is_null(by)) {
+    message("'by' has replaced 'exact' in the weightit() syntax, but 'exact' will always work.")
+    by <- A[["exact"]]
+  }
+  processed.by <- process.by(by = by, data = data, treat = treat)
 
   #Process moments and int
   moments.int <- check.moments.int(method, moments, int)
   moments <- moments.int["moments"]; int <- moments.int["int"]
 
   call <- match.call()
-  args <- list(...)
+  # args <- list(...)
 
   ## Running models ----
 
@@ -102,7 +116,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
                           covs = covs,
                           treat.type = treat.type,
                           s.weights = s.weights,
-                          exact.factor = processed.exact[["exact.factor"]],
+                          by.factor = processed.by[["by.factor"]],
                           estimand = estimand,
                           focal = focal,
                           stabilize = stabilize,
@@ -110,6 +124,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
                           moments = moments,
                           int = int,
                           ps = ps,
+                          include.obj = include.obj,
                           ...)
   })
 
@@ -117,11 +132,11 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   warn <- FALSE
   test.w <- obj$w*s.weights
-  if (treat.type == "continuous") {if (sd(test.w)/mean(test.w) > 4) warn <- TRUE}
-  else {if (any(sapply(unique(treat), function(x) sd(test.w[treat == x])/mean(test.w[treat == x]) > 4))) warn <- TRUE}
+  if (treat.type == "continuous") {if (sd(test.w, na.rm = TRUE)/mean(test.w, na.rm = TRUE) > 4) warn <- TRUE}
+  else {if (any(sapply(unique(treat), function(x) sd(test.w[treat == x], na.rm = TRUE)/mean(test.w[treat == x], na.rm = TRUE) > 4))) warn <- TRUE}
   if (warn) warning("Some extreme weights were generated. Examine them with summary() and maybe trim them with trim().", call. = FALSE)
   # #Create new data set
-  # #treat, covs, data (not in treat or covs), exact
+  # #treat, covs, data (not in treat or covs), by
   # treat.in.data <- treat; attr(treat.in.data, "treat.type") <- NULL
   # data.list <- list(treat.in.data, reported.covs)
   # o.data <- setNames(do.call("data.frame", data.list[sapply(data.list, is_not_null)]),
@@ -139,8 +154,9 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
               s.weights = s.weights,
               #discarded = NULL,
               focal = if (reported.estimand == "ATT") focal else NULL,
-              exact = processed.exact[["exact.components"]],
-              call = call)
+              by = processed.by[["by.components"]],
+              call = call,
+              obj = obj$fit.obj)
   class(out) <- "weightit"
 
   return(out)
@@ -152,14 +168,14 @@ print.weightit <- function(x, ...) {
   trim <- attr(x[["weights"]], "trim")
 
   cat("A weightit object\n")
-  cat(paste0(" - method: \"", x[["method"]], "\" (", method.to.phrase(x[["method"]]), ")\n"))
+  cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", method.to.phrase(x[["method"]]), ")\n"))
   cat(paste0(" - number of obs.: ", length(x[["weights"]]), "\n"))
   cat(paste0(" - sampling weights: ", ifelse(all_the_same(x[["s.weights"]]),"none", "present"), "\n"))
   cat(paste0(" - treatment: ", ifelse(treat.type == "continuous", "continuous", paste0(nunique(x[["treat"]]), "-category", ifelse(treat.type == "multinomial", paste0(" (", paste(levels(x[["treat"]]), collapse = ", "), ")"), ""))), "\n"))
   if (is_not_null(x[["estimand"]])) cat(paste0(" - estimand: ", x[["estimand"]], ifelse(is_not_null(x[["focal"]]), paste0(" (focal: ", x[["focal"]], ")"), ""), "\n"))
   cat(paste0(" - covariates: ", ifelse(length(names(x[["covs"]])) > 60, "too many to name", paste(names(x[["covs"]]), collapse = ", ")), "\n"))
-  if (is_not_null(x[["exact"]])) {
-    cat(paste0(" - exact: ", paste(names(x[["exact"]]), collapse = ", "), "\n"))
+  if (is_not_null(x[["by"]])) {
+    cat(paste0(" - by: ", paste(names(x[["by"]]), collapse = ", "), "\n"))
   }
   if (is_not_null(trim)) {
     if (trim < 1) {
@@ -179,7 +195,7 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
                 "effective.sample.size")
   out <- setNames(vector("list", length(outnames)), outnames)
 
-  if (ignore.s.weights) sw <- rep(1, length(object$weights))
+  if (ignore.s.weights  || is_null(object$s.weights)) sw <- rep(1, length(object$weights))
   else sw <- object$s.weights
   w <- object$weights*sw
   t <- object$treat
@@ -194,8 +210,8 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
     out$coef.of.var <- c(all = sd(w)/mean(w))
 
     nn <- as.data.frame(matrix(0, ncol = 1, nrow = 2))
-    nn[1, ] <- (sum(sw)^2)/sum(sw^2)
-    nn[2, ] <- (sum(w)^2)/sum((w)^2)
+    nn[1, ] <- ESS(sw)
+    nn[2, ] <- ESS(w)
     dimnames(nn) <- list(c("Unweighted", "Weighted"),
                          c("Total"))
 
@@ -224,10 +240,10 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
     #dc <- weightit$discarded
 
     nn <- as.data.frame(matrix(0, nrow = 2, ncol = 2))
-    nn[1, ] <- c((sum(sw[t==0])^2)/sum(sw[t==0]^2),
-                 (sum(sw[t==1])^2)/sum(sw[t==1]^2))
-    nn[2, ] <- c((sum(w[t==0])^2)/sum((w[t==0])^2),
-                 (sum(w[t==1])^2)/sum((w[t==1])^2))
+    nn[1, ] <- c(ESS(sw[t==0]),
+                 ESS(sw[t==1]))
+    nn[2, ] <- c(ESS(w[t==0]),
+                 ESS(w[t==1]))
     # nn[3, ] <- c(sum(t==0 & dc==1), #Discarded
     #              sum(t==1 & dc==1))
     dimnames(nn) <- list(c("Unweighted", "Weighted"),
@@ -249,8 +265,8 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
 
     nn <- as.data.frame(matrix(0, nrow = 2, ncol = nunique(t)))
     for (i in seq_len(nunique(t))) {
-      nn[1, i] <- (sum(sw[t==levels(t)[i]])^2)/sum(sw[t==levels(t)[i]]^2)
-      nn[2, i] <- (sum(w[t==levels(t)[i]])^2)/sum((w[t==levels(t)[i]])^2)
+      nn[1, i] <- ESS(sw[t==levels(t)[i]])
+      nn[2, i] <- ESS(w[t==levels(t)[i]])
       # nn[3, i] <- sum(t==levels(t)[i] & dc==1) #Discarded
     }
     dimnames(nn) <- list(c("Unweighted", "Weighted"),

@@ -1,6 +1,22 @@
 WeightIt News and Updates
 ======
 
+Version 0.5.0
+
+* Added `super` method to estimate propensity scores using the `SuperLearner` package.
+
+* Added `optweight` method to estimate weights using optimization (but you should probably just use the `optweight` package).
+
+* `weightit()` now uses the correct formula to estimate weights for the ATO with multinomial treatments as described by Li & Li (2018).
+
+* Added `include.obj` option in `weightit()` and `weightitMSM()` to include the fitted object in the output object for inspection. For example, with `method = "ps"`, the `glm` object containing the propensity score model will be included in the output.
+
+* Rearranged the help pages. Each method now has its own documentation page, linked from the `weightit` help page.
+
+* Propensity scores are now included in the output for binary tretaments with `gbm` and `cbps` methods. Thanks to @Blanch-Font for the suggestion.
+
+* Other bug fixes and minor changes.
+
 Version 0.4.0
 
 * Added `trim()` function to trim weights.

@@ -1,10 +1,8 @@
-weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FALSE, exact = NULL, s.weights = NULL,
+weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FALSE, by = NULL, s.weights = NULL,
                         num.formula = NULL, moments = 1L, int = FALSE,
-                        verbose = FALSE, ...) {
+                        verbose = FALSE, include.obj = FALSE, is.MSM.method, ...) {
 
   A <- list(...)
-  A[["estimand"]] <- NULL
-  estimand <- "ATE"
 
   call <- match.call()
 
@@ -20,14 +18,31 @@ weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FA
                           "npcbps",
                           "ebal", "entropy", "ebalance",
                           "sbw",
-                          "ebcw", "ate")
+                          "ebcw", "ate",
+                          "optweight", "opt",
+                          "super", "superlearner")
 
   if (is_null(method) || length(method) > 1) bad.method <- TRUE
-  else if (!is.character(method)) bad.method <- TRUE
-  else if (tolower(method) %nin% acceptable.methods) bad.method <- TRUE
+  else if (is.character(method)) {
+    if (tolower(method) %nin% acceptable.methods) bad.method <- TRUE
+  }
+  else if (!is.function(method)) bad.method <- TRUE
 
-  if (bad.method) stop("method must be a string of length 1 containing the name of an acceptable weighting method.", call. = FALSE)
-  method <- method.to.proper.method(tolower(method))
+  if (bad.method) stop("method must be a string of length 1 containing the name of an acceptable weighting method or a function that produces weights.", call. = FALSE)
+
+  if (is.character(method)) {
+    method <- method.to.proper.method(method)
+    attr(method, "name") <- method
+    if (missing(is.MSM.method)) is.MSM.method <- NULL
+    is.MSM.method <- check.MSM.method(method, is.MSM.method)
+  }
+  else if (is.function(method)) {
+    method.name <- paste(deparse(substitute(method)))
+    method <- check.user.method(method)
+    if (missing(is.MSM.method)) is.MSM.method <- NULL
+    is.MSM.method <- check.MSM.method(method, is.MSM.method)
+    attr(method, "name") <- method.name
+  }
 
   #Process moments and int
   moments.int <- check.moments.int(method, moments, int)
@@ -66,6 +81,11 @@ weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FA
     }
   }
 
+  if (is_not_null(A[["exact"]]) && is_null(by)) {
+    message("'by' has replaced 'exact' in the weightitMSM() syntax, but 'exact' will always work.")
+    by <- A[["exact"]]
+  }
+
   reported.covs.list <- covs.list <- treat.list <- w.list <- ps.list <-
     stabout <- sw.list <- vector("list", length(formula.list))
 
@@ -78,6 +98,7 @@ weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FA
     treat.list[[i]] <- t.c[["treat"]]
     treat.name <- t.c[["treat.name"]]
     names(treat.list)[i] <- treat.name
+    names(reported.covs.list)[i] <- treat.name
 
     if (is_null(covs.list[[i]])) stop("No covariates were specified in the ", ordinal(i), " formula.", call. = FALSE)
     if (is_null(treat.list[[i]])) stop("No treatment variable was specified in the ", ordinal(i), " formula.", call. = FALSE)
@@ -86,117 +107,160 @@ weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FA
 
     if (any(is.na(reported.covs.list[[i]])) || nrow(reported.covs.list[[i]]) != n) {
       warning("Missing values are present in the covariates. See ?weightit for information on how these are handled.", call. = FALSE)
-      #stop("No missing values are allowed in the covariates.", call. = FALSE)
     }
     if (any(is.na(treat.list[[i]]))) {
       stop(paste0("No missing values are allowed in the treatment variable. Missing values found in ", treat.name, "."), call. = FALSE)
     }
 
     treat.list[[i]] <- get.treat.type(treat.list[[i]])
-    treat.type <- attr(treat.list[[i]], "treat.type")
 
     #Recreate data and formula
     # w.data <- data.frame(treat.list[[i]], covs.list[[i]])
     # w.formula <- formula(w.data)
 
-    processed.exact <- process.exact(exact = exact, data = data,
+    processed.by <- process.by(by = by, data = data,
                                        treat = treat.list[[i]],
                                        treat.name = treat.name)
 
-    if (is_null(s.weights)) s.weights_i <- rep(1, n)
+  }
 
-    ## Running models ----
+  if (is_null(s.weights)) s.weights <- rep(1, n)
 
-    if (verbose) eval.verbose <- base::eval
-    else eval.verbose <- utils::capture.output
+  if (verbose) eval.verbose <- base::eval
+  else eval.verbose <- utils::capture.output
 
+  obj.list <- NULL
+
+  if (is.MSM.method) {
     eval.verbose({
-      #Returns weights (w) and propensty score (ps)
-      obj <- do.call("weightit.fit", c(list(covs = covs.list[[i]],
-                                            treat = treat.list[[i]],
-                                            treat.type = treat.type,
-                                            s.weights = s.weights_i,
-                                            exact.factor = processed.exact[["exact.factor"]],
-                                            estimand = estimand,
-                                            focal = NULL,
-                                            stabilize = FALSE,
+      #Returns weights (w)
+      obj <- do.call("weightit.fit", c(list(covs = covs.list,
+                                            treat = treat.list,
+                                            s.weights = s.weights,
+                                            by.factor = processed.by[["by.factor"]],
+                                            stabilize = stabilize,
                                             method = method,
                                             moments = moments,
                                             int = int,
-                                            ps = NULL), A))
+                                            ps = NULL,
+                                            is.MSM.method = TRUE,
+                                            include.obj = include.obj), A))
     })
-    w.list[[i]] <- obj[["w"]]
-    ps.list[[i]] <- obj[["ps"]]
+    w <- obj$w
+    stabout <- NULL
+    obj.list <- obj$fit.obj
+  }
+  else {
+    A[["estimand"]] <- NULL
+    estimand <- "ATE"
 
-    if (stabilize) {
-      #Process sabilization formulas and get stab weights
-      if (is.formula(num.formula)) {
-        if (i == 1) {
-          stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")), as.formula(paste(paste(num.formula, collapse = ""), "+ .")))
-        }
-        else {
-          stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * "))), as.formula(paste(num.formula, "+ .")))
-        }
-      }
-      else {
-        if (i == 1) {
-          stab.f <- as.formula(paste(names(treat.list)[i], "~ 1"))
-        }
-        else {
-          stab.f <- as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * ")))
-        }
-      }
-      stab.t.c_i <- get.covs.and.treat.from.formula(stab.f, data)
-      stab.covs_i <- stab.t.c_i[["model.covs"]]
+    if (length(A[["link"]]) %nin% c(0, 1, length(formula.list))) stop(paste0("The argument to link must have length 1 or ", length(formula.list), "."), call. = FALSE)
+    else if (length(A[["link"]]) == 1) A[["link"]] <- rep(A[["link"]], length(formula.list))
+    # if (length(A[["family"]]) %nin% c(0, 1, length(formula.list))) stop(paste0("The argument to link must have length 1 or ", length(formula.list), "."), call. = FALSE)
+    # if (length(A[["family"]]) == 1) A[["family"]] <- rep(A[["family"]], length(formula.list))
+
+    for (i in seq_along(formula.list)) {
+      A_i <- A
+      if (is_not_null(A[["link"]])) A_i[["link"]] <- A[["link"]][[i]]
+
+      ## Running models ----
 
       eval.verbose({
-        sw_obj <- do.call("weightit.fit", c(list(covs = stab.covs_i,
-                                                 treat = treat.list[[i]],
-                                                 treat.type = treat.type,
-                                                 s.weights = s.weights_i,
-                                                 exact.factor = processed.exact[["exact.factor"]],
-                                                 estimand = estimand,
-                                                 focal = NULL,
-                                                 stabilize = FALSE,
-                                                 method = "ps",
-                                                 moments = NULL,
-                                                 int = FALSE,
-                                                 ps = NULL), A))
+        #Returns weights (w) and propensty score (ps)
+        obj <- do.call("weightit.fit", c(list(covs = covs.list[[i]],
+                                              treat = treat.list[[i]],
+                                              treat.type = attr(treat.list[[i]], "treat.type"),
+                                              s.weights = s.weights,
+                                              by.factor = processed.by[["by.factor"]],
+                                              estimand = estimand,
+                                              focal = NULL,
+                                              stabilize = FALSE,
+                                              method = method,
+                                              moments = moments,
+                                              int = int,
+                                              ps = NULL,
+                                              is.MSM.method = FALSE,
+                                              include.obj = include.obj
+                                              ), A_i))
       })
-      sw.list[[i]] <- 1/sw_obj[["w"]]
-      stabout[[i]] <- stab.f[-2]
+      w.list[[i]] <- obj[["w"]]
+      ps.list[[i]] <- obj[["ps"]]
+
+      if (stabilize) {
+        #Process stabilization formulas and get stab weights
+        if (is.formula(num.formula)) {
+          if (i == 1) {
+            stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")), as.formula(paste(paste(num.formula, collapse = ""), "+ .")))
+          }
+          else {
+            stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * "))), as.formula(paste(num.formula, "+ .")))
+          }
+        }
+        else {
+          if (i == 1) {
+            stab.f <- as.formula(paste(names(treat.list)[i], "~ 1"))
+          }
+          else {
+            stab.f <- as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * ")))
+          }
+        }
+        stab.t.c_i <- get.covs.and.treat.from.formula(stab.f, data)
+        stab.covs_i <- stab.t.c_i[["model.covs"]]
+
+        eval.verbose({
+          sw_obj <- do.call("weightit.fit", c(list(covs = stab.covs_i,
+                                                   treat = treat.list[[i]],
+                                                   treat.type = attr(treat.list[[i]], "treat.type"),
+                                                   s.weights = s.weights,
+                                                   by.factor = processed.by[["by.factor"]],
+                                                   estimand = estimand,
+                                                   focal = NULL,
+                                                   stabilize = FALSE,
+                                                   method = "ps",
+                                                   moments = NULL,
+                                                   int = FALSE,
+                                                   ps = NULL), A))
+        })
+        sw.list[[i]] <- 1/sw_obj[["w"]]
+        stabout[[i]] <- stab.f[-2]
+
+      }
 
     }
 
+    w <- Reduce("*", w.list)
+
+    if (stabilize) {
+      sw <- Reduce("*", sw.list)
+      w <- w*sw
+
+      unique.stabout <- unique(stabout)
+      if (length(unique.stabout) <= 1) stabout <- unique.stabout
+    }
+    else stabout <- NULL
   }
 
-  w <- Reduce("*", w.list)
-
-  if (stabilize) {
-    sw <- Reduce("*", sw.list)
-    w <- w*sw
-
-    unique.stabout <- unique(stabout)
-    if (length(unique.stabout) <= 1) stabout <- unique.stabout
-  }
-  else stabout <- NULL
 
   if (all_the_same(w)) stop(paste0("All weights are ", w[1], "."), call. = FALSE)
   if (all(sapply(ps.list, is_null))) ps.list <- NULL
+  else names(ps.list) <- names(treat.list)
+
+  if (include.obj) names(obj.list) <- names(treat.list)
 
   ## Assemble output object----
   out <- list(weights = w,
               treat.list = treat.list,
               covs.list = reported.covs.list,
               #data = data,
-              estimand = estimand,
+              estimand = if (exists("estimand")) estimand else "ATE",
               method = method,
               ps.list = ps.list,
               s.weights = s.weights,
               #discarded = NULL,
-              exact = processed.exact[["exact.components"]],
+              by = processed.by[["by.components"]],
               call = call,
-              stabilization = stabout
+              stabilization = stabout,
+              obj = obj.list
   )
 
   class(out) <- c("weightitMSM", "weightit")
@@ -210,7 +274,7 @@ print.weightitMSM <- function(x, ...) {
   trim <- attr(x[["weights"]], "trim")
 
   cat("A weightitMSM object\n")
-  cat(paste0(" - method: \"", x[["method"]], "\" (", method.to.phrase(x[["method"]]), ")\n"))
+  cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", method.to.phrase(x[["method"]]), ")\n"))
   cat(paste0(" - number of obs.: ", length(x[["weights"]]), "\n"))
   cat(paste0(" - sampling weights: ", ifelse(all_the_same(x[["s.weights"]]), "none", "present"), "\n"))
   cat(paste0(" - number of time points: ", length(x[["treat.list"]]), " (", paste(names(x[["treat.list"]]), collapse = ", "), ")\n"))
@@ -226,11 +290,11 @@ print.weightitMSM <- function(x, ...) {
                  paste0("    + baseline: ", paste(names(x$covs.list[[i]]), collapse = ", "), "\n")
                }
                else {
-                 paste0("    + after time ", i-1, ": ", paste(names(x$covs.list[[i]])[!names(x$covs.list[[i]]) %in% c(names(x$treat.list)[i-1], names(x$covs.list[[i-1]]))], collapse = ", "), "\n")
+                 paste0("    + after time ", i-1, ": ", paste(names(x$covs.list[[i]]), collapse = ", "), "\n")
                }
              }), collapse = ""), collapse = "\n"))
-  if (is_not_null(x[["exact"]])) {
-    cat(paste0(" - exact: ", paste(names(x[["exact"]]), collapse = ", "), "\n"))
+  if (is_not_null(x[["by"]])) {
+    cat(paste0(" - by: ", paste(names(x[["by"]]), collapse = ", "), "\n"))
   }
   if (is_not_null(x$stabilization)) {
     cat(" - stabilized")
@@ -286,8 +350,8 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       out$weight.mean <- if (stabilized) mean(w) else NULL
 
       nn <- as.data.frame(matrix(0, ncol = 1, nrow = 2))
-      nn[1, ] <- (sum(sw)^2)/sum(sw^2)
-      nn[2, ] <- (sum(w)^2)/sum((w)^2)
+      nn[1, ] <- ESS(sw)
+      nn[2, ] <- ESS(w)
       dimnames(nn) <- list(c("Unweighted", "Weighted"),
                            c("Total"))
       out$effective.sample.size <- nn
@@ -317,10 +381,10 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       #dc <- weightit$discarded
 
       nn <- as.data.frame(matrix(0, nrow = 2, ncol = 2))
-      nn[1, ] <- c((sum(sw[t==0])^2)/sum(sw[t==0]^2),
-                   (sum(sw[t==1])^2)/sum(sw[t==1]^2))
-      nn[2, ] <- c((sum(w[t==0])^2)/sum((w[t==0])^2),
-                   (sum(w[t==1])^2)/sum((w[t==1])^2))
+      nn[1, ] <- c(ESS(sw[t==0]),
+                   ESS(sw[t==1]))
+      nn[2, ] <- c(ESS(w[t==0]),
+                   ESS(w[t==1]))
       # nn[3, ] <- c(sum(t==0 & dc==1), #Discarded
       #              sum(t==1 & dc==1))
       dimnames(nn) <- list(c("Unweighted", "Weighted"),
@@ -349,8 +413,8 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
 
       nn <- as.data.frame(matrix(0, nrow = 2, ncol = nunique(t)))
       for (i in seq_len(nunique(t))) {
-        nn[1, i] <- (sum(sw[t==levels(t)[i]])^2)/sum(sw[t==levels(t)[i]]^2)
-        nn[2, i] <- (sum(w[t==levels(t)[i]])^2)/sum((w[t==levels(t)[i]])^2)
+        nn[1, i] <- ESS(sw[t==levels(t)[i]])
+        nn[2, i] <- ESS(w[t==levels(t)[i]])
         # nn[3, i] <- sum(t==levels(t)[i] & dc==1) #Discarded
       }
       dimnames(nn) <- list(c("Unweighted", "Weighted"),
@@ -367,7 +431,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
   return(out.list)
 }
 print.summary.weightitMSM <- function(x, ...) {
-  if (all(sapply(x, function(y) isTRUE(all.equal(x[[1]], y))))) {
+  if (all(vapply(x, function(y) isTRUE(all.equal(x[[1]], y)), logical(1L)))) {
     only.one <- TRUE
   }
   else only.one <- FALSE
