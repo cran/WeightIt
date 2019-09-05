@@ -23,6 +23,9 @@ For longitudinal treatments, the weights are the product of the weights estimate
 \subsection{Sampling Weights}{
 Sampling weights are supported through \code{s.weights} in all scenarios.
 }
+\subsection{Missing Data}{
+Missing data is compatible with generalized boosted modeling. \code{NA} values are simply considered their own plausible value for the covariate. When balance statistics are computed to choose the optimal tree, they are computed using only the non-missing values for the variable in question.
+}
 }
 \section{Additional Arguments}{
 Any argument to \code{ps} or \code{ps.cont} can be passed through \code{weightit} or \code{weightitMSM}. The argument \code{stop.method} is required, and, in contrast to \code{ps} and \code{ps.cont}, can only be of length 1. If not provided, a default will be used (\code{"es.mean"} for binary and multinomial treatments and \code{"s.mean.z"} for continuous treatments).
@@ -52,13 +55,13 @@ Zhu, Y., Coffman, D. L., & Ghosh, D. (2015). A Boosting Algorithm for Estimating
 \note{
 The weights may be very slightly different from those estimated by a call to \code{ps}, but this difference is inconsequential.
 }
-\examples{\donttest{
+\examples{\dontrun{
 library("cobalt")
 data("lalonde", package = "cobalt")
 
 #Balancing covariates between treatment groups (binary)
 (W1 <- weightit(treat ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "gbm", estimand = "ATT",
                 stop.method = "es.max"))
 summary(W1)
@@ -66,7 +69,7 @@ bal.tab(W1)
 
 #Balancing covariates with respect to race (multinomial)
 (W2 <- weightit(race ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "gbm", estimand = "ATE",
                 stop.method = "ks.mean"))
 summary(W2)
@@ -74,7 +77,7 @@ bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "gbm", use.kernel = TRUE,
                 stop.method = "p.max"))
 summary(W3)

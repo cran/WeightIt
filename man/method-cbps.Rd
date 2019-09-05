@@ -23,6 +23,9 @@ For longitudinal treatments, the weights are the product of the weights estimate
 \subsection{Sampling Weights}{
 Sampling weights are supported through \code{s.weights} in all scenarios. See Note about sampling weights.
 }
+\subsection{Missing Data}{
+Missing data is not compatible with the CBPS algorithm, so a few extra things happen when \code{NA}s are present in the covariates. First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is \code{NA} and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with 0s (this value is arbitrary and does not affect estimation). The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting \code{weightit} object will be the original covariates with the \code{NA}s.
+}
 }
 \section{Additional Arguments}{
 All arguments to \code{CBPS} can be passed through \code{weightit} or \code{weightitMSM}, with the following exceptions:
@@ -58,27 +61,27 @@ Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing propensity score f
 \note{
 When sampling weights are used with \code{CBPS}, the estimated weights already incorporate the sampling weights. When \code{weightit} is used with \code{method = "cbps"}, the estimated weights are separated from the sampling weights, as they are with all other methods.
 }
-\examples{\donttest{
+\examples{\dontrun{
 library("cobalt")
 data("lalonde", package = "cobalt")
 
 #Balancing covariates between treatment groups (binary)
 (W1 <- weightit(treat ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "cbps", estimand = "ATT"))
 summary(W1)
 bal.tab(W1)
 
 #Balancing covariates with respect to race (multinomial)
 (W2 <- weightit(race ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "cbps", estimand = "ATE"))
 summary(W2)
 bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "cbps", over = FALSE))
 summary(W3)
 bal.tab(W3)

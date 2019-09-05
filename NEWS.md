@@ -1,6 +1,30 @@
 WeightIt News and Updates
 ======
 
+Version 0.6.0
+
+* Bug fixes. Functions now work better when used inside other functions (e.g., `lapply`).
+
+* Behavior of `weightit()` in the presence of non-`NULL` `focal` has changed. When `focal` is specified, `estimand` is assumed to be `ATT`. Previously, `focal` would be ignored unless `estimand = "ATT"`.
+
+* Processing of `estimand` and `focal` is improved. Functions are smarter about guessing which group is the focal group when one isn't specified, especially with non-numeric treatments. `focal` can now be used with `estimand = "ATC"` to indicate which group is the control group, so `"ATC"` and `"ATT"` now function more similarly. 
+
+* Added function `get_w_from_ps()` to transform propensity scores into weights (instead of having to go through `weightit()`).
+
+* Added functions `as.weightit()` and `as.weightitMSM()` to convert weights and treatments and other components into `weightit` objects so that `summary.weightit()` can be used on them.
+
+* Updated documentation to describe how missing data in the covariates is handled. Some bugs related to missing data have been fixed as well, thanks to Yong Hao Pua.
+
+* `ps.cont()` had the "z-transfromed correlation" options removed to simplify output. This function and its supporting functions will be deprecated as soon as the new version fo `twang` is released.
+
+* When using `method = "ps"` or `method = "super"` with continuous treatments, setting `use.kernel = TRUE` and `plot = TRUE`, the plot is now made with `ggplot2` rather than the base R plots.
+
+* Added `plot.summary.weightit()` to plot the distribution of weights (a feature also in `optweight`).
+
+* Removed dependency on `cobalt` temporarily, which means the examples and vignette won't run. 
+
+* Added `ggplot2` to Imports.
+
 Version 0.5.1
 
 * Fixed a bug when using the `ps` argument in `weightit()`.
@@ -65,7 +89,7 @@ Version 0.3.0
 
 Version 0.2.0
 
-* Added `method = "sbw"` for stable balancing weights
+* Added `method = "sbw"` for stable balancing weights (now removed and replaced with `method = "optweight"`)
 
 * Allowed for estimation of multinomial propensity scores using multiple binary regressions if `mlogit` is not installed
 

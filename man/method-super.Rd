@@ -23,6 +23,9 @@ For longitudinal treatments, the weights are the product of the weights estimate
 \subsection{Sampling Weights}{
 Sampling weights are supported through \code{s.weights} in all scenarios.
 }
+\subsection{Missing Data}{
+Missing data is not compatible with SuperLearner, so a few extra things happen when \code{NA}s are present in the covariates. First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is \code{NA} and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with 0s (this value is arbitrary and does not affect estimation). The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting \code{weightit} object will be the original covariates with the \code{NA}s.
+}
 }
 \section{Additional Arguments}{
 An argument to \code{SL.library} must be supplied. To see a list of available entries, use \code{\link[SuperLearner]{listWrappers}}.
@@ -50,13 +53,16 @@ Pirracchio, R., Petersen, M. L., & van der Laan, M. (2015). Improving Propensity
 \seealso{
 \code{\link{weightit}}, \code{\link{weightitMSM}}
 }
-\examples{
+\note{
+Some methods formerly available in \pkg{SuperLearner} are now in SuperLearnerExtra, which can be found on Github at \url{https://github.com/ecpolley/SuperLearnerExtra}.
+}
+\examples{\dontrun{
 library("cobalt")
 data("lalonde", package = "cobalt")
 
 #Balancing covariates between treatment groups (binary)
 (W1 <- weightit(treat ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "super", estimand = "ATT",
                 SL.library = c("SL.glm", "SL.gam",
                                "SL.knn")))
@@ -65,7 +71,7 @@ bal.tab(W1)
 
 #Balancing covariates with respect to race (multinomial)
 (W2 <- weightit(race ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "super", estimand = "ATE",
                 SL.library = c("SL.glm", "SL.gam",
                                "SL.knn")))
@@ -74,10 +80,10 @@ bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "super", use.kernel = TRUE,
                 SL.library = c("SL.glm", "SL.gam",
                                "SL.ridge")))
 summary(W3)
 bal.tab(W3)
-}
+}}

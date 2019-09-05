@@ -36,13 +36,13 @@ an optional data set in the form of a data frame that contains the variables in 
 a string of length 1 containing the name of the method that will be used to estimate weights. See Details below for allowable options. The default is \code{"ps"}.
 }
   \item{estimand}{
-the desired estimand. For binary treatments, can be "ATE", "ATT", "ATC", and, for some methods, "ATO" or "ATM". For multinomial treatments, can be "ATE" or "ATT". The default for both is "ATE". This argument is ignored for continuous treatments. See Details for more information.
+the desired estimand. For binary and multinomial treatments, can be "ATE", "ATT", "ATC", and, for some methods, "ATO" or "ATM". The default for both is "ATE". This argument is ignored for continuous treatments. See the individual pages for each method for more information on which estimands are allowed with each method and what literature to read to interpret these estimands.
 }
   \item{stabilize}{
 \code{logical}; whether or not to stabilize the weights. For the methods that involve estimating propensity scores, this involves multiplying each unit's weight by the sum of the weights in that unit's treatment group. For the \code{"ebal"} method, this involves using \code{ebalance.trim} to reduce the variance of the weights. Default is \code{FALSE}.
 }
   \item{focal}{
-when multinomial treatments are used and the "ATT" is requested, which group to consider the "treated" or focal group. This group will not be weighted, and the other groups will be weighted to be more like the focal group.
+when multinomial treatments are used and the "ATT" is requested, which group to consider the "treated" or focal group. This group will not be weighted, and the other groups will be weighted to be more like the focal group. If specified, \code{estimand} will automatically be set to \code{"ATT"}.
 }
   \item{by}{
 a vector or the names of variables in data for which weighting is to be done within categories. For example, if \code{by = "gender"}, weights will be generated separately within each level of the variable \code{"gender"}. The argument used to be called \code{exact}, which will still work but with a message.
@@ -86,7 +86,7 @@ a \code{weightit} object; the output of a call to \code{weightit}.
   \item{obj}{When \code{include.obj = TRUE}, the fit object.}
 }
 \details{
-The primary purpose of \code{weightit} is as a dispatcher to other functions in other packages that perform the estimation of balancing weights. These functions are identified by a name, which is used in \code{method} to request them. Each method has some slight distinctions in how it is called, but in general, simply entering the method will cause \code{weightit} to generate the weights correctly using the function. To use each method, the package containing the function must be installed, or else an error will appear. Below are the methods allowed and links to pages containing more information about them, including additional arguments and outputs (e.g., when \code{include.obj = TRUE}).
+The primary purpose of \code{weightit} is as a dispatcher to other functions in other packages that perform the estimation of balancing weights. These functions are identified by a name, which is used in \code{method} to request them. Each method has some slight distinctions in how it is called, but in general, simply entering the method will cause \code{weightit} to generate the weights correctly using the function. To use each method, the package containing the function must be installed, or else an error will appear. Below are the methods allowed and links to pages containing more information about them, including additional arguments and outputs (e.g., when \code{include.obj = TRUE}) and how missing values are treated.
 \itemize{
 \item{\code{\link[=method_ps]{"ps"}} - Propensity score weighting using generalized linear models.}
 \item{\code{\link[=method_gbm]{"gbm"}} - Propensity score weighting using generalized boosted modeling.}
@@ -96,6 +96,8 @@ The primary purpose of \code{weightit} is as a dispatcher to other functions in 
 \item{\code{\link[=method_ebcw]{"ebcw"}} - Empirical balancing calibration weighting.}
 \item{\code{\link[=method_optweight]{"optweight"}} - Optimization-based weighting.}
 \item{\code{\link[=method_super]{"super"}} - Propensity score weighting using SuperLearner.}
+\item{\code{\link[=method_user]{"user-defined"}} - Weighting using a user-defined weighting function.}
+
 }
 }
 
@@ -103,28 +105,28 @@ The primary purpose of \code{weightit} is as a dispatcher to other functions in 
 Noah Greifer
 }
 
-\examples{
+\examples{\dontrun{
 library("cobalt")
 data("lalonde", package = "cobalt")
 
 #Balancing covariates between treatment groups (binary)
 (W1 <- weightit(treat ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "ps", estimand = "ATT"))
 summary(W1)
 bal.tab(W1)
 
 #Balancing covariates with respect to race (multinomial)
 (W2 <- weightit(race ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "ebal", estimand = "ATE"))
 summary(W2)
 bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
-                nodegree + re74, data = lalonde,
+                  nodegree + re74, data = lalonde,
                 method = "cbps", over = FALSE))
 summary(W3)
 bal.tab(W3)
-}
+}}

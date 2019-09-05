@@ -9,6 +9,8 @@ Generalized Propensity Score Estimation using GBM
 }
 \description{
 \code{ps.cont} calculates generalized propensity scores and corresponding weights using boosted linear regression as implemented in \code{\link[gbm]{gbm}}. This function extends \code{\link[twang]{ps}} in \pkg{twang} to continuous treatments. The syntax and output are largely the same. The GBM parameter defaults are those found in Zhu, Coffman, & Ghosh (2015).
+
+Note: \code{ps.cont} will phased out when \pkg{twang} adds functionality for continuous treatments.
 }
 \usage{
 ps.cont(formula, data,
@@ -53,12 +55,12 @@ Currently ignored.
   \item{verbose}{
 If \code{TRUE}, information will be printed to monitor the the progress of the fitting.
 }
-\item{stop.method}{A method or methods of measuring and summarizing balance across pretreatment variables.  Current options are \code{p.max}, \code{p.mean}, \code{p.rms}, \code{p.mean.z}, \code{p.rms.z}, \code{s.max}, \code{s.mean}, \code{s.rms}, \code{s.mean.z}, and \code{s.rms.z}. \code{p} refers to the Pearson correlation and \code{s} refers to the Spearman correlation, both implemented in the \pkg{wCorr} package. These are summarized across the pretreatment variables by the maximum (\code{max}), the mean (\code{mean}), or the square root of the mean of the squares (\code{rms}). The correlations can first be Fisher's Z-transformed (\code{z}) or not.
+\item{stop.method}{A method or methods of measuring and summarizing balance across pretreatment variables.  Current options are \code{p.max}, \code{p.mean}, \code{p.rms}, \code{s.max}, \code{s.mean}, and \code{s.rms}. \code{p} refers to the Pearson correlation and \code{s} refers to the Spearman correlation. These are summarized across the pretreatment variables by the maximum (\code{max}), the mean (\code{mean}), or the square root of the mean of the squares (\code{rms}).
 }
 \item{sampw}{Optional sampling weights.
 }
 \item{optimize}{
-A numeric value, either \code{0}, \code{1}, or \code{2}. If \code{0}, balance will be checked for every tree, and the tree with the best balance will be the one used to generate the final weights. If \code{1}, the default, balance will be checked for 25 trees, and then \code{\link{optimize}} will be used to find the tree with the best balance within the tree interval chosen. If \code{2}, \code{optimize} will be used to find the tree that yields the best balance. \code{0} takes the longest but is guaranteed to find the best balance among the trees. \code{2} is the quickest but will often choose a tree that that suboptimal balance, though not by much. \code{1} is a compromise between speed and comprehensiveness and is the algorithm implemented in \pkg{twang}.
+A numeric value, either \code{0}, \code{1}, or \code{2}. If \code{0}, balance will be checked for every tree, and the tree with the best balance will be the one used to generate the final weights. If \code{1}, the default, balance will be checked for a susbet of trees, and then \code{\link{optimize}} will be used to find the tree with the best balance within the tree interval chosen. If \code{2}, \code{optimize} will be used to find the tree that yields the best balance. \code{0} takes the longest but is guaranteed to find the best balance among the trees. \code{2} is the quickest but will often choose a tree that that suboptimal balance, though not by much. \code{1} is a compromise between speed and comprehensiveness and is the algorithm implemented in \pkg{twang}.
 }
 \item{use.kernel}{
 Whether to use kernel density estimation as implemented in \code{\link{density}} to estimate the numerator of the weights. If \code{TRUE}, \code{density} will be used. If \code{FALSE}, the default, a normal density will be assumed and will be estimated using \code{\link{dnorm}}.
@@ -77,6 +79,8 @@ For \code{summary.ps.cont}, additional arguments affecting the summary produced.
 The weights are estimated as the marginal density of the treatment divided by the conditional density of the treatment on the covariates for each unit. For the marginal density, a kernel density estimator can be implemented using the \code{\link{density}} function. For the conditional density, a Gaussian density is assumed. Note that with treatment with outlying values, extreme weights can be produced, so it is important to examine the weights and trim them if necessary.
 
 It is recommended to use as many trees as possible, though this requires more computation time, especially with \code{use.optimize} set to \code{0}. There is little difference between using Pearson and Spearman correlations or between using the raw correlations and the Z-transformed correlations. Typically the only \code{gbm}-related options that should be changed are the interaction depth and number of trees.
+
+Missing data is not allowed in the covariates because of the ambiguity in computing correlations with missing values.
 
 \code{summary.ps.cont} compresses the information in the \code{desc} component of the \code{ps.cont} object into a short summary table describing the size of the dataset and the quality of the generalized propensity score weights, in a similar way to \code{\link[twang]{summary.ps}}.
 
@@ -111,7 +115,7 @@ Returns an object of class \code{ps} and \code{ps.cont}, a list containing
   \item{parameters}{Saves the \code{ps.cont} call.}
   \item{alerts}{\code{NULL}}
 \item{iters}{A sequence of iterations used in the GBM fits used by \code{plot.ps.cont}.}
-\item{balance}{The balance summary for each tree examined, with a column for each stop.method. If \code{optimize = 0}, this will contain balance summaries for all trees. If \code{optimize = 1}, this will contain balance summaries for the 25 trees corresponding to \code{iters}. If \code{optimize = 2}, this will be NULL.}
+\item{balance}{The balance summary for each tree examined, with a column for each stop.method. If \code{optimize = 0}, this will contain balance summaries for all trees. If \code{optimize = 1}, this will contain balance summaries for the subset of trees corresponding to \code{iters}. If \code{optimize = 2}, this will be NULL.}
 \item{n.trees}{Maximum number of trees considered in GBM fit.}
 \item{data}{Data as specified in the \code{data} argument.}
 
