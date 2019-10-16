@@ -18,10 +18,15 @@ ps.cont <- function(formula, data, n.trees = 20000, interaction.depth = 4, shrin
 
     if (corr.type == "spearman") {
       ranked.t <- rank(t)
-      corr_ <- apply(covs, 2, function(c) w.r(rank(c), y = ranked.t, w = wt, s.weights = s.weights))
+      corr_ <- col.w.r(apply(covs, 2, rank), ranked.t, w = wt, s.weights = s.weights)
+      # corr_ <- apply(covs, 2, function(c) w.r(rank(c), y = ranked.t, w = wt, s.weights = s.weights))
     }
-    else if (corr.type == "pearson") corr_ <- apply(covs, 2, function(c) {
-      w.r(c, y = t, w = wt, s.weights = s.weights)})
+    else if (corr.type == "pearson") {
+      corr_ <- col.w.r(covs, t, w = wt, s.weights = s.weights)
+
+      # corr_ <- apply(covs, 2, function(c) {
+      # w.r(c, y = t, w = wt, s.weights = s.weights)})
+    }
     else stop("stop.method is not correctly specified.", call. = FALSE)
 
     # if (z.trans) corr_ <- cor2z(corr_)
@@ -32,14 +37,14 @@ ps.cont <- function(formula, data, n.trees = 20000, interaction.depth = 4, shrin
   desc.wts.cont <- function(t, covs, weights, which.tree) {
     desc <- setNames(vector("list", 10),
                      c("ess", "n", "max.p.cor", "mean.p.cor", "rms.p.cor", "max.s.cor", "mean.s.cor", "rms.s.cor", "bal.tab", "n.trees"))
-    desc[["bal.tab"]][["results"]] <- data.frame(p.cor = apply(covs, 2, function(c) w.r(t, c, w = weights, s.weights = s.weights)),
+    desc[["bal.tab"]][["results"]] <- data.frame(p.cor = col.w.r(covs, t, w = weights, s.weights = s.weights),
                                                  # p.cor.z = NA,
-                                                 s.cor = apply(covs, 2, function(c) w.r(rank(t), rank(c), w = weights, s.weights = s.weights)),
+                                                 s.cor = col.w.r(apply(covs, 2, rank), rank(t), w = weights, s.weights = s.weights),
                                                  # s.cor.z = NA,
                                                  row.names = colnames(covs))
     # desc[["bal.tab"]][["results"]][["p.cor.z"]] <- cor2z(desc[["bal.tab"]][["results"]][["p.cor"]])
     # desc[["bal.tab"]][["results"]][["s.cor.z"]] <- cor2z(desc[["bal.tab"]][["results"]][["s.cor"]])
-    desc[["ess"]] <- (sum(weights)^2)/sum(weights^2)
+    desc[["ess"]] <- ESS(weights)
     desc[["n"]] <- length(t)
     desc[["max.p.cor"]] <- max(abs(desc[["bal.tab"]][["results"]][["p.cor"]]))
     desc[["mean.p.cor"]] <- mean(abs(desc[["bal.tab"]][["results"]][["p.cor"]]))
@@ -55,8 +60,8 @@ ps.cont <- function(formula, data, n.trees = 20000, interaction.depth = 4, shrin
   check.package("gbm")
 
   if (missing(stop.method)) {
-    warning("No stop.method was entered. Using \"s.mean.z\", the mean of the absolute Z-transformed Spearman correlations.", call. = FALSE, immediate. = TRUE)
-    stop.method <- "p.max"
+    warning("No stop.method was entered. Using \"p.mean\", the mean of the absolute Pearson correlations.", call. = FALSE, immediate. = TRUE)
+    stop.method <- "p.mean"
   }
   else {
     stop.method <- tryCatch(match.arg(tolower(stop.method), apply(expand.grid(c("s", "p"),
@@ -119,7 +124,8 @@ ps.cont <- function(formula, data, n.trees = 20000, interaction.depth = 4, shrin
       d.all <- rbind(d.n_)
       d.all$dens <- factor(d.all$dens, levels = c("Numerator Density"))
       pl <- ggplot(d.all, aes(x=x,y=y)) + geom_line() + labs(title = "Weight Component Densities", x = "E[Treat|X]", y = "Density") +
-        facet_grid(rows = vars(dens)) + theme(panel.background = element_rect(fill = "white", color = "black"),
+        facet_grid(rows = vars(dens)) + theme(panel.background = element_rect(fill = "white"),
+                                              panel.border = element_rect(fill = NA, color = "black"),
                                               axis.text.x = element_text(color = "black"),
                                               axis.text.y = element_text(color = "black"),
                                               panel.grid.major = element_blank(),
@@ -246,12 +252,15 @@ ps.cont <- function(formula, data, n.trees = 20000, interaction.depth = 4, shrin
         else {
           if (corr.type[s] == "spearman") {
             ranked.t <- rank(t)
-            corr_[i, , s] <- apply(covs, 2, function(c) {
-              w.r(rank(c), y = ranked.t, w = wt[[i]], s.weights = s.weights)})
+            corr_[i, , s] <- col.w.r(apply(covs, 2, rank), ranked.t, w = wt[[i]], s.weights = s.weights)
+            # corr_[i, , s] <- apply(covs, 2, function(c) {
+            #   w.r(rank(c), y = ranked.t, w = wt[[i]], s.weights = s.weights)
+            #   })
           }
           else if (corr.type[s] == "pearson") {
-            corr_[i, , s] <- apply(covs, 2, function(c) {
-              w.r(c, y = t, w = wt[[i]], s.weights = s.weights)})
+            corr_[i, , s] <- col.w.r(covs, t, w = wt[[i]], s.weights = s.weights)
+            # corr_[i, , s] <- apply(covs, 2, function(c) {
+            #   w.r(c, y = t, w = wt[[i]], s.weights = s.weights)})
           }
           else stop("stop.method is not correctly specified.", call. = FALSE)
 

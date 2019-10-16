@@ -38,13 +38,13 @@ Longitudinal treatments can be handled either by running the fitting function fo
 }
 
 \examples{
-\dontrun{
+
 library("cobalt")
 data("lalonde", package = "cobalt")
 
 #A user-defined version of method = "ps"
 my.ps <- function(treat, covs, estimand, focal = NULL) {
-  covs <- make.full.rank(covs)
+  covs <- make_full_rank(covs)
   d <- data.frame(treat, covs)
   f <- formula(d)
   ps <- glm(f, data = d, family = "binomial")$fitted
@@ -79,6 +79,7 @@ bal.tab(W2)
 # instead of 'method' in weightit() to choose between
 # "ebal" and "el".
 
+\dontrun{
 kbal.fun <- function(treat, covs, estimand, focal, ...) {
     args <- list(...)
     if (is_not_null(focal))

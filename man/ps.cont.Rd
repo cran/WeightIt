@@ -60,7 +60,7 @@ If \code{TRUE}, information will be printed to monitor the the progress of the f
 \item{sampw}{Optional sampling weights.
 }
 \item{optimize}{
-A numeric value, either \code{0}, \code{1}, or \code{2}. If \code{0}, balance will be checked for every tree, and the tree with the best balance will be the one used to generate the final weights. If \code{1}, the default, balance will be checked for a susbet of trees, and then \code{\link{optimize}} will be used to find the tree with the best balance within the tree interval chosen. If \code{2}, \code{optimize} will be used to find the tree that yields the best balance. \code{0} takes the longest but is guaranteed to find the best balance among the trees. \code{2} is the quickest but will often choose a tree that that suboptimal balance, though not by much. \code{1} is a compromise between speed and comprehensiveness and is the algorithm implemented in \pkg{twang}.
+A numeric value, either \code{0}, \code{1}, or \code{2}. If \code{0}, balance will be checked for every tree, and the tree with the best balance will be the one used to generate the final weights. If \code{1}, the default, balance will be checked for a subset of trees, and then \code{\link{optimize}} will be used to find the tree with the best balance within the tree interval chosen. If \code{2}, \code{optimize} will be used to find the tree that yields the best balance. \code{0} takes the longest but is guaranteed to find the best balance among the trees. \code{2} is the quickest but will often choose a tree that that suboptimal balance, though not by much. \code{1} is a compromise between speed and comprehensiveness and is the algorithm implemented in \pkg{twang}.
 }
 \item{use.kernel}{
 Whether to use kernel density estimation as implemented in \code{\link{density}} to estimate the numerator of the weights. If \code{TRUE}, \code{density} will be used. If \code{FALSE}, the default, a normal density will be assumed and will be estimated using \code{\link{dnorm}}.
@@ -138,6 +138,7 @@ Noah Greifer
 \code{\link[gbm]{gbm}} for the underlying machinery and explanation of the parameters.
 }
 \examples{
+# Examples take a long time
 \dontrun{
 library("cobalt")
 data("lalonde", package = "cobalt")
@@ -149,4 +150,5 @@ psc.out <- ps.cont(re75 ~ age + educ + married +
                 use.optimize = 2)
 summary(psc.out)
 twang::bal.table(psc.out) #twang's bal.table
-}}
+}
+}

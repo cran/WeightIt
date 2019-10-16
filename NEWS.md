@@ -1,6 +1,23 @@
 WeightIt News and Updates
 ======
 
+
+Version 0.7.0
+
+* Added new `sbps()` function for estimating subgroup balancing propensity score weights, including both the standard method and a new smooth version.
+
+* Setting `method = "gbm"` and `method = "twang"` will now do two different things. `method = "gbm"` uses `gbm` and `cobalt` functions to estimate the weights and is much faster, while `method = "twang"` uses `twang` functions to estimate the weights. The results are similar between the two methods. Prior to this version, `method = "gbm"` and `method = "twang"` both did what `method = "twang"` does now. 
+
+* Bug fixes when `stabilize = TRUE`, thanks to @ulriksartipy and Sven Rieger.
+
+* Fixes for using `base.weight` argument with `method = "ebal"`. Now the supplied vector should have a length equal to the number of units in the dataset (in contrast to its use in `ebalance`, which requires a length equal to the number of control units).
+
+* Restored dependency on `cobalt` for examples and vignette.
+
+* When `method = "ps"` and the treatment is ordered (i.e., ordinal), `MASS::polr()` is used to fit an ordinal regression. Make the treatment un-ordered to to use multinomial regression instead.
+
+* Added support for using bias-reduced fitting functions when `method = "ps"` as provided by the `brglm2` package. These can be accessed by changing the `link` to, for example, `"br.logit"` or `"br.probit"`. For multinomial treatments, setting `link = "br.logit"` fits a bias-reduced multinomial regression model using `brglm2::brmultinom()`. This can be helpful when regular maximum likelihood models fail to converge, though this may also be a sign of lack of overlap.
+
 Version 0.6.0
 
 * Bug fixes. Functions now work better when used inside other functions (e.g., `lapply`).
@@ -15,7 +32,7 @@ Version 0.6.0
 
 * Updated documentation to describe how missing data in the covariates is handled. Some bugs related to missing data have been fixed as well, thanks to Yong Hao Pua.
 
-* `ps.cont()` had the "z-transfromed correlation" options removed to simplify output. This function and its supporting functions will be deprecated as soon as the new version fo `twang` is released.
+* `ps.cont()` had the "z-transformed correlation" options removed to simplify output. This function and its supporting functions will be deprecated as soon as the new version of `twang` is released.
 
 * When using `method = "ps"` or `method = "super"` with continuous treatments, setting `use.kernel = TRUE` and `plot = TRUE`, the plot is now made with `ggplot2` rather than the base R plots.
 

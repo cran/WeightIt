@@ -4,7 +4,7 @@
 \title{Empirical Balancing Calibration Weighting}
 
 \description{
-This page explains the details of estimating weights using empricial balancing calibration weighting (EBCW) by setting \code{method = "ebcw"} in the call to \code{\link{weightit}}. This method can be used with binary and multinomial treatments.
+This page explains the details of estimating weights using empirical balancing calibration weighting (EBCW) by setting \code{method = "ebcw"} in the call to \code{\link{weightit}}. This method can be used with binary and multinomial treatments.
 
 In general, this method relies on estimating weights by minimizing a function of the weights subject to exact moment balancing constraints. This method relies on \code{\link[ATE]{ATE}} from the \pkg{ATE} package.
 
@@ -44,7 +44,7 @@ Chan, K. C. G., Yam, S. C. P., & Zhang, Z. (2016). Globally efficient non-parame
 \code{\link{weightit}}
 }
 
-\examples{\dontrun{
+\examples{
 library("cobalt")
 data("lalonde", package = "cobalt")
 
@@ -62,4 +62,4 @@ bal.tab(W1)
 summary(W2)
 bal.tab(W2)
 
-}}
+}

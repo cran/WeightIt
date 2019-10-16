@@ -14,13 +14,12 @@ vignette: >
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warnings = FALSE, messages = FALSE, 
-                      eval=FALSE)
+knitr::opts_chunk$set(echo = TRUE, warnings = FALSE, messages = FALSE)
 ```
 
 ## Introduction
 
-`WeightIt` contains several functions for estimating and assessing balancing weights for observational studies. These weights can be used to estimate the causal parameters of marginal structural models. I will not go into the basics of causal inference methods here. For good introductory articles, see Austin (2011), Austin & Stuart (2015), Robins, Hernan & Brumback (2000), or Thoemmes & Ong (2016).
+`WeightIt` contains several functions for estimating and assessing balancing weights for observational studies. These weights can be used to estimate the causal parameters of marginal structural models. I will not go into the basics of causal inference methods here. For good introductory articles, see Austin (2011), Austin and Stuart (2015), Robins, Hernán, and Brumback (2000), or Thoemmes and Ong (2016).
 
 Typically, the analysis of an observation study might proceed as follows: identify the covariates for which balance is required; assess the quality of the data available, including missingness and measurement error; estimate weights that balance the covariates adequately; and estimate a treatment effect and corresponding standard error or confidence interval. This guide will go through all these steps for two observational studies: estimating the causal effect of a point treatment on an outcome, and estimating the causal parameters of a marginal structural model with multiple treatment periods. This is not meant to be a definitive guide, but rather an introduction to the relevant issues.
 
@@ -84,7 +83,7 @@ Now that we have our weights stored in `W.out`, let's extract them and estimate 
 
 ```{r, message=FALSE}
 library("survey")
-d.w <- svydesign(ids = ~1, weights = get.w(W.out),
+d.w <- svydesign(ids = ~1, weights = W.out$weights,
                      data = lalonde)
 fit <- svyglm(re78 ~ treat, design = d.w)
 coef(fit)
@@ -97,7 +96,8 @@ Now let's do some inference. Although some authors recommend using "robust" sand
 ```{r}
 #Robust standard errors and confidence intervals
 library("jtools")
-summ(fit, confint = TRUE) 
+summ(fit, confint = TRUE, 
+     model.fit = FALSE, model.info = FALSE) 
 ```
 
 Our confidence interval for `treat` contains 0, so there isn't evidence that `treat` has an effect on `re78`.
@@ -110,7 +110,7 @@ library("boot")
 est.fun <- function(data, index) {
   W.out <- weightit(treat ~ age + educ + race + married + nodegree + re74 + re75,
         data = data[index,], estimand = "ATT", method = "ebal")
-  fit <- glm(re78 ~ treat, data = data[index,], weights = get.w(W.out))
+  fit <- glm(re78 ~ treat, data = data[index,], weights = W.out$weights)
   return(coef(fit)["treat"])
 }
 boot.out <- boot(est.fun, data = lalonde, R = 999)
@@ -138,7 +138,7 @@ library("cobalt") #if not already attached
 bal.tab(list(tx1 ~ age + gender + use0,
              tx2 ~ tx1 + use1 + age + gender + use0,
              tx3 ~ tx2 + use2 + tx1 + use1 + age + gender + use0),
-        data = iptwExWide, m.threshold = .1)
+        data = iptwExWide, m.threshold = .1, disp.ks = TRUE)
 ```
 
 `bal.tab()` indicates significant imbalance on most covariates at most time points, so we need to do some work to eliminate that imbalance in our weighted data set. We'll use the `weightitMSM()` function to specify our weight models. The syntax is similar both to that of `weightit()` for point treatments and to that of `bal.tab()` for longitudinal treatments. We'll use `method = "ps"` for propensity score weights estimated using logistic regression.
@@ -160,14 +160,14 @@ summary(Wmsm.out)
 Displayed are summaries of how the weights perform at each time point with respect to variability. Next, we'll examine how well they perform with respect to covariate balance.
 
 ```{r}
-bal.tab(Wmsm.out, m.threshold = .1, disp.v.ratio = TRUE, which.time = NA)
+bal.tab(Wmsm.out, m.threshold = .1, disp.ks = TRUE, which.time = .none)
 ```
 
-By setting `which.time = NA` in `bal.tab()`, we can focus on the overall balance assessment, which displays the greatest imbalance for each covariate across time points. We can see that our estimated weights balance all covariates all time points with respect to means and variances. Now we can estimate our treatment effects. We'll sequentially simplify our model by checking whether interaction terms are needed (implying that specific patterns of treatment yield different outcomes), then by checking whether different coefficients are needed for the treatments (implying that outcomes depend on which treatments are received).
+By setting `which.time = .none` in `bal.tab()`, we can focus on the overall balance assessment, which displays the greatest imbalance for each covariate across time points. We can see that our estimated weights balance all covariates all time points with respect to means and variances. Now we can estimate our treatment effects. We'll sequentially simplify our model by checking whether interaction terms are needed (implying that specific patterns of treatment yield different outcomes), then by checking whether different coefficients are needed for the treatments (implying that outcomes depend on which treatments are received).
 
 ```{r, message=FALSE}
 library("survey")
-d.w.msm <- svydesign(ids = ~1, weights = get.w(Wmsm.out),
+d.w.msm <- svydesign(ids = ~1, weights = Wmsm.out$weights,
                      data = iptwExWide)
 full.fit <- svyglm(outcome ~ tx1*tx2*tx3, design = d.w.msm)
 main.effects.fit <- svyglm(outcome ~ tx1 + tx2 + tx3, design = d.w.msm)
@@ -184,7 +184,8 @@ anova(main.effects.fit, cum.fit)
 Based on the non-significant p-value, we can assume the effects of each treatment are close enough to be treated as the same, indicating that the number of treatments received is the relevant predictor of the outcome. Now we can examine what that treatment effect is with `summ()` in `jtools` (or `summary()`).
 
 ```{r}
-summ(cum.fit, confint = TRUE) 
+summ(cum.fit, confint = TRUE, 
+     model.fit = FALSE, model.info = FALSE) 
 ```
 
 For each additional treatment received, the outcome is expected to decrease by 0.15 points. The confidence interval excludes 0, so there is evidence of a treatment effect in the population.

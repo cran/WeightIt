@@ -1,7 +1,8 @@
 method.to.proper.method <- function(method) {
   method <- tolower(method)
   if      (method %in% c("ps")) return("ps")
-  else if (method %in% c("gbm", "gbr", "twang")) return("gbm")
+  else if (method %in% c("gbm", "gbr")) return("gbm")
+  else if (method %in% c("twang")) return("twang")
   else if (method %in% c("cbps")) return("cbps")
   else if (method %in% c("npcbps")) return("npcbps")
   else if (method %in% c("entropy", "ebal", "ebalance")) return("ebal")
@@ -15,7 +16,8 @@ method.to.proper.method <- function(method) {
 check.acceptable.method <- function(method, msm = FALSE, force = FALSE) {
   bad.method <- FALSE
   acceptable.methods <- c("ps"
-                          , "gbm", "twang", "gbr"
+                          , "gbm", "gbr"
+                          , "twang"
                           , "cbps"
                           , "npcbps"
                           , "ebal", "entropy", "ebalance"
@@ -60,6 +62,7 @@ method.to.phrase <- function(method) {
     method <- method.to.proper.method(method)
     if (method %in% c("ps")) return("propensity score weighting")
     else if (method %in% c("gbm")) return("generalized boosted modeling")
+    else if (method %in% c("twang")) return("generalized boosted modeling with TWANG")
     else if (method %in% c("cbps")) return("covariate balancing propensity score weighting")
     else if (method %in% c("npcbps")) return("non-parametric covariate balancing propensity score weighting")
     else if (method %in% c("ebal")) return("entropy balancing")
@@ -74,7 +77,8 @@ method.to.phrase <- function(method) {
 process.estimand <- function(estimand, method, treat.type) {
   #Allowable estimands
   AE <- list(binary = list(ps = c("ATT", "ATC", "ATE", "ATO", "ATM")
-                           , gbm = c("ATT", "ATC", "ATE")
+                           , gbm = c("ATT", "ATC", "ATE", "ATO", "ATM")
+                           , twang = c("ATT", "ATC", "ATE")
                            , cbps = c("ATT", "ATC", "ATE")
                            , npcbps = c("ATE")
                            , ebal = c("ATT", "ATC", "ATE")
@@ -83,17 +87,18 @@ process.estimand <- function(estimand, method, treat.type) {
                            , super = c("ATT", "ATC", "ATE", "ATO", "ATM")
                            # , kbal = c("ATT", "ATC", "ATE")
                            # , sbps = c("ATT", "ATC", "ATE", "ATO", "ATM")
-                           ),
-             multinomial = list(ps = c("ATT", "ATC", "ATE", "ATO", "ATM")
-                                , gbm = c("ATT", "ATC", "ATE")
-                                , cbps = c("ATT", "ATC", "ATE")
-                                , npcbps = c("ATE")
-                                , ebal = c("ATT", "ATC", "ATE")
-                                , ebcw = c("ATT", "ATC", "ATE")
-                                , optweight = c("ATT", "ATC", "ATE")
-                                , super = c("ATT", "ATC", "ATE", "ATO", "ATM")
-                                # , kbal = c("ATT", "ATE")
-                                ))
+  ),
+  multinomial = list(ps = c("ATT", "ATC", "ATE", "ATO", "ATM")
+                     , gbm = c("ATT", "ATC", "ATE", "ATO", "ATM")
+                     , twang = c("ATT", "ATC", "ATE")
+                     , cbps = c("ATT", "ATC", "ATE")
+                     , npcbps = c("ATE")
+                     , ebal = c("ATT", "ATC", "ATE")
+                     , ebcw = c("ATT", "ATC", "ATE")
+                     , optweight = c("ATT", "ATC", "ATE")
+                     , super = c("ATT", "ATC", "ATE", "ATO", "ATM")
+                     # , kbal = c("ATT", "ATE")
+  ))
 
   if (treat.type != "continuous" && !is.function(method) &&
       toupper(estimand) %nin% AE[[treat.type]][[method]]) {
@@ -129,7 +134,7 @@ process.focal.and.estimand <- function(focal, estimand, treat, treat.type, treat
     }
     else if (estimand == "ATC") {
       if (is_null(focal)) {
-          stop("When estimand = \"ATC\" for multinomial treatments, an argument must be supplied to focal.", call. = FALSE)
+        stop("When estimand = \"ATC\" for multinomial treatments, an argument must be supplied to focal.", call. = FALSE)
       }
     }
   }
@@ -137,8 +142,8 @@ process.focal.and.estimand <- function(focal, estimand, treat, treat.type, treat
     unique.treat <- unique(treat, nmax = 2)
     unique.treat.bin <- unique(binarize(treat), nmax = 2)
     if (estimand %nin% c("ATT", "ATC") && is_not_null(focal)) {
-        warning(paste(estimand, "is not compatible with focal. Setting estimand to \"ATT\"."), call. = FALSE)
-        reported.estimand <- estimand <- "ATT"
+      warning(paste(estimand, "is not compatible with focal. Setting estimand to \"ATT\"."), call. = FALSE)
+      reported.estimand <- estimand <- "ATT"
     }
 
     if (estimand == "ATT") {
@@ -195,37 +200,56 @@ process.focal.and.estimand <- function(focal, estimand, treat, treat.type, treat
               reported.estimand = reported.estimand,
               treated = if (is.factor(treated)) as.character(treated) else treated))
 }
-process.by <- function(by, data, treat, treat.name = NULL, by.arg = "by") {
+process.by <- function(by.name, data, treat, treat.name = NULL, by.arg = "by") {
 
   ##Process by
   bad.by <- FALSE
   acceptable.bys <- names(data)
-  by.vars <- character(0)
-  by.components <- NULL
   n <- length(treat)
 
-  if (missing(by) || is_null(by)) by.factor <- factor(rep(1, n))
-  else if (!is.atomic(by)) bad.by <- TRUE
-  else if (is.character(by) && all(by %in% acceptable.bys)) {
-    by.components <- data[by]
-    by.factor <- factor(apply(by.components, 1, paste, collapse = "|"))
-    by.vars <- by
-  }
-  else if (length(by) == n) {
-    by.components <- setNames(data.frame(by), deparse(substitute(by)))
-    by.factor <- factor(by.components[[1]])
-    by.vars <- acceptable.bys[vapply(acceptable.bys, function(x) equivalent.factors(by, data[[x]]), logical(1L))]
-  }
-  else bad.by <- TRUE
+  if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
+  treat.type <- get.treat.type(treat)
 
-  if (bad.by) stop(paste(by.arg, "must be the quoted names of variables in data for which weighting is to occur within strata or the variable itself."), call. = FALSE)
-
-  if (any(vapply(levels(by.factor), function(x) nunique(treat) != nunique(treat[by.factor == x]), logical(1L)))) {
-    stop(paste0("Not all the groups formed by ", by.arg, " contain all treatment levels", if (is_not_null(treat.name)) paste("in", treat.name) else "", ". Consider coarsening", by.arg, "."), call. = FALSE)
+  if (missing(by.name) || !is.character(by.name)) {
+    stop("by.name must be a character with the name of the by variable to be evaluated. Use deparse(substitute()) to pass a vector.", call. = FALSE)
   }
+  else {
+    by <- try(eval(parse(text = by.name)))
 
-  return(list(by.components = by.components,
-              by.factor = by.factor))
+    if (is_null(by)) {
+      by.components <- data.frame()
+      by.factor <- factor(rep(1, n))
+    }
+    else {
+      if (null_or_error(by)) bad.by <- TRUE
+      if (len(by) == 1) {
+        if (by %in% names(data)) {
+          by.name <- by
+          by <- data[[by]]
+        }
+        else bad.by <- TRUE
+      }
+      else if (len(by) != n || (is_not_null(dim(by)) && dim(by)[2] > 1L)) bad.by <- TRUE
+
+      if (!bad.by) {
+        by.components <- data.frame(by)
+        if (is_not_null(colnames(by))) names(by.components) <- colnames(by)
+        else names(by.components) <- by.name
+        by.factor <- factor(by.components[[1]], levels = unique(by.components[[1]]),
+                            labels = paste(names(by.components), "=", unique(by.components[[1]])))
+        # by.vars <- acceptable.bys[vapply(acceptable.bys, function(x) equivalent.factors(by, data[[x]]), logical(1L))]
+      }
+      else {
+        stop(paste(by.arg, "must be the quoted name of a variable in data for which weighting is to occur within strata or the variable itself."), call. = FALSE)
+      }
+
+      if (treat.type != "continuous" && any(vapply(levels(by.factor), function(x) nunique(treat) != nunique(treat[by.factor == x]), logical(1L)))) {
+        stop(paste0("Not all the groups formed by ", by.arg, " contain all treatment levels", if (is_not_null(treat.name)) paste("in", treat.name) else "", ". Consider coarsening ", by.arg, "."), call. = FALSE)
+      }
+    }
+    attr(by.components, "by.factor") <- by.factor
+    return(by.components)
+  }
 }
 process.moments.int <- function(moments, int, method) {
   if (!is.function(method)) {
@@ -282,7 +306,7 @@ check.package <- function(package.name, alternative = FALSE) {
   else return(invisible(TRUE))
 }
 make.closer.to.1 <- function(x) {
-  if (is.factor(x) || is.character(x)) return(x)
+  if (is.factor(x) || is.character(x) || all_the_same(x)) return(x)
   else if (is_binary(x)) {
     return(as.numeric(x == x[!is.na(x)][1]))
   }
@@ -328,6 +352,114 @@ int.poly.f <- function(mat, ex = NULL, int = FALSE, poly = 1, center = FALSE, se
   colnames(new) <- new.names
 
   return(new[, !single.value, drop = FALSE])
+}
+get.s.d.denom.weightit <- function(s.d.denom = NULL, estimand = NULL, weights = NULL, treat = NULL, focal = NULL) {
+  check.estimand <- check.weights <- check.focal <- bad.s.d.denom <- bad.estimand <- FALSE
+  s.d.denom.specified <- is_not_null(s.d.denom)
+  estimand.specified <- is_not_null(estimand)
+
+  if (is_not_null(weights) && !is.data.frame(weights)) weights <- data.frame(weights)
+
+  if (s.d.denom.specified) {
+    try.s.d.denom <- tryCatch(match_arg(s.d.denom, c("treated", "control", "pooled", "all"), several.ok = TRUE),
+                              error = function(cond) FALSE)
+    if (any(try.s.d.denom == FALSE)) {
+      check.estimand <- TRUE
+      bad.s.d.denom <- TRUE
+    }
+    else {
+      if (length(try.s.d.denom) > 1 && length(try.s.d.denom) != ncol(weights)) {
+        stop("s.d.denom must have length 1 or equal to the number of valid sets of weights.", call. = FALSE)
+      }
+      else s.d.denom <- try.s.d.denom
+    }
+  }
+  else {
+    check.estimand <- TRUE
+  }
+
+  if (check.estimand == TRUE) {
+    if (estimand.specified) {
+      try.estimand <- tryCatch(match_arg(tolower(estimand), c("att", "atc", "ate"), several.ok = TRUE),
+                               error = function(cond) FALSE)
+      if (any(try.estimand == FALSE)) {
+        check.focal <- TRUE
+        bad.estimand <- TRUE
+      }
+      else {
+        if (length(try.estimand) > 1 && length(try.estimand) != ncol(weights)) {
+          stop("estimand must have length 1 or equal to the number of valid sets of weights.", call. = FALSE)
+        }
+        else s.d.denom <- vapply(try.estimand, switch, character(1L), att = "treated", atc = "control", ate = "pooled")
+      }
+    }
+    else {
+      check.focal <- TRUE
+    }
+  }
+  if (check.focal == TRUE) {
+    if (is_not_null(focal)) {
+      s.d.denom <- "treated"
+      estimand <- "att"
+    }
+    else check.weights <- TRUE
+  }
+  if (check.weights == TRUE) {
+    if (is_null(weights)) {
+      s.d.denom <- "pooled"
+      estimand <- "ate"
+    }
+    else {
+      s.d.denom <- estimand <- character(ncol(weights))
+      for (i in seq_len(ncol(weights))) {
+        if (is_binary(treat)) {
+          if (all_the_same(weights[[i]][treat==1 & !check_if_zero(weights[[i]])]) &&
+              !all_the_same(weights[[i]][treat==0 & !check_if_zero(weights[[i]])])
+          ) { #if treated weights are the same and control weights differ; ATT
+            estimand[i] <- "att"
+            s.d.denom[i] <- "treated"
+          }
+          else if (all_the_same(weights[[i]][treat==0 & !check_if_zero(weights[[i]])]) &&
+                   !all_the_same(weights[[i]][treat==1 & !check_if_zero(weights[[i]])])
+          ) { #if control weights are the same and treated weights differ; ATC
+            estimand[i] <- "atc"
+            s.d.denom[i] <- "control"
+          }
+          else {
+            estimand[i] <- "ate"
+            s.d.denom[i] <- "pooled"
+          }
+        }
+        else {
+          if (length(focal) == 1) {
+            estimand[i] <- "att"
+            s.d.denom[i] <- "treated"
+          }
+          else {
+            estimand[i] <- "ate"
+            s.d.denom[i] <- "pooled"
+          }
+        }
+      }
+    }
+  }
+  if (is_not_null(weights) && length(s.d.denom) == 1) s.d.denom <- rep(s.d.denom, ncol(weights))
+
+  if (s.d.denom.specified && bad.s.d.denom && (!estimand.specified || bad.estimand)) {
+    # message("Warning: s.d.denom should be one of \"treated\", \"control\", \"pooled\", or \"all\".\n         Using \"", word_list(s.d.denom), "\" instead.")
+  }
+  else if (estimand.specified && bad.estimand) {
+    # message("Warning: the supplied estimand is not allowed. Using \"", ifelse(all_the_same(estimand), toupper(estimand)[1], word_list(toupper(estimand))), "\" instead.")
+  }
+  else if (check.focal || check.weights) {
+    # message("Note: estimand not specified; assuming ", ifelse(all_the_same(toupper(estimand)), toupper(unique(estimand)), word_list(toupper(estimand))), ".")
+  }
+
+  if (is_not_null(weights) && length(s.d.denom) != ncol(weights)) {
+    # stop("Valid inputs to s.d.denom or estimand must have length 1 or equal to the number of valid sets of weights.", call. = FALSE)
+  }
+
+  return(s.d.denom)
 }
 
 #For the user to use
@@ -407,8 +539,8 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
       if ((is.matrix(ps) && all(is.numeric(ps))) ||
           (is.data.frame(ps) && all(vapply(ps, is.numeric, logical(1L))))) {
         if (ncol(ps) == 1) {
-          if (suppressWarnings(!any(is.na(as.numeric(as.character(treat))))) &&
-            all(check_if_zero(binarize(treat) - as.numeric(as.character(treat))))) treated.level <- 1
+          if (suppressWarnings(!anyNA(as.numeric(as.character(treat)))) &&
+              all(check_if_zero(binarize(treat) - as.numeric(as.character(treat))))) treated.level <- 1
           else if (is_not_null(treated)) {
             if (treated %in% treat) treated.level <- treated
             else stop("The argument to treated must be a value in treat.", call. = FALSE)

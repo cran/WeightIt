@@ -42,7 +42,9 @@ Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing propensity score f
 \code{\link{weightit}}, \code{\link{weightitMSM}}
 }
 
-\examples{\dontrun{
+\examples{
+# Examples take a long time to run
+\dontrun{
 library("cobalt")
 data("lalonde", package = "cobalt")
 
@@ -59,5 +61,5 @@ bal.tab(W1)
                 method = "npcbps", estimand = "ATE"))
 summary(W2)
 bal.tab(W2)
-
-}}
+}
+}
