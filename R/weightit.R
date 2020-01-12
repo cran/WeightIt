@@ -1,6 +1,6 @@
 weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stabilize = FALSE, focal = NULL,
-                     by = NULL, s.weights = NULL, ps = NULL, moments = 1L, int = FALSE,
-                     verbose = FALSE, include.obj = FALSE, ...) {
+                     by = NULL, s.weights = NULL, ps = NULL, moments = 1L, int = FALSE, subclass = NULL,
+                     missing = NULL, verbose = FALSE, include.obj = FALSE, ...) {
 
   ## Checks and processing ----
 
@@ -50,10 +50,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   n <- length(treat)
 
-  if (anyNA(reported.covs) || nrow(reported.covs) != n) {
-    warning("Missing values are present in the covariates. See ?weightit for information on how these are handled.", call. = FALSE)
-    #stop("No missing values are allowed in the covariates.", call. = FALSE)
-  }
+
   if (anyNA(treat)) {
     stop("No missing values are allowed in the treatment variable.", call. = FALSE)
   }
@@ -69,6 +66,15 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   estimand <- f.e.r[["estimand"]]
   reported.estimand <- f.e.r[["reported.estimand"]]
 
+  #Process missing
+  if (anyNA(reported.covs) || nrow(reported.covs) != n) {
+    missing <- process.missing(missing, method, treat.type)
+  }
+  else missing <- ""
+
+  #Check subclass
+  if(is_not_null(subclass)) check.subclass(method, treat.type)
+
   #Process s.weights
   s.weights <- process.s.weights(s.weights, data)
 
@@ -77,7 +83,6 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   ##Process by
   if (is_not_null(A[["exact"]])) {
     message("'by' has replaced 'exact' in the weightit() syntax, but 'exact' will always work.")
-    # by.name <- deparse(A[["exact"]])
     by <- A[["exact"]]
     by.arg <- "exact"
   }
@@ -111,7 +116,9 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
                           method = method,
                           moments = moments,
                           int = int,
+                          subclass = subclass,
                           ps = ps,
+                          missing = missing,
                           include.obj = include.obj,
                           ...)
   })
@@ -123,13 +130,6 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   if (treat.type == "continuous") {if (sd(test.w, na.rm = TRUE)/mean(test.w, na.rm = TRUE) > 4) warn <- TRUE}
   else {if (any(sapply(unique(treat), function(x) sd(test.w[treat == x], na.rm = TRUE)/mean(test.w[treat == x], na.rm = TRUE) > 4))) warn <- TRUE}
   if (warn) warning("Some extreme weights were generated. Examine them with summary() and maybe trim them with trim().", call. = FALSE)
-  # #Create new data set
-  # #treat, covs, data (not in treat or covs), by
-  # treat.in.data <- treat; attr(treat.in.data, "treat.type") <- NULL
-  # data.list <- list(treat.in.data, reported.covs)
-  # o.data <- setNames(do.call("data.frame", data.list[sapply(data.list, is_not_null)]),
-  #                    c(treat.name, names(reported.covs)))
-  # o.data <- data.frame(o.data, data[names(data) %nin% names(o.data)])
 
   ## Assemble output object----
   out <- list(weights = obj$w,
@@ -144,6 +144,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
               focal = if (reported.estimand == "ATT") focal else NULL,
               by = processed.by,
               call = call,
+              info = obj$info,
               obj = obj$fit.obj)
 
   out <- clear_null(out)

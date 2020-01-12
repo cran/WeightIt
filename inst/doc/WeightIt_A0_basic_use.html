@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
@@ -13,7 +12,7 @@
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2019-10-29" />
+<meta name="date" content="2020-01-11" />
 
 <title>A Guide to Using WeightIt for Estimating Balancing Weights</title>
 
@@ -304,7 +303,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 
 <h1 class="title toc-ignore">A Guide to Using WeightIt for Estimating Balancing Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2019-10-29</h4>
+<h4 class="date">2020-01-11</h4>
 
 
 
@@ -405,44 +404,44 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 </div>
 <p>We have our outcome (<code>re78</code>), our treatment (<code>treat</code>), and the covariates for which balance is desired (<code>age</code>, <code>educ</code>, <code>race</code>, <code>married</code>, <code>nodegree</code>, <code>re74</code>, and <code>re75</code>). Using <code>cobalt</code>, we can examine the initial imbalance on the covariates:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;cobalt&quot;</span>)</a></code></pre></div>
-<pre><code>##  cobalt (Version 3.9.0.9000, Build Date: )
+<pre><code>##  cobalt (Version 4.0.0, Build Date: 2020-01-08 14:20:10 UTC)
 ##    Please read the documentation at ?bal.tab to understand the default outputs.
 ##    Submit bug reports and feature requests to https://github.com/ngreifer/cobalt/issues
 ##    Install the development version (not guaranteed to be stable) with:
 ##      devtools::install_github(&quot;ngreifer/cobalt&quot;)
 ##    Thank you for using cobalt!</code></pre>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="kw">bal.tab</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
-<a class="sourceLine" id="cb4-2" data-line-number="2">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">m.threshold =</span> <span class="fl">.1</span>)</a></code></pre></div>
+<a class="sourceLine" id="cb4-2" data-line-number="2">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">m.threshold =</span> <span class="fl">.05</span>)</a></code></pre></div>
 <pre><code>## Balance Measures
-##                Type Diff.Un     M.Threshold.Un
-## age         Contin. -0.3094 Not Balanced, &gt;0.1
-## educ        Contin.  0.0550     Balanced, &lt;0.1
-## race_black   Binary  0.6404 Not Balanced, &gt;0.1
-## race_hispan  Binary -0.0827     Balanced, &lt;0.1
-## race_white   Binary -0.5577 Not Balanced, &gt;0.1
-## married      Binary -0.3236 Not Balanced, &gt;0.1
-## nodegree     Binary  0.1114 Not Balanced, &gt;0.1
-## re74        Contin. -0.7211 Not Balanced, &gt;0.1
-## re75        Contin. -0.2903 Not Balanced, &gt;0.1
+##                Type Diff.Un      M.Threshold.Un
+## age         Contin. -0.3094 Not Balanced, &gt;0.05
+## educ        Contin.  0.0550 Not Balanced, &gt;0.05
+## race_black   Binary  0.6404 Not Balanced, &gt;0.05
+## race_hispan  Binary -0.0827 Not Balanced, &gt;0.05
+## race_white   Binary -0.5577 Not Balanced, &gt;0.05
+## married      Binary -0.3236 Not Balanced, &gt;0.05
+## nodegree     Binary  0.1114 Not Balanced, &gt;0.05
+## re74        Contin. -0.7211 Not Balanced, &gt;0.05
+## re75        Contin. -0.2903 Not Balanced, &gt;0.05
 ## 
 ## Balance tally for mean differences
-##                    count
-## Balanced, &lt;0.1         2
-## Not Balanced, &gt;0.1     7
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     9
 ## 
 ## Variable with the greatest mean difference
-##  Variable Diff.Un     M.Threshold.Un
-##      re74 -0.7211 Not Balanced, &gt;0.1
+##  Variable Diff.Un      M.Threshold.Un
+##      re74 -0.7211 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
 ## All     429     185</code></pre>
-<p>Based on this output, we can see that most variables are imbalanced in the sense that the standardized mean differences (for continuous variables) and differences in proportion (for binary variables) are greater than .1 for most variables. In particular, <code>re74</code> and <code>re75</code> are quite imbalanced, which is troubling given that they are likely strong predictors of the outcome. We will estimate weights using <code>weightit()</code> to try to attain balance on these covariates.</p>
+<p>Based on this output, we can see that all variables are imbalanced in the sense that the standardized mean differences (for continuous variables) and differences in proportion (for binary variables) are greater than .05 for all variables. In particular, <code>re74</code> and <code>re75</code> are quite imbalanced, which is troubling given that they are likely strong predictors of the outcome. We will estimate weights using <code>weightit()</code> to try to attain balance on these covariates.</p>
 <p>First, we’ll start simple, and use inverse probability weights from propensity scores generated through logistic regression. We need to supply <code>weightit()</code> with the formula for the model, the data set, the estimand (ATT), and the method of estimation (<code>&quot;ps&quot;</code>) for propensity score weights).</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;WeightIt&quot;</span>)</a>
 <a class="sourceLine" id="cb6-2" data-line-number="2">W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
 <a class="sourceLine" id="cb6-3" data-line-number="3">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ps&quot;</span>)</a>
-<a class="sourceLine" id="cb6-4" data-line-number="4">W.out <span class="co">#print the ooutput</span></a></code></pre></div>
+<a class="sourceLine" id="cb6-4" data-line-number="4">W.out <span class="co">#print the output</span></a></code></pre></div>
 <pre><code>## A weightit object
 ##  - method: &quot;ps&quot; (propensity score weighting)
 ##  - number of obs.: 614
@@ -461,7 +460,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                            
-##               1      3      4      6      7
+##               1      2      3      4      5
 ##  treated      1      1      1      1      1
 ##             597    573    411    381    303
 ##  control 3.0301 3.0592 3.2397 3.5231 3.7432
@@ -476,95 +475,95 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## Unweighted 429.000     185
 ## Weighted    99.815     185</code></pre>
 <p>These weights have quite high variability, and yield an ESS of close to 100 in the control group. Let’s see if these weights managed to yield balance on our covariates.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb10-1" data-line-number="1"><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.1</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb10-1" data-line-number="1"><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
 <pre><code>## Call
 ##  weightit(formula = treat ~ age + educ + race + married + nodegree + 
 ##     re74 + re75, data = lalonde, method = &quot;ps&quot;, estimand = &quot;ATT&quot;)
 ## 
 ## Balance Measures
-##                 Type Diff.Adj        M.Threshold V.Ratio.Adj
-## prop.score  Distance  -0.0205                         1.0324
-## age          Contin.   0.1188 Not Balanced, &gt;0.1      0.4578
-## educ         Contin.  -0.0284     Balanced, &lt;0.1      0.6636
-## race_black    Binary  -0.0022     Balanced, &lt;0.1            
-## race_hispan   Binary   0.0002     Balanced, &lt;0.1            
-## race_white    Binary   0.0021     Balanced, &lt;0.1            
-## married       Binary   0.0186     Balanced, &lt;0.1            
-## nodegree      Binary   0.0184     Balanced, &lt;0.1            
-## re74         Contin.  -0.0021     Balanced, &lt;0.1      1.3206
-## re75         Contin.   0.0110     Balanced, &lt;0.1      1.3938
+##                 Type Diff.Adj         M.Threshold V.Ratio.Adj
+## prop.score  Distance  -0.0205                          1.0324
+## age          Contin.   0.1188 Not Balanced, &gt;0.05      0.4578
+## educ         Contin.  -0.0284     Balanced, &lt;0.05      0.6636
+## race_black    Binary  -0.0022     Balanced, &lt;0.05            
+## race_hispan   Binary   0.0002     Balanced, &lt;0.05            
+## race_white    Binary   0.0021     Balanced, &lt;0.05            
+## married       Binary   0.0186     Balanced, &lt;0.05            
+## nodegree      Binary   0.0184     Balanced, &lt;0.05            
+## re74         Contin.  -0.0021     Balanced, &lt;0.05      1.3206
+## re75         Contin.   0.0110     Balanced, &lt;0.05      1.3938
 ## 
 ## Balance tally for mean differences
-##                    count
-## Balanced, &lt;0.1         8
-## Not Balanced, &gt;0.1     1
+##                     count
+## Balanced, &lt;0.05         8
+## Not Balanced, &gt;0.05     1
 ## 
 ## Variable with the greatest mean difference
-##  Variable Diff.Adj        M.Threshold
-##       age   0.1188 Not Balanced, &gt;0.1
+##  Variable Diff.Adj         M.Threshold
+##       age   0.1188 Not Balanced, &gt;0.05
 ## 
 ## Effective sample sizes
 ##            Control Treated
 ## Unadjusted 429.000     185
 ## Adjusted    99.815     185</code></pre>
-<p>For nearly all the covariates, these weights yielded very good balance. Only <code>age</code> remained imbalanced, with a standardized mean difference greater than .1 and a variance ratio greater than 2. Let’s see if we can do better. We’ll choose a different method: entropy balancing, which guarantees perfect balance on specified moments of the covariates while minimizing the entropy (a measure of dispersion) of the weights.</p>
+<p>For nearly all the covariates, these weights yielded very good balance. Only <code>age</code> remained imbalanced, with a standardized mean difference greater than .05 and a variance ratio greater than 2. Let’s see if we can do better. We’ll choose a different method: entropy balancing, which guarantees perfect balance on specified moments of the covariates while minimizing the entropy (a measure of dispersion) of the weights.</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb12-1" data-line-number="1">W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
 <a class="sourceLine" id="cb12-2" data-line-number="2">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ebal&quot;</span>)</a>
 <a class="sourceLine" id="cb12-3" data-line-number="3"><span class="kw">summary</span>(W.out)</a></code></pre></div>
 <pre><code>## Summary of weights:
 ## 
 ## - Weight ranges:
-##            Min                                  Max
-## treated 1.0000        ||                     1.0000
-## control 0.0081 |---------------------------| 4.0624
+##            Min                                 Max
+## treated 1.0000        ||                     1.000
+## control 0.0081 |---------------------------| 4.062
 ## 
 ## - Units with 5 greatest weights by group:
-##                                            
-##               1      2      3      4      5
-##  treated      1      1      1      1      1
-##             608    597    411    381    303
-##  control 3.0735 3.2348 3.4498 3.8965 4.0624
+##                                           
+##               1      2      3      4     5
+##  treated      1      1      1      1     1
+##             608    597    411    381   303
+##  control 3.0733 3.2346 3.4492 3.8959 4.062
 ## 
 ##            Ratio Coef of Var
 ## treated   1.0000      0.0000
-## control 502.3782      1.8344
-## overall 502.3782      1.1794
+## control 501.1599      1.8340
+## overall 501.1599      1.1792
 ## 
 ## - Effective Sample Sizes:
 ##            Control Treated
 ## Unweighted 429.000     185
-## Weighted    98.459     185</code></pre>
+## Weighted    98.493     185</code></pre>
 <p>The variability of the weights has not changed much, but let’s see if there are any gains in terms of balance:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb14-1" data-line-number="1"><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.1</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb14-1" data-line-number="1"><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
 <pre><code>## Call
 ##  weightit(formula = treat ~ age + educ + race + married + nodegree + 
 ##     re74 + re75, data = lalonde, method = &quot;ebal&quot;, estimand = &quot;ATT&quot;)
 ## 
 ## Balance Measures
-##                Type Diff.Adj    M.Threshold V.Ratio.Adj
-## age         Contin.       -0 Balanced, &lt;0.1      0.4096
-## educ        Contin.       -0 Balanced, &lt;0.1      0.6635
-## race_black   Binary        0 Balanced, &lt;0.1            
-## race_hispan  Binary        0 Balanced, &lt;0.1            
-## race_white   Binary       -0 Balanced, &lt;0.1            
-## married      Binary       -0 Balanced, &lt;0.1            
-## nodegree     Binary        0 Balanced, &lt;0.1            
-## re74        Contin.       -0 Balanced, &lt;0.1      1.3265
-## re75        Contin.       -0 Balanced, &lt;0.1      1.3351
+##                Type Diff.Adj     M.Threshold V.Ratio.Adj
+## age         Contin.  -0.0001 Balanced, &lt;0.05      0.4096
+## educ        Contin.   0.0000 Balanced, &lt;0.05      0.6635
+## race_black   Binary   0.0001 Balanced, &lt;0.05            
+## race_hispan  Binary   0.0000 Balanced, &lt;0.05            
+## race_white   Binary  -0.0001 Balanced, &lt;0.05            
+## married      Binary  -0.0001 Balanced, &lt;0.05            
+## nodegree     Binary   0.0000 Balanced, &lt;0.05            
+## re74        Contin.  -0.0002 Balanced, &lt;0.05      1.3259
+## re75        Contin.  -0.0001 Balanced, &lt;0.05      1.3350
 ## 
 ## Balance tally for mean differences
-##                    count
-## Balanced, &lt;0.1         9
-## Not Balanced, &gt;0.1     0
+##                     count
+## Balanced, &lt;0.05         9
+## Not Balanced, &gt;0.05     0
 ## 
 ## Variable with the greatest mean difference
-##    Variable Diff.Adj    M.Threshold
-##  race_white       -0 Balanced, &lt;0.1
+##  Variable Diff.Adj     M.Threshold
+##      re74  -0.0002 Balanced, &lt;0.05
 ## 
 ## Effective sample sizes
 ##            Control Treated
 ## Unadjusted 429.000     185
-## Adjusted    98.459     185</code></pre>
+## Adjusted    98.493     185</code></pre>
 <p>Indeed, we have achieved perfect balance on the means of the covariates. However, the variance ratio of <code>age</code> is still quite high. We could continue to try to adjust for this imbalance, but if there is reason to believe it is unlikely to affect the outcome, it may be best to leave it as is. (You can try adding <code>I(age^2)</code> to the formula and see what changes this causes.)</p>
 <p>Now that we have our weights stored in <code>W.out</code>, let’s extract them and estimate our treatment effect. We’ll use the <code>survey</code> package to incorporate the weights into our analysis.</p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb16-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;survey&quot;</span>)</a>
@@ -573,7 +572,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 <a class="sourceLine" id="cb16-4" data-line-number="4">fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(re78 <span class="op">~</span><span class="st"> </span>treat, <span class="dt">design =</span> d.w)</a>
 <a class="sourceLine" id="cb16-5" data-line-number="5"><span class="kw">coef</span>(fit)</a></code></pre></div>
 <pre><code>## (Intercept)       treat 
-##    5075.888    1273.255</code></pre>
+##    5076.188    1272.955</code></pre>
 <p>Now let’s do some inference. Although some authors recommend using “robust” sandwich standard errors to adjust for the weights (Robins et al., 2000; Hainmueller, 2012), others believe these can misleading and recommend bootstrapping instead (e.g., Chan, Yam, &amp; Zhang, 2016). We’ll examine both approaches.</p>
 <p><code>svyglm()</code> in the survey package produces robust standard errors. We’ll use the <code>jtools</code> package to provide clean summaries of our results. Similar output can be generated using <code>summary()</code> without installing <code>jtools</code>.</p>
 <div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb18-1" data-line-number="1"><span class="co">#Robust standard errors and confidence intervals</span></a>
@@ -608,13 +607,13 @@ p
 (Intercept)
 </td>
 <td style="text-align:right;">
-5075.89
+5076.19
 </td>
 <td style="text-align:right;">
-3918.36
+3918.83
 </td>
 <td style="text-align:right;">
-6233.41
+6233.55
 </td>
 <td style="text-align:right;">
 8.61
@@ -628,13 +627,13 @@ p
 treat
 </td>
 <td style="text-align:right;">
-1273.26
+1272.96
 </td>
 <td style="text-align:right;">
--347.03
+-347.21
 </td>
 <td style="text-align:right;">
-2893.54
+2893.12
 </td>
 <td style="text-align:right;">
 1.54
@@ -672,9 +671,9 @@ treat
 ## 
 ## Intervals : 
 ## Level       BCa          
-## 95%   (-343, 2864 )  
+## 95%   (-243, 3072 )  
 ## Calculations and Intervals on Original Scale</code></pre>
-<p>In this case, our confidence intervals were similar. Bootstrapping can take some time, especially with weight estimation methods that take longer, such as generalized boosted modeling (<code>method = &quot;gbm&quot;</code>), covariate balancing propensity score estimation (<code>method = &quot;cbps&quot;</code>), or entropy balancing with <code>stabilize = TRUE</code>.</p>
+<p>In this case, our confidence intervals were similar. Bootstrapping can take some time, especially with weight estimation methods that take longer, such as SuperLearner (<code>method = &quot;super&quot;</code>), covariate balancing propensity score estimation (<code>method = &quot;cbps&quot;</code>), or entropy balancing with <code>stabilize = TRUE</code>.</p>
 <p>If we wanted to produce a “doubly-robust” treatment effect estimate, we could add baseline covariates to the <code>glm()</code> (or <code>svyglm()</code>) model (in both the original effect estimation and the confidence interval estimation).</p>
 </div>
 <div id="estimating-the-effect-of-a-longitudinal-treatment" class="section level2">
@@ -773,24 +772,25 @@ treat
 <a class="sourceLine" id="cb22-2" data-line-number="2"><span class="kw">bal.tab</span>(<span class="kw">list</span>(tx1 <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</a>
 <a class="sourceLine" id="cb22-3" data-line-number="3">             tx2 <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</a>
 <a class="sourceLine" id="cb22-4" data-line-number="4">             tx3 <span class="op">~</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>use2 <span class="op">+</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0),</a>
-<a class="sourceLine" id="cb22-5" data-line-number="5">        <span class="dt">data =</span> iptwExWide, <span class="dt">m.threshold =</span> <span class="fl">.1</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
+<a class="sourceLine" id="cb22-5" data-line-number="5">        <span class="dt">data =</span> iptwExWide, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>,</a>
+<a class="sourceLine" id="cb22-6" data-line-number="6">        <span class="dt">which.time =</span> .all)</a></code></pre></div>
 <pre><code>## Balance by Time Point
 ## 
 ##  - - - Time: 1 - - - 
 ## Balance Measures
-##           Type Diff.Un     M.Threshold.Un  KS.Un
-## age    Contin.  0.3799 Not Balanced, &gt;0.1 0.2099
-## gender  Binary  0.2945 Not Balanced, &gt;0.1 0.2945
-## use0   Contin.  0.2668 Not Balanced, &gt;0.1 0.1681
+##           Type Diff.Un      M.Threshold.Un  KS.Un
+## age    Contin.  0.3799 Not Balanced, &gt;0.05 0.2099
+## gender  Binary  0.2945 Not Balanced, &gt;0.05 0.2945
+## use0   Contin.  0.2668 Not Balanced, &gt;0.05 0.1681
 ## 
 ## Balance tally for mean differences
-##                    count
-## Balanced, &lt;0.1         0
-## Not Balanced, &gt;0.1     3
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     3
 ## 
 ## Variable with the greatest mean difference
-##  Variable Diff.Un     M.Threshold.Un
-##       age  0.3799 Not Balanced, &gt;0.1
+##  Variable Diff.Un      M.Threshold.Un
+##       age  0.3799 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
@@ -798,21 +798,21 @@ treat
 ## 
 ##  - - - Time: 2 - - - 
 ## Balance Measures
-##           Type Diff.Un     M.Threshold.Un  KS.Un
-## age    Contin.  0.2240 Not Balanced, &gt;0.1 0.1331
-## gender  Binary  0.1927 Not Balanced, &gt;0.1 0.1927
-## use0   Contin.  0.1169 Not Balanced, &gt;0.1 0.0913
-## tx1     Binary  0.1695 Not Balanced, &gt;0.1 0.1695
-## use1   Contin.  0.0848     Balanced, &lt;0.1 0.0763
+##           Type Diff.Un      M.Threshold.Un  KS.Un
+## age    Contin.  0.2240 Not Balanced, &gt;0.05 0.1331
+## gender  Binary  0.1927 Not Balanced, &gt;0.05 0.1927
+## use0   Contin.  0.1169 Not Balanced, &gt;0.05 0.0913
+## tx1     Binary  0.1695 Not Balanced, &gt;0.05 0.1695
+## use1   Contin.  0.0848 Not Balanced, &gt;0.05 0.0763
 ## 
 ## Balance tally for mean differences
-##                    count
-## Balanced, &lt;0.1         1
-## Not Balanced, &gt;0.1     4
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     5
 ## 
 ## Variable with the greatest mean difference
-##  Variable Diff.Un     M.Threshold.Un
-##       age   0.224 Not Balanced, &gt;0.1
+##  Variable Diff.Un      M.Threshold.Un
+##       age   0.224 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
@@ -820,23 +820,23 @@ treat
 ## 
 ##  - - - Time: 3 - - - 
 ## Balance Measures
-##           Type Diff.Un     M.Threshold.Un  KS.Un
-## age    Contin.  0.3431 Not Balanced, &gt;0.1 0.1863
-## gender  Binary  0.1532 Not Balanced, &gt;0.1 0.1532
-## use0   Contin.  0.1859 Not Balanced, &gt;0.1 0.1350
-## tx1     Binary  0.1071 Not Balanced, &gt;0.1 0.1071
-## use1   Contin.  0.1662 Not Balanced, &gt;0.1 0.1397
-## tx2     Binary  0.2423 Not Balanced, &gt;0.1 0.2423
-## use2   Contin.  0.1087 Not Balanced, &gt;0.1 0.1161
+##           Type Diff.Un      M.Threshold.Un  KS.Un
+## age    Contin.  0.3431 Not Balanced, &gt;0.05 0.1863
+## gender  Binary  0.1532 Not Balanced, &gt;0.05 0.1532
+## use0   Contin.  0.1859 Not Balanced, &gt;0.05 0.1350
+## tx1     Binary  0.1071 Not Balanced, &gt;0.05 0.1071
+## use1   Contin.  0.1662 Not Balanced, &gt;0.05 0.1397
+## tx2     Binary  0.2423 Not Balanced, &gt;0.05 0.2423
+## use2   Contin.  0.1087 Not Balanced, &gt;0.05 0.1161
 ## 
 ## Balance tally for mean differences
-##                    count
-## Balanced, &lt;0.1         0
-## Not Balanced, &gt;0.1     7
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     7
 ## 
 ## Variable with the greatest mean difference
-##  Variable Diff.Un     M.Threshold.Un
-##       age  0.3431 Not Balanced, &gt;0.1
+##  Variable Diff.Un      M.Threshold.Un
+##       age  0.3431 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
@@ -844,14 +844,14 @@ treat
 ##  - - - - - - - - - - - 
 ## 
 ## Balance summary across all time points
-##          Times    Type Max.Diff.Un     M.Threshold.Un Max.KS.Un
-## age    1, 2, 3 Contin.      0.3799 Not Balanced, &gt;0.1    0.2099
-## gender 1, 2, 3  Binary      0.2945 Not Balanced, &gt;0.1    0.2945
-## use0   1, 2, 3 Contin.      0.2668 Not Balanced, &gt;0.1    0.1681
-## tx1       2, 3  Binary      0.1695 Not Balanced, &gt;0.1    0.1695
-## use1      2, 3 Contin.      0.1662 Not Balanced, &gt;0.1    0.1397
-## tx2          3  Binary      0.2423 Not Balanced, &gt;0.1    0.2423
-## use2         3 Contin.      0.1087 Not Balanced, &gt;0.1    0.1161
+##          Times    Type Max.Diff.Un      M.Threshold.Un Max.KS.Un
+## age    1, 2, 3 Contin.      0.3799 Not Balanced, &gt;0.05    0.2099
+## gender 1, 2, 3  Binary      0.2945 Not Balanced, &gt;0.05    0.2945
+## use0   1, 2, 3 Contin.      0.2668 Not Balanced, &gt;0.05    0.1681
+## tx1       2, 3  Binary      0.1695 Not Balanced, &gt;0.05    0.1695
+## use1      2, 3 Contin.      0.1662 Not Balanced, &gt;0.05    0.1397
+## tx2          3  Binary      0.2423 Not Balanced, &gt;0.05    0.2423
+## use2         3 Contin.      0.1087 Not Balanced, &gt;0.05    0.1161
 ## 
 ## Sample sizes
 ##  - Time 1
@@ -955,17 +955,22 @@ treat
 ## Unweighted 415.000 585.000
 ## Weighted   235.672 366.399</code></pre>
 <p>Displayed are summaries of how the weights perform at each time point with respect to variability. Next, we’ll examine how well they perform with respect to covariate balance.</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb28-1" data-line-number="1"><span class="kw">bal.tab</span>(Wmsm.out, <span class="dt">m.threshold =</span> <span class="fl">.1</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>, <span class="dt">which.time =</span> .none)</a></code></pre></div>
-<pre><code>## Balance summary across all time points
-##              Times     Type Max.Diff.Adj    M.Threshold Max.KS.Adj
-## prop.score 1, 2, 3 Distance       0.0251                    0.0935
-## age        1, 2, 3  Contin.       0.0703 Balanced, &lt;0.1     0.0796
-## gender     1, 2, 3   Binary       0.0263 Balanced, &lt;0.1     0.0263
-## use0       1, 2, 3  Contin.       0.0558 Balanced, &lt;0.1     0.0938
-## tx1           2, 3   Binary       0.0171 Balanced, &lt;0.1     0.0171
-## use1          2, 3  Contin.       0.0316 Balanced, &lt;0.1     0.0692
-## tx2              3   Binary       0.0085 Balanced, &lt;0.1     0.0085
-## use2             3  Contin.       0.0315 Balanced, &lt;0.1     0.0659
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb28-1" data-line-number="1"><span class="kw">bal.tab</span>(Wmsm.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>, <span class="dt">which.time =</span> .none)</a></code></pre></div>
+<pre><code>## Call
+##  weightitMSM(formula.list = list(tx1 ~ age + gender + use0, tx2 ~ 
+##     tx1 + use1 + age + gender + use0, tx3 ~ tx2 + use2 + tx1 + 
+##     use1 + age + gender + use0), data = iptwExWide, method = &quot;ps&quot;)
+## 
+## Balance summary across all time points
+##              Times     Type Max.Diff.Adj         M.Threshold Max.KS.Adj
+## prop.score 1, 2, 3 Distance       0.0251                         0.0935
+## age        1, 2, 3  Contin.       0.0703 Not Balanced, &gt;0.05     0.0796
+## gender     1, 2, 3   Binary       0.0263     Balanced, &lt;0.05     0.0263
+## use0       1, 2, 3  Contin.       0.0558 Not Balanced, &gt;0.05     0.0938
+## tx1           2, 3   Binary       0.0171     Balanced, &lt;0.05     0.0171
+## use1          2, 3  Contin.       0.0316     Balanced, &lt;0.05     0.0692
+## tx2              3   Binary       0.0085     Balanced, &lt;0.05     0.0085
+## use2             3  Contin.       0.0315     Balanced, &lt;0.05     0.0659
 ## 
 ## Effective sample sizes
 ##  - Time 1
@@ -998,9 +1003,14 @@ treat
 ##  in svyglm(formula = outcome ~ tx1 + tx2 + tx3, design = d.w.msm)
 ## Working 2logLR =  3.756596 p= 0.15446 
 ## (scale factors:  1.1 0.94 );  denominator df= 996</code></pre>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb34-1" data-line-number="1"><span class="kw">anova</span>(full.fit, cum.fit)</a></code></pre></div>
+<pre><code>## Working (Rao-Scott+F) LRT for tx1 tx2 tx3 tx1:tx2 tx1:tx3 tx2:tx3 tx1:tx2:tx3 - I(tx1 + tx2 + tx3)
+##  in svyglm(formula = outcome ~ tx1 * tx2 * tx3, design = d.w.msm)
+## Working 2logLR =  11.64059 p= 0.074118 
+## (scale factors:  1.4 1.2 0.93 0.89 0.85 0.7 );  denominator df= 992</code></pre>
 <p>Based on the non-significant p-value, we can assume the effects of each treatment are close enough to be treated as the same, indicating that the number of treatments received is the relevant predictor of the outcome. Now we can examine what that treatment effect is with <code>summ()</code> in <code>jtools</code> (or <code>summary()</code>).</p>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb34-1" data-line-number="1"><span class="kw">summ</span>(cum.fit, <span class="dt">confint =</span> <span class="ot">TRUE</span>, </a>
-<a class="sourceLine" id="cb34-2" data-line-number="2">     <span class="dt">model.fit =</span> <span class="ot">FALSE</span>, <span class="dt">model.info =</span> <span class="ot">FALSE</span>) </a></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb36-1" data-line-number="1"><span class="kw">summ</span>(cum.fit, <span class="dt">confint =</span> <span class="ot">TRUE</span>, </a>
+<a class="sourceLine" id="cb36-2" data-line-number="2">     <span class="dt">model.fit =</span> <span class="ot">FALSE</span>, <span class="dt">model.info =</span> <span class="ot">FALSE</span>) </a></code></pre></div>
 <table class="table table-striped table-hover table-condensed table-responsive" style="width: auto !important; margin-left: auto; margin-right: auto;">
 <thead>
 <tr>

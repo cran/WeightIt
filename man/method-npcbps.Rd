@@ -9,13 +9,13 @@ This page explains the details of estimating weights from nonparametric covariat
 In general, this method relies on estimating weights by maximizing the empirical likelihood of the data subject to balance constraints. This method relies on \code{\link[CBPS]{npCBPS}} from the \pkg{CBPS} package.
 
 \subsection{Binary Treatments}{
-For binary treatments, this method estimates the weights using \code{\link[CBPS]{npCBPS}}. The ATE is the only estimand allowed. The weights are taken from the output of the \code{npCBPS} fit object. When \code{include.obj = TRUE}, the returned object is the \code{npCBPS} fit.
+For binary treatments, this method estimates the weights using \code{\link[CBPS]{npCBPS}}. The ATE is the only estimand allowed. The weights are taken from the output of the \code{npCBPS} fit object.
 }
 \subsection{Multinomial Treatments}{
-For multinomial treatments, this method estimates the weights using \code{\link[CBPS]{npCBPS}}. The ATE is the only estimand allowed. The weights are taken from the output of the \code{npCBPS} fit object. When \code{include.obj = TRUE}, the returned object is the \code{npCBPS} fit.
+For multinomial treatments, this method estimates the weights using \code{\link[CBPS]{npCBPS}}. The ATE is the only estimand allowed. The weights are taken from the output of the \code{npCBPS} fit object.
 }
 \subsection{Continuous Treatments}{
-For continuous treatments, this method estimates the weights using \code{\link[CBPS]{npCBPS}}. The weights are taken from the output of the \code{npCBPS} fit object. When \code{include.obj = TRUE}, the returned object is the \code{npCBPS} fit.
+For continuous treatments, this method estimates the weights using \code{\link[CBPS]{npCBPS}}. The weights are taken from the output of the \code{npCBPS} fit object.
 }
 \subsection{Longitudinal Treatments}{
 For longitudinal treatments, the weights are the product of the weights estimated at each time point. This is not how \code{\link[CBPS]{CBMSM}} in the \pkg{CBPS} package estimates weights for longitudinal treatments.
@@ -24,14 +24,26 @@ For longitudinal treatments, the weights are the product of the weights estimate
 Sampling weights are supported through \code{s.weights} in all scenarios.
 }
 \subsection{Missing Data}{
-Missing data is not compatible with the nonparametric CBPS algorithm, so a few extra things happen when \code{NA}s are present in the covariates. First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is \code{NA} and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with 0s (this value is arbitrary and does not affect estimation). The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting \code{weightit} object will be the original covariates with the \code{NA}s.
+In the presence of missing data, the following value(s) for \code{missing} are allowed:
+\describe{
+\item{\code{"ind"} (default)}{
+First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is \code{NA} and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with 0s (this value is arbitrary and does not affect estimation). The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting \code{weightit} object will be the original covariates with the \code{NA}s.
+}
+}
 }
 }
 \section{Additional Arguments}{
-All argument to \code{npCBPS} can be passed through \code{weightit} or \code{weightitMSM}.
+All arguments to \code{npCBPS} can be passed through \code{weightit} or \code{weightitMSM}.
 
 All arguments take on the defaults of those in \code{npCBPS}.
 
+}
+\section{Additional Outputs}{
+\describe{
+\item{\code{obj}}{
+When \code{include.obj = TRUE}, the nonparametric CB(G)PS model fit. The output of the call to \code{\link[CBPS:npCBPS]{CBPS::npCBPS}}.
+}
+}
 }
 \references{
 
