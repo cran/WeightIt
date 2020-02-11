@@ -422,98 +422,88 @@ weightit2ps.cont <- function(covs, treat, s.weights, subset, stabilize, missing,
   data <- data.frame(treat, covs)
   formula <- formula(data)
 
-  stabilize <- TRUE
+  #Process density params
+  if (isTRUE(A[["use.kernel"]])) {
+    if (is_null(A[["bw"]])) A[["bw"]] <- "nrd0"
+    if (is_null(A[["adjust"]])) A[["adjust"]] <- 1
+    if (is_null(A[["kernel"]])) A[["kernel"]] <- "gaussian"
+    if (is_null(A[["n"]])) A[["n"]] <- 10*length(treat)
+    use.kernel <- TRUE
+    densfun <- NULL
+  }
+  else {
+    if (is_null(A[["density"]])) densfun <- dnorm
+    else if (is.function(A[["density"]])) densfun <- A[["density"]]
+    else if (is.character(A[["density"]]) && length(A[["density"]] == 1)) {
+      splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
+      if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
+        if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
+          stop(paste(A[["density"]], "is not an appropriate argument to density because",
+                     word_list(splitdens[-1], and.or = "or", quotes = TRUE), "cannot be coerced to numeric."), call. = FALSE)
+        }
+        densfun <- function(x) {
+          tryCatch(do.call(get(splitdens[1]), c(list(x), as.list(str2num(splitdens[-1])))),
+                   error = function(e) stop(paste0("Error in applying density:\n  ", conditionMessage(e)), call. = FALSE))
+        }
+      }
+      else {
+        stop(paste(A[["density"]], "is not an appropriate argument to density because",
+                   splitdens[1], "is not an available function."), call. = FALSE)
+      }
+    }
+    else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
+    use.kernel <- FALSE
+  }
 
+  #Stabilization - get dens.num
+  p.num <- treat - mean(treat)
+
+  if (use.kernel) {
+    d.n <- density(p.num, n = A[["n"]],
+                   weights = s.weights/sum(s.weights), give.Rkern = FALSE,
+                   bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
+    dens.num <- with(d.n, approxfun(x = x, y = y))(p.num)
+  }
+  else {
+    dens.num <- densfun(p.num/sd(treat))
+    if (is_null(dens.num) || !is.atomic(dens.num) || anyNA(dens.num)) {
+      stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
+    }
+    else if (any(dens.num <= 0)) {
+      stop("The input to density may not accept the full range of treatment values.", call. = FALSE)
+    }
+  }
+
+  #Estimate GPS
   if (is_null(ps)) {
+
     if (is_null(A$link)) A$link <- "identity"
     fit <- do.call("glm", c(list(formula, data = data,
                                  weights = s.weights[subset],
                                  family = gaussian(link = A$link),
                                  control = as.list(A$control))),
                    quote = TRUE)
-    p.denom <- treat - fit$fitted.values
+    gp.score <- fit$fitted.values
 
     fit.obj <- fit
-
-    if (isTRUE(A[["use.kernel"]])) {
-      if (is_null(A[["bw"]])) A[["bw"]] <- "nrd0"
-      if (is_null(A[["adjust"]])) A[["adjust"]] <- 1
-      if (is_null(A[["kernel"]])) A[["kernel"]] <- "gaussian"
-      if (is_null(A[["n"]])) A[["n"]] <- 10*length(treat)
-
-      d.d <- density(p.denom, n = A[["n"]],
-                     weights = s.weights[subset]/sum(s.weights[subset]), give.Rkern = FALSE,
-                     bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
-      dens.denom <- with(d.d, approxfun(x = x, y = y))(p.denom)
-    }
-    else {
-      if (is_null(A[["density"]])) densfun <- dnorm
-      else if (is.function(A[["density"]])) densfun <- A[["density"]]
-      else if (is.character(A[["density"]]) && length(A[["density"]] == 1)) {
-        splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
-        if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
-          if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
-            stop(paste(A[["density"]], "is not an appropriate argument to density because",
-                       word_list(splitdens[-1], and.or = "or", quotes = TRUE), "cannot be coerced to numeric."), call. = FALSE)
-          }
-          densfun <- function(x) {
-            tryCatch(do.call(get(splitdens[1]), c(list(x), as.list(str2num(splitdens[-1])))),
-                     error = function(e) stop(paste0("Error in applying density:\n  ", conditionMessage(e)), call. = FALSE))
-          }
-        }
-        else {
-          stop(paste(A[["density"]], "is not an appropriate argument to density because",
-                     splitdens[1], "is not an available function."), call. = FALSE)
-        }
-      }
-      else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
-      dens.denom <- densfun(p.denom/sqrt(summary(fit)$dispersion))
-      if (is_null(dens.denom) || !is.atomic(dens.denom) || anyNA(dens.denom)) {
-        stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
-      }
-      else if (any(dens.denom <= 0)) {
-        warning("The input to density may not accept the full range of standardized residuals of the treatment model. Some weights may be NA or zero.", call. = FALSE)
-      }
-    }
-
-    if (stabilize) {
-
-      num.fit <- do.call("glm", c(list(treat ~ 1, data = data.frame(treat = treat),
-                                       weights = s.weights[subset],
-                                       family = gaussian(link = A$link),
-                                       control = as.list(A$control))),
-                         quote = TRUE)
-
-      p.num <- treat - num.fit$fitted.values
-
-      if (isTRUE(A[["use.kernel"]])) {
-        d.n <- density(p.num, n = A[["n"]],
-                       weights = s.weights[subset]/sum(s.weights[subset]), give.Rkern = FALSE,
-                       bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
-        dens.num <- with(d.n, approxfun(x = x, y = y))(p.num)
-      }
-      else {
-        dens.num <- densfun(p.num/sqrt(summary(num.fit)$dispersion))
-        if (is_null(dens.num) || !is.atomic(dens.num) || anyNA(dens.num)) {
-          stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
-        }
-        else if (any(dens.num <= 0) && !any(dens.denom <= 0)) {
-          warning("The input to density may not accept the full range of treatment values. Some weights may be NA or zero.", call. = FALSE)
-        }
-      }
-      w <- dens.num/dens.denom
-    }
-    else {
-      w <- 1/dens.denom
-    }
   }
 
-  if (isTRUE(A[["use.kernel"]]) && isTRUE(A[["plot"]])) {
+  #Get weights
+  w <- get_cont_weights(gp.score, treat = treat, s.weights = s.weights,
+                        dens.num = dens.num, densfun = densfun,
+                        use.kernel = use.kernel, densControl = A)
+
+  if (use.kernel && isTRUE(A[["plot"]])) {
+    d.d <- density(treat - gp.score, n = A[["n"]],
+                   weights = s.weights/sum(s.weights), give.Rkern = FALSE,
+                   bw = A[["bw"]], adjust = A[["adjust"]],
+                   kernel = A[["kernel"]])
     d.d_ <- cbind(as.data.frame(d.d[c("x", "y")]), dens = "Denominator Density", stringsAsfactors = FALSE)
     d.n_ <- cbind(as.data.frame(d.n[c("x", "y")]), dens = "Numerator Density", stringsAsfactors = FALSE)
     d.all <- rbind(d.d_, d.n_)
     d.all$dens <- factor(d.all$dens, levels = c("Numerator Density", "Denominator Density"))
-    pl <- ggplot(d.all, aes(x=x,y=y)) + geom_line() + labs(title = "Weight Component Densities", x = "E[Treat|X]", y = "Density") +
+    pl <- ggplot(d.all, aes(x = x, y = y)) + geom_line() +
+      labs(title = "Weight Component Densities", x = "E[Treat|X]", y = "Density") +
       facet_grid(rows = vars(dens)) + theme(panel.background = element_rect(fill = "white"),
                                             panel.border = element_rect(fill = NA, color = "black"),
                                             axis.text.x = element_text(color = "black"),
@@ -1192,7 +1182,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
   }
 
   cv <- 0
-  available.stop.methods <- c("p.mean", "s.mean", "p.max", "s.max", "p.rms", "s.rms")
+  available.stop.methods <- expand.grid_string(c("p", "s"), c("mean", "max", "rms"), collapse = ".")
   s.m.matches <- charmatch(A[["stop.method"]], available.stop.methods)
   if (is.na(s.m.matches) || s.m.matches == 0L) {
     if (startsWith(A[["stop.method"]], "cv") && can_str2num(numcv <- substr(A[["stop.method"]], 3, nchar(A[["stop.method"]])))) {
@@ -1252,11 +1242,14 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
   A[["w"]] <- s.weights
   A[["verbose"]] <- FALSE
 
+  #Process density params
   if (isTRUE(A[["use.kernel"]])) {
     if (is_null(A[["bw"]])) A[["bw"]] <- "nrd0"
     if (is_null(A[["adjust"]])) A[["adjust"]] <- 1
     if (is_null(A[["kernel"]])) A[["kernel"]] <- "gaussian"
     if (is_null(A[["n"]])) A[["n"]] <- 10*length(treat)
+    use.kernel <- TRUE
+    densfun <- NULL
   }
   else {
     if (is_null(A[["density"]])) densfun <- dnorm
@@ -1279,12 +1272,13 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
       }
     }
     else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
+    use.kernel <- FALSE
   }
 
-  #Stabilization
+  #Stabilization - get dens.num
   p.num <- treat - mean(treat)
 
-  if (isTRUE(A[["use.kernel"]])) {
+  if (use.kernel) {
     d.n <- density(p.num, n = A[["n"]],
                    weights = s.weights/sum(s.weights), give.Rkern = FALSE,
                    bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
@@ -1300,30 +1294,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
     }
   }
 
-  get_cont_weights <- function(ps, treat, s.weights, dens.num) {
-    p.denom <- treat - ps
-
-    if (isTRUE(A[["use.kernel"]])) {
-      d.d <- density(p.denom, n = A[["n"]],
-                     weights = s.weights/sum(s.weights), give.Rkern = FALSE,
-                     bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
-      dens.denom <- with(d.d, approxfun(x = x, y = y))(p.denom)
-    }
-    else {
-      dens.denom <- densfun(p.denom/sd(p.denom))
-      if (is_null(dens.denom) || !is.atomic(dens.denom) || anyNA(dens.denom)) {
-        stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
-      }
-      else if (any(dens.denom <= 0)) {
-        stop("The input to density may not accept the full range of standardized residuals of the treatment model.", call. = FALSE)
-      }
-
-    }
-
-    w <- dens.num/dens.denom
-
-    return(w)
-  }
+  #Estimate GPS
 
   fit <- do.call(gbm::gbm.fit, A[names(A) %in% names(formals(gbm::gbm.fit))])
 
@@ -1334,9 +1305,10 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
 
     if (anyNA(iters.grid) || is_null(iters.grid) || any(iters.grid > n.trees)) stop("A problem has occurred")
 
-    ps <- gbm::predict.gbm(fit, n.trees = iters.grid, newdata = covs)
+    gps <- gbm::predict.gbm(fit, n.trees = iters.grid, newdata = covs)
 
-    w <- apply(ps, 2, get_cont_weights, treat = treat, s.weights = s.weights, dens.num = dens.num)
+    w <- apply(gps, 2, get_cont_weights, treat = treat, s.weights = s.weights, dens.num = dens.num,
+               densfun = densfun, use.kernel = use.kernel, densControl = A)
     w <- suppressMessages(apply(w, 2, trim, at = trim.at, treat = treat))
 
     iter.grid.balance <- apply(w, 2, function(w_) stop.sum(stop.fun(covs, treat, weights = w_, s.weights, bin.vars)))
@@ -1348,8 +1320,9 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
 
     if (anyNA(iters.to.check) || is_null(iters.to.check) || any(iters.to.check > n.trees)) stop("A problem has occurred")
 
-    ps <- gbm::predict.gbm(fit, n.trees = iters.to.check, newdata = covs)
-    w <- apply(ps, 2, get_cont_weights, treat = treat, s.weights = s.weights, dens.num = dens.num)
+    gps <- gbm::predict.gbm(fit, n.trees = iters.to.check, newdata = covs)
+    w <- apply(gps, 2, get_cont_weights, treat = treat, s.weights = s.weights, dens.num = dens.num,
+               densfun = densfun, use.kernel = use.kernel, densControl = A)
     w <- suppressMessages(apply(w, 2, trim, at = trim.at, treat = treat))
 
     iter.grid.balance.fine <- apply(w, 2, function(w_) stop.sum(stop.fun(covs, treat, weights = w_, s.weights, bin.vars)))
@@ -1360,6 +1333,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
                          c("tree", stop.method))
     tree.val <- unique(tree.val[order(tree.val$tree),])
     w <- w[,as.character(best.tree)]
+    gps <- gps[,as.character(best.tree)]
   }
   else {
     A["data"] <- list(data.frame(treat, covs))
@@ -1376,10 +1350,33 @@ weightit2gbm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
     best.tree <- which.min(cv.results$error)
     tree.val <- data.frame(tree = seq_along(cv.results$error),
                            error = cv.results$error)
-    ps <- gbm::predict.gbm(fit, n.trees = best.tree, newdata = covs)
-    w <- get_cont_weights(ps, treat = treat, s.weights = s.weights, dens.num = dens.num)
+    gps <- gbm::predict.gbm(fit, n.trees = best.tree, newdata = covs)
+    w <- get_cont_weights(gps, treat = treat, s.weights = s.weights, dens.num = dens.num,
+                          densfun = densfun, use.kernel = use.kernel, densControl = A)
     w <- suppressMessages(trim(w, at = trim.at, treat = treat))
   }
+
+  if (use.kernel && isTRUE(A[["plot"]])) {
+    d.d <- density(treat - gps, n = A[["n"]],
+                   weights = s.weights/sum(s.weights), give.Rkern = FALSE,
+                   bw = A[["bw"]], adjust = A[["adjust"]],
+                   kernel = A[["kernel"]])
+    d.d_ <- cbind(as.data.frame(d.d[c("x", "y")]), dens = "Denominator Density", stringsAsfactors = FALSE)
+    d.n_ <- cbind(as.data.frame(d.n[c("x", "y")]), dens = "Numerator Density", stringsAsfactors = FALSE)
+    d.all <- rbind(d.d_, d.n_)
+    d.all$dens <- factor(d.all$dens, levels = c("Numerator Density", "Denominator Density"))
+    pl <- ggplot(d.all, aes(x = x, y = y)) + geom_line() +
+      labs(title = "Weight Component Densities", x = "E[Treat|X]", y = "Density") +
+      facet_grid(rows = vars(dens)) + theme(panel.background = element_rect(fill = "white"),
+                                            panel.border = element_rect(fill = NA, color = "black"),
+                                            axis.text.x = element_text(color = "black"),
+                                            axis.text.y = element_text(color = "black"),
+                                            panel.grid.major = element_blank(),
+                                            panel.grid.minor = element_blank()
+      )
+    print(pl)
+  }
+
   obj <- list(w = w, info = list(best.tree = best.tree,
                                  tree.val = tree.val), fit.obj = fit)
   return(obj)
@@ -1560,7 +1557,7 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, moments, int, missin
 
   return(obj)
 }
-weightit2npcbps.cont <- function(covs, treat, s.weights, subset, estimand, moments, int, missing, ...) {
+weightit2npcbps.cont <- function(covs, treat, s.weights, subset, moments, int, missing, ...) {
   A <- list(...)
 
   if (!all_the_same(s.weights)) stop(paste0("Sampling weights cannot be used with method = \"npcbps\"."),
@@ -1700,6 +1697,68 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal, stabi
   obj <- list(w = w, fit.obj = fit.list)
   return(obj)
 }
+weightit2ebal.cont <- function(covs, treat, s.weights, subset, moments, int, missing, ...) {
+  A <- list(...)
+
+  covs <- covs[subset, , drop = FALSE]
+  treat <- treat[subset]
+
+  if (missing == "ind") {
+    missing.ind <- apply(covs[, apply(covs, 2, anyNA), drop = FALSE], 2, function(x) as.numeric(is.na(x)))
+    covs[is.na(covs)] <- 0
+    covs <- cbind(covs, missing.ind)
+  }
+
+  covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int))
+  covs <- apply(covs, 2, make.closer.to.1)
+  # colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
+  # covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
+
+  if (is_not_null(A[["base.weights"]])) A[["base.weight"]] <- A[["base.weights"]]
+  if (is_null(A[["base.weight"]])) {
+    q <- rep(1, length(treat))
+  }
+  else {
+    if (!is.numeric(A[["base.weight"]]) || length(A[["base.weight"]]) != length(treat)) {
+      stop("The argument to base.weight must be a numeric vector with length equal to the number of units.", call. = FALSE)
+    }
+    else q <- A[["base.weight"]]
+  }
+
+  treat_sc <- (treat - weighted.mean(treat, (s.weights)[subset])) /
+    cobalt::col_w_sd(treat, (s.weights)[subset])
+  covs_sc <- mat_div(center(covs, at = cobalt::col_w_mean(covs, (s.weights)[subset])),
+                    cobalt::col_w_sd(covs, (s.weights)[subset]))
+
+  gTX <- cbind(treat_sc, covs_sc, treat_sc*covs_sc)
+
+  #----Code written by Stefan Tubbicke---#
+  #define ojective function (Lagrange dual)
+  objective.EBCT <- function(theta) {
+    f <- log(mean(q*s.weights*exp(gTX %*% theta)))*nrow(gTX)
+    return(f)
+  }
+
+  #define gradient function (LHS of equations 8 in Tubbicke (2020))
+  gradient.EBCT<- function(theta) {
+    g <- t(gTX) %*% (q*s.weights*exp(gTX %*% theta)/(mean(q*s.weights*exp(gTX %*% theta))))
+    return(g)
+  }
+
+  opt.out <- optim(par = rep(0, ncol(gTX)),
+                   fn = objective.EBCT,
+                   gr = gradient.EBCT,
+                   method = "BFGS",
+                   control = list(trace = TRUE,
+                                  maxit = if_null_then(A[["max.iterations"]], 200)))
+
+  w <-  q*exp(gTX %*% opt.out$par)/(mean(q*exp(gTX %*% opt.out$par)))
+  #--------------------------------------#
+
+  obj <- list(w = w, fit.obj = opt.out)
+
+  return(obj)
+}
 
 #Empirical Balancing Calibration weights with ATE
 weightit2ebcw <- function(covs, treat, s.weights, subset, estimand, focal, missing, moments, int, ...) {
@@ -1820,13 +1879,44 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
   discrete <- if_null_then(A[["discrete"]], FALSE)
   if (length(discrete) != 1 || !is_(discrete, "logical")) stop("discrete must be TRUE or FALSE.", call. = FALSE)
 
+  if (identical(A[["SL.method"]], "method.balance")) {
+    if (!is_binary(treat)) stop("\"method.balance\" cannot be used with multi-category treatments.", call. = FALSE)
+
+    stop.method <- A[["stop.method"]]
+
+    if (is_null(stop.method)) {
+      warning("No stop.method was provided. Using \"es.mean\".",
+              call. = FALSE, immediate. = TRUE)
+      stop.method <- "es.mean"
+    }
+    else if (length(stop.method) > 1) {
+      warning("Only one stop.method is allowed at a time. Using just the first stop.method.",
+              call. = FALSE, immediate. = TRUE)
+      stop.method <- stop.method[1]
+    }
+
+    available.stop.methods <- expand.grid_string(c("es", "ks"), c("mean", "max", "rms"), collapse = ".")
+    s.m.matches <- charmatch(stop.method, available.stop.methods)
+    if (is.na(s.m.matches) || s.m.matches == 0L) {
+      stop(paste0("stop.method must be one of ", word_list(c(available.stop.methods), "or", quotes = TRUE), "."), call. = FALSE)
+    }
+    else stop.method <- available.stop.methods[s.m.matches]
+
+    sneaky <- 0
+    attr(sneaky, "vals") <- list(estimand = estimand, covs = covs)
+    A[["control"]] <- list(trimLogit = sneaky)
+
+    A[["SL.method"]] <- method.balance(stop.method)
+  }
+
   ps <- setNames(as.data.frame(matrix(NA_real_, ncol = nunique(treat), nrow = length(treat))),
                  levels(treat))
 
   if (is_binary(treat)) {
 
     fit.list <- do.call(SuperLearner::SuperLearner, list(Y = binarize(treat),
-                                                         X = covs, newX = covs,
+                                                         X = covs,
+                                                         newX = covs,
                                                          family = binomial(),
                                                          SL.library = A[["SL.library"]],
                                                          verbose = FALSE,
@@ -1854,7 +1944,8 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
       treat_i <- as.numeric(treat == i)
 
       fit.list[[i]] <- do.call(SuperLearner::SuperLearner, list(Y = treat_i,
-                                                                X = covs, newX = covs,
+                                                                X = covs,
+                                                                newX = covs,
                                                                 family = binomial(),
                                                                 SL.library = A[["SL.library"]],
                                                                 verbose = FALSE,
@@ -1900,8 +1991,59 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
     covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
   }
 
-  stabilize <- TRUE
+  #Process density params
+  if (isTRUE(A[["use.kernel"]])) {
+    if (is_null(A[["bw"]])) A[["bw"]] <- "nrd0"
+    if (is_null(A[["adjust"]])) A[["adjust"]] <- 1
+    if (is_null(A[["kernel"]])) A[["kernel"]] <- "gaussian"
+    if (is_null(A[["n"]])) A[["n"]] <- 10*length(treat)
+    use.kernel <- TRUE
+    densfun <- NULL
+  }
+  else {
+    if (is_null(A[["density"]])) densfun <- dnorm
+    else if (is.function(A[["density"]])) densfun <- A[["density"]]
+    else if (is.character(A[["density"]]) && length(A[["density"]] == 1)) {
+      splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
+      if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
+        if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
+          stop(paste(A[["density"]], "is not an appropriate argument to density because",
+                     word_list(splitdens[-1], and.or = "or", quotes = TRUE), "cannot be coerced to numeric."), call. = FALSE)
+        }
+        densfun <- function(x) {
+          tryCatch(do.call(get(splitdens[1]), c(list(x), as.list(str2num(splitdens[-1])))),
+                   error = function(e) stop(paste0("Error in applying density:\n  ", conditionMessage(e)), call. = FALSE))
+        }
+      }
+      else {
+        stop(paste(A[["density"]], "is not an appropriate argument to density because",
+                   splitdens[1], "is not an available function."), call. = FALSE)
+      }
+    }
+    else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
+    use.kernel <- FALSE
+  }
 
+  #Stabilization - get dens.num
+  p.num <- treat - mean(treat)
+
+  if (use.kernel) {
+    d.n <- density(p.num, n = A[["n"]],
+                   weights = s.weights/sum(s.weights), give.Rkern = FALSE,
+                   bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
+    dens.num <- with(d.n, approxfun(x = x, y = y))(p.num)
+  }
+  else {
+    dens.num <- densfun(p.num/sd(treat))
+    if (is_null(dens.num) || !is.atomic(dens.num) || anyNA(dens.num)) {
+      stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
+    }
+    else if (any(dens.num <= 0)) {
+      stop("The input to density may not accept the full range of treatment values.", call. = FALSE)
+    }
+  }
+
+  #Estimate GPS
   for (f in names(formals(SuperLearner::SuperLearner))) {
     if (f == "method") {if (is_null(B[["SL.method"]])) B[["SL.method"]] <- formals(SuperLearner::SuperLearner)[["method"]]}
     else if (f == "env") {if (is_null(B[["env"]])) B[["env"]] <- environment(SuperLearner::SuperLearner)}
@@ -1910,6 +2052,38 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
 
   discrete <- if_null_then(A[["discrete"]], FALSE)
   if (length(discrete) != 1 || !is_(discrete, "logical")) stop("discrete must be TRUE or FALSE.", call. = FALSE)
+
+  if (identical(B[["SL.method"]], "method.balance")) {
+    stop.method <- B[["stop.method"]]
+
+    if (is_null(stop.method)) {
+      warning("No stop.method was provided. Using \"p.mean\".",
+              call. = FALSE, immediate. = TRUE)
+      stop.method <- "p.mean"
+    }
+    else if (length(stop.method) > 1) {
+      warning("Only one stop.method is allowed at a time. Using just the first stop.method.",
+              call. = FALSE, immediate. = TRUE)
+      stop.method <- stop.method[1]
+    }
+
+    available.stop.methods <- expand.grid_string(c("p", "s"), c("mean", "max", "rms"), collapse = ".")
+    s.m.matches <- charmatch(stop.method, available.stop.methods)
+    if (is.na(s.m.matches) || s.m.matches == 0L) {
+      stop(paste0("stop.method must be one of ", word_list(c(available.stop.methods), "or", quotes = TRUE), "."), call. = FALSE)
+    }
+    else stop.method <- available.stop.methods[s.m.matches]
+
+    sneaky <- 0
+    attr(sneaky, "vals") <- list(covs = covs,
+                                 dens.num = dens.num,
+                                 densfun = densfun,
+                                 use.kernel = use.kernel,
+                                 densControl = A)
+    B[["control"]] <- list(trimLogit = sneaky)
+
+    B[["SL.method"]] <- method.balance.cont(stop.method)
+  }
 
   fit <- do.call(SuperLearner::SuperLearner, list(Y = treat,
                                                   X = covs, newX = covs,
@@ -1926,88 +2100,16 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
   if (discrete) gp.score <- fit$library.predict[,which.min(fit$cvRisk)]
   else gp.score <- fit$SL.predict
 
-  p.denom <- treat - gp.score
+  #Get weights
+  w <- get_cont_weights(gp.score, treat = treat, s.weights = s.weights,
+                        dens.num = dens.num, densfun = densfun,
+                        use.kernel = use.kernel, densControl = A)
 
-  info <- list(coef = fit$coef,
-               cvRisk = fit$cvRisk)
-
-  if (isTRUE(A[["use.kernel"]])) {
-    if (is_null(A[["bw"]])) A[["bw"]] <- "nrd0"
-    if (is_null(A[["adjust"]])) A[["adjust"]] <- 1
-    if (is_null(A[["kernel"]])) A[["kernel"]] <- "gaussian"
-    if (is_null(A[["n"]])) A[["n"]] <- 10*length(treat)
-
-    d.d <- density(p.denom, n = A[["n"]],
-                   weights = s.weights[subset]/sum(s.weights[subset]), give.Rkern = FALSE,
-                   bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
-    dens.denom <- with(d.d, approxfun(x = x, y = y))(p.denom)
-  }
-  else {
-    if (is_null(A[["density"]])) densfun <- dnorm
-    else if (is.function(A[["density"]])) densfun <- A[["density"]]
-    else if (is.character(A[["density"]]) && length(A[["density"]] == 1)) {
-      splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
-      if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
-        if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
-          stop(paste(A[["density"]], "is not an appropriate argument to density because",
-                     word_list(splitdens[-1], quotes = TRUE, and.or = "or"), "cannot be coerced to numeric."), call. = FALSE)
-        }
-        densfun <- function(x) {
-          tryCatch(do.call(get(splitdens[1]), c(list(x), as.list(str2num(splitdens[-1])))),
-                   error = function(e) stop(paste0("Error in applying density:\n  ", conditionMessage(e)), call. = FALSE))
-        }
-      }
-      else {
-        stop(paste(A[["density"]], "is not an appropriate argument to density because",
-                   splitdens[1], "is not an available function."), call. = FALSE)
-      }
-    }
-    else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
-
-    dens.denom <- densfun(p.denom/sd(p.denom))
-
-    if (is_null(dens.denom) || !is.atomic(dens.denom) || anyNA(dens.denom)) {
-      stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
-    }
-    else if (any(dens.denom <= 0)) {
-      warning("The input to density may not accept the full range of standardized residuals of the treatment model. Some weights may be NA or zero.", call. = FALSE)
-    }
-  }
-
-  if (stabilize) {
-
-    if (is_null(A[["link"]])) A[["link"]] <- "identity"
-    num.fit <- do.call(glm, list(treat ~ 1,
-                                 data = data.frame(treat = treat),
-                                 weights = s.weights[subset],
-                                 family = gaussian(link = A[["link"]]),
-                                 control = as.list(A[["control"]])),
-                       quote = TRUE)
-
-    p.num <- treat - num.fit$fitted.values
-
-    if (isTRUE(A[["use.kernel"]])) {
-      d.n <- density(p.num, n = A[["n"]],
-                     weights = s.weights[subset]/sum(s.weights[subset]), give.Rkern = FALSE,
-                     bw = A[["bw"]], adjust = A[["adjust"]], kernel = A[["kernel"]])
-      dens.num <- with(d.n, approxfun(x = x, y = y))(p.num)
-    }
-    else {
-      dens.num <- densfun(p.num/sqrt(summary(num.fit)$dispersion))
-      if (is_null(dens.num) || !is.atomic(dens.num) || anyNA(dens.num)) {
-        stop("There was a problem with the output of density. Try another density function or leave it blank to use the normal density.", call. = FALSE)
-      }
-      else if (any(dens.num <= 0) && !any(dens.denom <= 0)) {
-        warning("The input to density may not accept the full range of treatment values. Some weights may be NA or zero.", call. = FALSE)
-      }
-    }
-    w <- dens.num/dens.denom
-  }
-  else {
-    w <- 1/dens.denom
-  }
-
-  if (isTRUE(A[["use.kernel"]]) && isTRUE(A[["plot"]])) {
+  if (use.kernel && isTRUE(A[["plot"]])) {
+    d.d <- density(treat - gp.score, n = A[["n"]],
+                   weights = s.weights/sum(s.weights), give.Rkern = FALSE,
+                   bw = A[["bw"]], adjust = A[["adjust"]],
+                   kernel = A[["kernel"]])
     d.d_ <- cbind(as.data.frame(d.d[c("x", "y")]), dens = "Denominator Density", stringsAsfactors = FALSE)
     d.n_ <- cbind(as.data.frame(d.n[c("x", "y")]), dens = "Numerator Density", stringsAsfactors = FALSE)
     d.all <- rbind(d.d_, d.n_)
@@ -2023,6 +2125,9 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
       )
     print(pl)
   }
+
+  info <- list(coef = fit$coef,
+               cvRisk = fit$cvRisk)
 
   obj <- list(w = w, info = info, fit.obj = fit)
   return(obj)

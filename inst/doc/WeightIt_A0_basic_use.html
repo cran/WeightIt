@@ -12,7 +12,7 @@
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2020-01-11" />
+<meta name="date" content="2020-02-09" />
 
 <title>A Guide to Using WeightIt for Estimating Balancing Weights</title>
 
@@ -303,7 +303,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 
 <h1 class="title toc-ignore">A Guide to Using WeightIt for Estimating Balancing Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2020-01-11</h4>
+<h4 class="date">2020-02-09</h4>
 
 
 
@@ -451,9 +451,10 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ##  - covariates: age, educ, race, married, nodegree, re74, re75</code></pre>
 <p>Printing the output of <code>weightit()</code> displays a summary of how the weights were estimated. Let’s examine the quality of the weights using <code>summary()</code>. Weights with low variability are desirable because they improve the precision of the estimator. This variability is presented in several ways: by the ratio of the largest weight to the smallest in each group, the coefficient of variation (standard deviation divided by the mean) of the weights in each group, and the effective sample size computed from the weights. We want a small ratio, a smaller coefficient of variation, and a large effective sample size (ESS). What constitutes these values is mostly relative, though, and must be balanced with other constraints, including covariate balance. These metrics are best used when comparing weighting methods, but the ESS can give a sense of how much information remains in the weighted sample on a familiar scale.</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb8-1" data-line-number="1"><span class="kw">summary</span>(W.out)</a></code></pre></div>
-<pre><code>## Summary of weights:
+<pre><code>##                  Summary of weights
 ## 
 ## - Weight ranges:
+## 
 ##            Min                                  Max
 ## treated 1.0000         ||                    1.0000
 ## control 0.0092 |---------------------------| 3.7432
@@ -465,12 +466,15 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ##             597    573    411    381    303
 ##  control 3.0301 3.0592 3.2397 3.5231 3.7432
 ## 
-##            Ratio Coef of Var
-## treated   1.0000      0.0000
-## control 408.4971      1.8181
-## overall 408.4971      1.1737
+## - Weight statistics:
+## 
+##         Coef of Var   MAD Entropy
+## treated       0.000 0.000   0.000
+## control       1.818 1.289 114.992
+## overall       1.174 0.962  82.732
 ## 
 ## - Effective Sample Sizes:
+## 
 ##            Control Treated
 ## Unweighted 429.000     185
 ## Weighted    99.815     185</code></pre>
@@ -510,9 +514,10 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb12-1" data-line-number="1">W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
 <a class="sourceLine" id="cb12-2" data-line-number="2">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ebal&quot;</span>)</a>
 <a class="sourceLine" id="cb12-3" data-line-number="3"><span class="kw">summary</span>(W.out)</a></code></pre></div>
-<pre><code>## Summary of weights:
+<pre><code>##                  Summary of weights
 ## 
 ## - Weight ranges:
+## 
 ##            Min                                 Max
 ## treated 1.0000        ||                     1.000
 ## control 0.0081 |---------------------------| 4.062
@@ -524,12 +529,15 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ##             608    597    411    381   303
 ##  control 3.0733 3.2346 3.4492 3.8959 4.062
 ## 
-##            Ratio Coef of Var
-## treated   1.0000      0.0000
-## control 501.1599      1.8340
-## overall 501.1599      1.1792
+## - Weight statistics:
+## 
+##         Coef of Var   MAD Entropy
+## treated       0.000 0.000   0.000
+## control       1.834 1.287 111.587
+## overall       1.179 0.962  79.861
 ## 
 ## - Effective Sample Sizes:
+## 
 ##            Control Treated
 ## Unweighted 429.000     185
 ## Weighted    98.493     185</code></pre>
@@ -671,7 +679,7 @@ treat
 ## 
 ## Intervals : 
 ## Level       BCa          
-## 95%   (-243, 3072 )  
+## 95%   (-262, 3022 )  
 ## Calculations and Intervals on Original Scale</code></pre>
 <p>In this case, our confidence intervals were similar. Bootstrapping can take some time, especially with weight estimation methods that take longer, such as SuperLearner (<code>method = &quot;super&quot;</code>), covariate balancing propensity score estimation (<code>method = &quot;cbps&quot;</code>), or entropy balancing with <code>stabilize = TRUE</code>.</p>
 <p>If we wanted to produce a “doubly-robust” treatment effect estimate, we could add baseline covariates to the <code>glm()</code> (or <code>svyglm()</code>) model (in both the original effect estimation and the confidence interval estimation).</p>
@@ -884,10 +892,11 @@ treat
 ##     + after time 2: tx2, use2, tx1, use1, age, gender, use0</code></pre>
 <p>No matter which method is selected, <code>weightitMSM()</code> estimates separate weights for each time period and then takes the product of the weights for each individual to arrive at the final estimated weights. Printing the output of <code>weightitMSM()</code> provides some details about the function call and the output. We can take a look at the quality of the weights with <code>summary()</code>, just as we could for point treatments.</p>
 <div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb26-1" data-line-number="1"><span class="kw">summary</span>(Wmsm.out)</a></code></pre></div>
-<pre><code>## Summary of weights:
+<pre><code>##                  Summary of weights
 ## 
-##  - - - - - - - - - - Time 1 - - - - - - - - - -
+##                        Time 1                       
 ## - Weight ranges:
+## 
 ##            Min                                   Max
 ## treated 1.6667 |---|                         15.5292
 ## control 2.6123 |---------------------------| 82.2349
@@ -899,18 +908,22 @@ treat
 ##              288     176     147      72      52
 ##  control 44.8027 46.1355 58.4164 79.8919 82.2349
 ## 
-##           Ratio Coef of Var
-## treated  9.3171      0.4808
-## control 31.4795      0.7679
-## overall 49.3385      0.8569
+## - Weight statistics:
+## 
+##         Coef of Var   MAD  Entropy
+## treated       0.481 0.376 1317.833
+## control       0.768 0.494  819.850
+## overall       0.857 0.520 2314.014
 ## 
 ## - Effective Sample Sizes:
+## 
 ##            Control Treated
 ## Unweighted  294.00 706.000
 ## Weighted    185.18 573.598
 ## 
-##  - - - - - - - - - - Time 2 - - - - - - - - - -
+##                        Time 2                       
 ## - Weight ranges:
+## 
 ##            Min                                   Max
 ## treated 1.6667 |---------------------------| 82.2349
 ## control 2.6123 |--------------------------|  79.8919
@@ -922,18 +935,22 @@ treat
 ##              265     139     103      47      39
 ##  control 39.7862 42.2256 44.8027 46.1355 79.8919
 ## 
-##           Ratio Coef of Var
-## treated 49.3385      0.9605
-## control 30.5826      0.7375
-## overall 49.3385      0.8569
+## - Weight statistics:
+## 
+##         Coef of Var   MAD  Entropy
+## treated       0.960 0.653 1218.348
+## control       0.737 0.384 1095.956
+## overall       0.857 0.520 2314.014
 ## 
 ## - Effective Sample Sizes:
+## 
 ##            Control Treated
 ## Unweighted 492.000 508.000
 ## Weighted   318.903 264.487
 ## 
-##  - - - - - - - - - - Time 3 - - - - - - - - - -
+##                        Time 3                       
 ## - Weight ranges:
+## 
 ##            Min                                   Max
 ## treated 1.6667 |-------------|               44.8027
 ## control 2.6123 |---------------------------| 82.2349
@@ -945,12 +962,15 @@ treat
 ##              403     264     226     224     110
 ##  control 42.9442 46.1355 58.4164 79.8919 82.2349
 ## 
-##           Ratio Coef of Var
-## treated 26.8803      0.7731
-## control 31.4795      0.8734
-## overall 49.3385      0.8569
+## - Weight statistics:
+## 
+##         Coef of Var   MAD  Entropy
+## treated       0.773 0.565 1267.537
+## control       0.873 0.469 1023.060
+## overall       0.857 0.520 2314.014
 ## 
 ## - Effective Sample Sizes:
+## 
 ##            Control Treated
 ## Unweighted 415.000 585.000
 ## Weighted   235.672 366.399</code></pre>
