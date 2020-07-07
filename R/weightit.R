@@ -1,5 +1,5 @@
 weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stabilize = FALSE, focal = NULL,
-                     by = NULL, s.weights = NULL, ps = NULL, moments = 1L, int = FALSE, subclass = NULL,
+                     by = NULL, s.weights = NULL, ps = NULL, moments = NULL, int = FALSE, subclass = NULL,
                      missing = NULL, verbose = FALSE, include.obj = FALSE, ...) {
 
   ## Checks and processing ----
@@ -9,18 +9,18 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   #Checks
   if (is_null(ps)) {
     if (is_null(formula) || is_null(class(formula)) || !is.formula(formula, 2)) {
-      stop("formula must be a formula relating treatment to covariates.", call. = FALSE)
+      stop("'formula' must be a formula relating treatment to covariates.", call. = FALSE)
     }
   }
   else {
     if (!(is.character(ps) && length(ps) == 1) && !is.numeric(ps)) {
-      stop("The argument to ps must be a vector or data frame of propensity scores or the (quoted) names of variables in data that contain propensity scores.", call. = FALSE)
+      stop("The argument to 'ps' must be a vector or data frame of propensity scores or the (quoted) names of variables in 'data' that contain propensity scores.", call. = FALSE)
     }
     if (is.character(ps) && length(ps)==1) {
       if (ps %in% names(data)) {
         ps <- data[[ps]]
       }
-      else stop("The name supplied to ps is not the name of a variable in data.", call. = FALSE)
+      else stop("The name supplied to 'ps' is not the name of a variable in 'data'.", call. = FALSE)
     }
     method <- "ps"
   }
@@ -47,6 +47,9 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   if (is_null(covs)) stop("No covariates were specified.", call. = FALSE)
   if (is_null(treat)) stop("No treatment variable was specified.", call. = FALSE)
+  if (length(treat) != nrow(covs)) {
+    stop("Treatment and covariates must have the same number of units.", call. = FALSE)
+  }
 
   n <- length(treat)
 
@@ -67,7 +70,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   reported.estimand <- f.e.r[["reported.estimand"]]
 
   #Process missing
-  if (anyNA(reported.covs) || nrow(reported.covs) != n) {
+  if (anyNA(reported.covs)) {
     missing <- process.missing(missing, method, treat.type)
   }
   else missing <- ""
@@ -93,7 +96,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   #Process moments and int
   moments.int <- process.moments.int(moments, int, method)
-  moments <- moments.int["moments"]; int <- moments.int["int"]
+  moments <- moments.int[["moments"]]; int <- moments.int[["int"]]
 
   call <- match.call()
   # args <- list(...)
@@ -200,7 +203,8 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
     out$weight.top <- list(all = sort(setNames(top.weights, which(w %in% top.weights)[seq_len(top)])))
     out$coef.of.var <- c(all = sd(w)/mean_fast(w))
     out$scaled.mad <- c(all = mean.abs.dev(w)/mean_fast(w))
-    out$negative.entropy <- c(all = sum(w*log(w))/mean(w))
+    out$negative.entropy <- c(all = sum(w[w>0]*log(w[w>0]))/sum(w[w>0]))
+    out$num.zeros <- c(overall = sum(check_if_zero(w)))
 
     nn <- as.data.frame(matrix(0, ncol = 1, nrow = 2))
     nn[1, ] <- ESS(sw)
@@ -228,10 +232,13 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
                          overall = sd(w)/mean_fast(w))
     out$scaled.mad <- c(treated = mean.abs.dev(w[t==1])/mean_fast(w[t==1]),
                         control = mean.abs.dev(w[t==0])/mean_fast(w[t==0]),
-                        all = mean.abs.dev(w)/mean_fast(w))
-    out$negative.entropy <- c(treated = sum(w[t==1]*log(w[t==1]))/mean_fast(w[t==1]),
-                              control = sum(w[t==0]*log(w[t==0]))/mean_fast(w[t==0]),
-                              all = sum(w*log(w))/mean_fast(w))
+                        overall = mean.abs.dev(w)/mean_fast(w))
+    out$negative.entropy <- c(treated = sum(w[t==1 & w>0]*log(w[t==1 & w>0]))/sum(w[t==1 & w>0]),
+                              control = sum(w[t==0 & w>0]*log(w[t==0 & w>0]))/sum(w[t==0 & w>0]),
+                              overall = sum(w[w>0]*log(w[w>0]))/sum(w[w>0]))
+    out$num.zeros <- c(treated = sum(check_if_zero(w[t==1])),
+                       control = sum(check_if_zero(w[t==0])),
+                       overall = sum(check_if_zero(w)))
 
     #dc <- weightit$discarded
 
@@ -253,12 +260,14 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
                             levels(t))
     out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w %in% top.weights[[x]] & t == x)[seq_len(top)]))),
                                names(top.weights))
-    out$coef.of.var <- c(sapply(levels(t), function(x) sd(w[t==x])/mean_fast(w[t==x])),
+    out$coef.of.var <- c(vapply(levels(t), function(x) sd(w[t==x])/mean_fast(w[t==x]), numeric(1L)),
                          overall = sd(w)/mean_fast(w))
-    out$scaled.mad <- c(sapply(levels(t), function(x) mean.abs.dev(w[t==x])/mean_fast(w[t==x])),
+    out$scaled.mad <- c(vapply(levels(t), function(x) mean.abs.dev(w[t==x])/mean_fast(w[t==x]), numeric(1L)),
                         overall = mean.abs.dev(w)/mean_fast(w))
-    out$negative.entropy <- c(sapply(levels(t), function(x) sum(w[t==x]*log(w[t==x]))/mean_fast(w[t==x])),
-                         overall = sum(w*log(w))/mean_fast(w))
+    out$negative.entropy <- c(vapply(levels(t), function(x) sum(w[t==x & w>0]*log(w[t==x & w>0]))/sum(w[t==x & w>0]), numeric(1L)),
+                         overall = sum(w[w>0]*log(w[w>0]))/sum(w[w>0]))
+    out$num.zeros <- c(vapply(levels(t), function(x) sum(check_if_zero(w[t==x])), numeric(1L)),
+                       overall = sum(check_if_zero(w)))
 
     nn <- as.data.frame(matrix(0, nrow = 2, ncol = nunique(t)))
     for (i in seq_len(nunique(t))) {
@@ -300,8 +309,9 @@ print.summary.weightit <- function(x, ...) {
   cat("\n- " %+% italic("Weight statistics") %+% ":\n\n")
   print.data.frame(round_df_char(setNames(as.data.frame(cbind(x$coef.of.var,
                                                               x$scaled.mad,
-                                                              x$negative.entropy)),
-                                        c("Coef of Var", "MAD", "Entropy")), 3))
+                                                              x$negative.entropy,
+                                                              x$num.zeros)),
+                                        c("Coef of Var", "MAD", "Entropy", "# Zeros")), 3))
   cat("\n- " %+% italic("Effective Sample Sizes") %+% ":\n\n")
   print.data.frame(round_df_char(x$effective.sample.size, 3))
   invisible(x)

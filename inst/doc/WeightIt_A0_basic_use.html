@@ -8,21 +8,37 @@
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2020-02-09" />
+<meta name="date" content="2020-07-07" />
 
 <title>A Guide to Using WeightIt for Estimating Balancing Weights</title>
 
+<script>// Hide empty <a> tag within highlighted CodeBlock for screen reader accessibility (see https://github.com/jgm/pandoc/issues/6352#issuecomment-626106786) -->
+// v0.0.1
+// Written by JooYoung Seo (jooyoung@psu.edu) and Atsushi Yasumoto on June 1st, 2020.
+
+document.addEventListener('DOMContentLoaded', function() {
+  const codeList = document.getElementsByClassName("sourceCode");
+  for (var i = 0; i < codeList.length; i++) {
+    var linkList = codeList[i].getElementsByTagName('a');
+    for (var j = 0; j < linkList.length; j++) {
+      if (linkList[j].innerHTML === "") {
+        linkList[j].setAttribute('aria-hidden', 'true');
+      }
+    }
+  }
+});
+</script>
 
 
 <style type="text/css">code{white-space: pre;}</style>
 <style type="text/css" data-origin="pandoc">
-a.sourceLine { display: inline-block; line-height: 1.25; }
-a.sourceLine { pointer-events: none; color: inherit; text-decoration: inherit; }
-a.sourceLine:empty { height: 1.2em; }
+code.sourceCode > span { display: inline-block; line-height: 1.25; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode { white-space: pre; position: relative; }
 div.sourceCode { margin: 1em 0; }
@@ -32,14 +48,16 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 code.sourceCode { white-space: pre-wrap; }
-a.sourceLine { text-indent: -1em; padding-left: 1em; }
+code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
-pre.numberSource a.sourceLine
-  { position: relative; left: -4em; }
-pre.numberSource a.sourceLine::before
-  { content: attr(data-line-number);
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
     position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; pointer-events: all; display: inline-block;
+    border: none; display: inline-block;
     -webkit-touch-callout: none; -webkit-user-select: none;
     -khtml-user-select: none; -moz-user-select: none;
     -ms-user-select: none; user-select: none;
@@ -48,9 +66,9 @@ pre.numberSource a.sourceLine::before
   }
 pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
 div.sourceCode
-  {  }
+  {   }
 @media screen {
-a.sourceLine::before { text-decoration: underline; }
+code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 code span.al { color: #ff0000; font-weight: bold; } /* Alert */
 code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
@@ -117,9 +135,6 @@ padding-right: 2em;
 font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 font-size: 14px;
 line-height: 1.35;
-}
-#header {
-text-align: center;
 }
 #TOC {
 clear: both;
@@ -288,7 +303,8 @@ code > span.st { color: #d14; }
 code > span.co { color: #888888; font-style: italic; } 
 code > span.ot { color: #007020; } 
 code > span.al { color: #ff0000; font-weight: bold; } 
-code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61717; background-color: #e3d2d2; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
 </style>
 
 
@@ -303,7 +319,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 
 <h1 class="title toc-ignore">A Guide to Using WeightIt for Estimating Balancing Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2020-02-09</h4>
+<h4 class="date">2020-07-07</h4>
 
 
 
@@ -315,8 +331,8 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 <div id="estimating-the-effect-of-a-point-treatment" class="section level2">
 <h2>Estimating the Effect of a Point Treatment</h2>
 <p>First we will use the Lalonde dataset to estimate the effect of a point treatment. We’ll use the version of the data set that resides within the <code>cobalt</code> package, which we will use later on as well. Here, we are interested in the average treatment effect on the treated (ATT).</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb1-1" data-line-number="1"><span class="kw">data</span>(<span class="st">&quot;lalonde&quot;</span>, <span class="dt">package =</span> <span class="st">&quot;cobalt&quot;</span>)</a>
-<a class="sourceLine" id="cb1-2" data-line-number="2"><span class="kw">head</span>(lalonde)</a></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">data</span>(<span class="st">&quot;lalonde&quot;</span>, <span class="dt">package =</span> <span class="st">&quot;cobalt&quot;</span>)</span>
+<span id="cb1-2"><a href="#cb1-2"></a><span class="kw">head</span>(lalonde)</span></code></pre></div>
 <div class="kable-table">
 <table>
 <thead>
@@ -403,15 +419,10 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 </table>
 </div>
 <p>We have our outcome (<code>re78</code>), our treatment (<code>treat</code>), and the covariates for which balance is desired (<code>age</code>, <code>educ</code>, <code>race</code>, <code>married</code>, <code>nodegree</code>, <code>re74</code>, and <code>re75</code>). Using <code>cobalt</code>, we can examine the initial imbalance on the covariates:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;cobalt&quot;</span>)</a></code></pre></div>
-<pre><code>##  cobalt (Version 4.0.0, Build Date: 2020-01-08 14:20:10 UTC)
-##    Please read the documentation at ?bal.tab to understand the default outputs.
-##    Submit bug reports and feature requests to https://github.com/ngreifer/cobalt/issues
-##    Install the development version (not guaranteed to be stable) with:
-##      devtools::install_github(&quot;ngreifer/cobalt&quot;)
-##    Thank you for using cobalt!</code></pre>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb4-1" data-line-number="1"><span class="kw">bal.tab</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
-<a class="sourceLine" id="cb4-2" data-line-number="2">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">m.threshold =</span> <span class="fl">.05</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">library</span>(<span class="st">&quot;cobalt&quot;</span>)</span></code></pre></div>
+<pre><code>##  cobalt (Version 4.2.2, Build Date: )</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">bal.tab</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</span>
+<span id="cb4-2"><a href="#cb4-2"></a>        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">m.threshold =</span> <span class="fl">.05</span>)</span></code></pre></div>
 <pre><code>## Balance Measures
 ##                Type Diff.Un      M.Threshold.Un
 ## age         Contin. -0.3094 Not Balanced, &gt;0.05
@@ -438,10 +449,10 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## All     429     185</code></pre>
 <p>Based on this output, we can see that all variables are imbalanced in the sense that the standardized mean differences (for continuous variables) and differences in proportion (for binary variables) are greater than .05 for all variables. In particular, <code>re74</code> and <code>re75</code> are quite imbalanced, which is troubling given that they are likely strong predictors of the outcome. We will estimate weights using <code>weightit()</code> to try to attain balance on these covariates.</p>
 <p>First, we’ll start simple, and use inverse probability weights from propensity scores generated through logistic regression. We need to supply <code>weightit()</code> with the formula for the model, the data set, the estimand (ATT), and the method of estimation (<code>&quot;ps&quot;</code>) for propensity score weights).</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;WeightIt&quot;</span>)</a>
-<a class="sourceLine" id="cb6-2" data-line-number="2">W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
-<a class="sourceLine" id="cb6-3" data-line-number="3">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ps&quot;</span>)</a>
-<a class="sourceLine" id="cb6-4" data-line-number="4">W.out <span class="co">#print the output</span></a></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">library</span>(<span class="st">&quot;WeightIt&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2"></a>W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</span>
+<span id="cb6-3"><a href="#cb6-3"></a>        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ps&quot;</span>)</span>
+<span id="cb6-4"><a href="#cb6-4"></a>W.out <span class="co">#print the output</span></span></code></pre></div>
 <pre><code>## A weightit object
 ##  - method: &quot;ps&quot; (propensity score weighting)
 ##  - number of obs.: 614
@@ -450,7 +461,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ##  - estimand: ATT (focal: 1)
 ##  - covariates: age, educ, race, married, nodegree, re74, re75</code></pre>
 <p>Printing the output of <code>weightit()</code> displays a summary of how the weights were estimated. Let’s examine the quality of the weights using <code>summary()</code>. Weights with low variability are desirable because they improve the precision of the estimator. This variability is presented in several ways: by the ratio of the largest weight to the smallest in each group, the coefficient of variation (standard deviation divided by the mean) of the weights in each group, and the effective sample size computed from the weights. We want a small ratio, a smaller coefficient of variation, and a large effective sample size (ESS). What constitutes these values is mostly relative, though, and must be balanced with other constraints, including covariate balance. These metrics are best used when comparing weighting methods, but the ESS can give a sense of how much information remains in the weighted sample on a familiar scale.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb8-1" data-line-number="1"><span class="kw">summary</span>(W.out)</a></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1"></a><span class="kw">summary</span>(W.out)</span></code></pre></div>
 <pre><code>##                  Summary of weights
 ## 
 ## - Weight ranges:
@@ -461,17 +472,17 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                            
-##               1      2      3      4      5
+##               1      2      3      5      6
 ##  treated      1      1      1      1      1
 ##             597    573    411    381    303
 ##  control 3.0301 3.0592 3.2397 3.5231 3.7432
 ## 
 ## - Weight statistics:
 ## 
-##         Coef of Var   MAD Entropy
-## treated       0.000 0.000   0.000
-## control       1.818 1.289 114.992
-## overall       1.174 0.962  82.732
+##         Coef of Var   MAD Entropy # Zeros
+## treated       0.000 0.000   0.000       0
+## control       1.818 1.289   0.268       0
+## overall       1.174 0.962   0.135       0
 ## 
 ## - Effective Sample Sizes:
 ## 
@@ -479,14 +490,13 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## Unweighted 429.000     185
 ## Weighted    99.815     185</code></pre>
 <p>These weights have quite high variability, and yield an ESS of close to 100 in the control group. Let’s see if these weights managed to yield balance on our covariates.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb10-1" data-line-number="1"><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</span></code></pre></div>
 <pre><code>## Call
-##  weightit(formula = treat ~ age + educ + race + married + nodegree + 
-##     re74 + re75, data = lalonde, method = &quot;ps&quot;, estimand = &quot;ATT&quot;)
+##  weightit(formula = treat ~ age + educ + race + married + nodegree + re74 + re75, data = lalonde, method = &quot;ps&quot;, estimand = &quot;ATT&quot;)
 ## 
 ## Balance Measures
 ##                 Type Diff.Adj         M.Threshold V.Ratio.Adj
-## prop.score  Distance  -0.0205                          1.0324
+## prop.score  Distance  -0.0205     Balanced, &lt;0.05      1.0324
 ## age          Contin.   0.1188 Not Balanced, &gt;0.05      0.4578
 ## educ         Contin.  -0.0284     Balanced, &lt;0.05      0.6636
 ## race_black    Binary  -0.0022     Balanced, &lt;0.05            
@@ -499,7 +509,7 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## 
 ## Balance tally for mean differences
 ##                     count
-## Balanced, &lt;0.05         8
+## Balanced, &lt;0.05         9
 ## Not Balanced, &gt;0.05     1
 ## 
 ## Variable with the greatest mean difference
@@ -511,9 +521,9 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## Unadjusted 429.000     185
 ## Adjusted    99.815     185</code></pre>
 <p>For nearly all the covariates, these weights yielded very good balance. Only <code>age</code> remained imbalanced, with a standardized mean difference greater than .05 and a variance ratio greater than 2. Let’s see if we can do better. We’ll choose a different method: entropy balancing, which guarantees perfect balance on specified moments of the covariates while minimizing the entropy (a measure of dispersion) of the weights.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb12-1" data-line-number="1">W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
-<a class="sourceLine" id="cb12-2" data-line-number="2">        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ebal&quot;</span>)</a>
-<a class="sourceLine" id="cb12-3" data-line-number="3"><span class="kw">summary</span>(W.out)</a></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1"></a>W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</span>
+<span id="cb12-2"><a href="#cb12-2"></a>        <span class="dt">data =</span> lalonde, <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ebal&quot;</span>)</span>
+<span id="cb12-3"><a href="#cb12-3"></a><span class="kw">summary</span>(W.out)</span></code></pre></div>
 <pre><code>##                  Summary of weights
 ## 
 ## - Weight ranges:
@@ -531,10 +541,10 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## 
 ## - Weight statistics:
 ## 
-##         Coef of Var   MAD Entropy
-## treated       0.000 0.000   0.000
-## control       1.834 1.287 111.587
-## overall       1.179 0.962  79.861
+##         Coef of Var   MAD Entropy # Zeros
+## treated       0.000 0.000    0.00       0
+## control       1.834 1.287    0.26       0
+## overall       1.179 0.962    0.13       0
 ## 
 ## - Effective Sample Sizes:
 ## 
@@ -542,10 +552,9 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## Unweighted 429.000     185
 ## Weighted    98.493     185</code></pre>
 <p>The variability of the weights has not changed much, but let’s see if there are any gains in terms of balance:</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb14-1" data-line-number="1"><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1"></a><span class="kw">bal.tab</span>(W.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.v.ratio =</span> <span class="ot">TRUE</span>)</span></code></pre></div>
 <pre><code>## Call
-##  weightit(formula = treat ~ age + educ + race + married + nodegree + 
-##     re74 + re75, data = lalonde, method = &quot;ebal&quot;, estimand = &quot;ATT&quot;)
+##  weightit(formula = treat ~ age + educ + race + married + nodegree + re74 + re75, data = lalonde, method = &quot;ebal&quot;, estimand = &quot;ATT&quot;)
 ## 
 ## Balance Measures
 ##                Type Diff.Adj     M.Threshold V.Ratio.Adj
@@ -574,103 +583,40 @@ code > span.fu { color: #900; font-weight: bold; }  code > span.er { color: #a61
 ## Adjusted    98.493     185</code></pre>
 <p>Indeed, we have achieved perfect balance on the means of the covariates. However, the variance ratio of <code>age</code> is still quite high. We could continue to try to adjust for this imbalance, but if there is reason to believe it is unlikely to affect the outcome, it may be best to leave it as is. (You can try adding <code>I(age^2)</code> to the formula and see what changes this causes.)</p>
 <p>Now that we have our weights stored in <code>W.out</code>, let’s extract them and estimate our treatment effect. We’ll use the <code>survey</code> package to incorporate the weights into our analysis.</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb16-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;survey&quot;</span>)</a>
-<a class="sourceLine" id="cb16-2" data-line-number="2">d.w &lt;-<span class="st"> </span><span class="kw">svydesign</span>(<span class="dt">ids =</span> <span class="op">~</span><span class="dv">1</span>, <span class="dt">weights =</span> W.out<span class="op">$</span>weights,</a>
-<a class="sourceLine" id="cb16-3" data-line-number="3">                     <span class="dt">data =</span> lalonde)</a>
-<a class="sourceLine" id="cb16-4" data-line-number="4">fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(re78 <span class="op">~</span><span class="st"> </span>treat, <span class="dt">design =</span> d.w)</a>
-<a class="sourceLine" id="cb16-5" data-line-number="5"><span class="kw">coef</span>(fit)</a></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1"></a><span class="kw">library</span>(<span class="st">&quot;survey&quot;</span>)</span>
+<span id="cb16-2"><a href="#cb16-2"></a>d.w &lt;-<span class="st"> </span><span class="kw">svydesign</span>(<span class="dt">ids =</span> <span class="op">~</span><span class="dv">1</span>, <span class="dt">weights =</span> W.out<span class="op">$</span>weights,</span>
+<span id="cb16-3"><a href="#cb16-3"></a>                     <span class="dt">data =</span> lalonde)</span>
+<span id="cb16-4"><a href="#cb16-4"></a>fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(re78 <span class="op">~</span><span class="st"> </span>treat, <span class="dt">design =</span> d.w)</span>
+<span id="cb16-5"><a href="#cb16-5"></a><span class="kw">coef</span>(fit)</span></code></pre></div>
 <pre><code>## (Intercept)       treat 
 ##    5076.188    1272.955</code></pre>
 <p>Now let’s do some inference. Although some authors recommend using “robust” sandwich standard errors to adjust for the weights (Robins et al., 2000; Hainmueller, 2012), others believe these can misleading and recommend bootstrapping instead (e.g., Chan, Yam, &amp; Zhang, 2016). We’ll examine both approaches.</p>
 <p><code>svyglm()</code> in the survey package produces robust standard errors. We’ll use the <code>jtools</code> package to provide clean summaries of our results. Similar output can be generated using <code>summary()</code> without installing <code>jtools</code>.</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb18-1" data-line-number="1"><span class="co">#Robust standard errors and confidence intervals</span></a>
-<a class="sourceLine" id="cb18-2" data-line-number="2"><span class="kw">library</span>(<span class="st">&quot;jtools&quot;</span>)</a>
-<a class="sourceLine" id="cb18-3" data-line-number="3"><span class="kw">summ</span>(fit, <span class="dt">confint =</span> <span class="ot">TRUE</span>, </a>
-<a class="sourceLine" id="cb18-4" data-line-number="4">     <span class="dt">model.fit =</span> <span class="ot">FALSE</span>, <span class="dt">model.info =</span> <span class="ot">FALSE</span>) </a></code></pre></div>
-<table class="table table-striped table-hover table-condensed table-responsive" style="width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:left;">
-</th>
-<th style="text-align:right;">
-Est.
-</th>
-<th style="text-align:right;">
-2.5%
-</th>
-<th style="text-align:right;">
-97.5%
-</th>
-<th style="text-align:right;">
-t val.
-</th>
-<th style="text-align:right;">
-p
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left;font-weight: bold;">
-(Intercept)
-</td>
-<td style="text-align:right;">
-5076.19
-</td>
-<td style="text-align:right;">
-3918.83
-</td>
-<td style="text-align:right;">
-6233.55
-</td>
-<td style="text-align:right;">
-8.61
-</td>
-<td style="text-align:right;">
-0.00
-</td>
-</tr>
-<tr>
-<td style="text-align:left;font-weight: bold;">
-treat
-</td>
-<td style="text-align:right;">
-1272.96
-</td>
-<td style="text-align:right;">
--347.21
-</td>
-<td style="text-align:right;">
-2893.12
-</td>
-<td style="text-align:right;">
-1.54
-</td>
-<td style="text-align:right;">
-0.12
-</td>
-</tr>
-</tbody>
-<tfoot>
-<tr>
-<td style="padding: 0; border: 0;" colspan="100%">
-<sup></sup> Standard errors: Robust
-</td>
-</tr>
-</tfoot>
-</table>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1"></a><span class="co">#Robust standard errors and confidence intervals</span></span>
+<span id="cb18-2"><a href="#cb18-2"></a><span class="kw">library</span>(<span class="st">&quot;jtools&quot;</span>)</span>
+<span id="cb18-3"><a href="#cb18-3"></a><span class="kw">summ</span>(fit, <span class="dt">confint =</span> <span class="ot">TRUE</span>, </span>
+<span id="cb18-4"><a href="#cb18-4"></a>     <span class="dt">model.fit =</span> <span class="ot">FALSE</span>, <span class="dt">model.info =</span> <span class="ot">FALSE</span>) </span></code></pre></div>
+<pre><code>## Standard errors: Robust
+## ---------------------------------------------------------------
+##                        Est.      2.5%     97.5%   t val.      p
+## ----------------- --------- --------- --------- -------- ------
+## (Intercept)         5076.19   3918.83   6233.55     8.61   0.00
+## treat               1272.96   -347.21   2893.12     1.54   0.12
+## ---------------------------------------------------------------
+## 
+## Estimated dispersion parameter = 49766310</code></pre>
 <p>Our confidence interval for <code>treat</code> contains 0, so there isn’t evidence that <code>treat</code> has an effect on <code>re78</code>.</p>
 <p>Next let’s use bootstrapping to estimate confidence intervals. We don’t need to use <code>svyglm()</code> and can simply use <code>glm()</code> to compute the effect estimates in each bootstrapped sample because we are not computing standard errors, and the estimated treatment effect estimates will be the same.</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb19-1" data-line-number="1"><span class="co">#Bootstrapping</span></a>
-<a class="sourceLine" id="cb19-2" data-line-number="2"><span class="kw">library</span>(<span class="st">&quot;boot&quot;</span>)</a>
-<a class="sourceLine" id="cb19-3" data-line-number="3">est.fun &lt;-<span class="st"> </span><span class="cf">function</span>(data, index) {</a>
-<a class="sourceLine" id="cb19-4" data-line-number="4">  W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</a>
-<a class="sourceLine" id="cb19-5" data-line-number="5">        <span class="dt">data =</span> data[index,], <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ebal&quot;</span>)</a>
-<a class="sourceLine" id="cb19-6" data-line-number="6">  fit &lt;-<span class="st"> </span><span class="kw">glm</span>(re78 <span class="op">~</span><span class="st"> </span>treat, <span class="dt">data =</span> data[index,], <span class="dt">weights =</span> W.out<span class="op">$</span>weights)</a>
-<a class="sourceLine" id="cb19-7" data-line-number="7">  <span class="kw">return</span>(<span class="kw">coef</span>(fit)[<span class="st">&quot;treat&quot;</span>])</a>
-<a class="sourceLine" id="cb19-8" data-line-number="8">}</a>
-<a class="sourceLine" id="cb19-9" data-line-number="9">boot.out &lt;-<span class="st"> </span><span class="kw">boot</span>(est.fun, <span class="dt">data =</span> lalonde, <span class="dt">R =</span> <span class="dv">999</span>)</a>
-<a class="sourceLine" id="cb19-10" data-line-number="10"><span class="kw">boot.ci</span>(boot.out, <span class="dt">type =</span> <span class="st">&quot;bca&quot;</span>) <span class="co">#type shouldn't matter so much</span></a></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1"></a><span class="co">#Bootstrapping</span></span>
+<span id="cb20-2"><a href="#cb20-2"></a><span class="kw">library</span>(<span class="st">&quot;boot&quot;</span>)</span>
+<span id="cb20-3"><a href="#cb20-3"></a>est.fun &lt;-<span class="st"> </span><span class="cf">function</span>(data, index) {</span>
+<span id="cb20-4"><a href="#cb20-4"></a>  W.out &lt;-<span class="st"> </span><span class="kw">weightit</span>(treat <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>educ <span class="op">+</span><span class="st"> </span>race <span class="op">+</span><span class="st"> </span>married <span class="op">+</span><span class="st"> </span>nodegree <span class="op">+</span><span class="st"> </span>re74 <span class="op">+</span><span class="st"> </span>re75,</span>
+<span id="cb20-5"><a href="#cb20-5"></a>        <span class="dt">data =</span> data[index,], <span class="dt">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="dt">method =</span> <span class="st">&quot;ebal&quot;</span>)</span>
+<span id="cb20-6"><a href="#cb20-6"></a>  fit &lt;-<span class="st"> </span><span class="kw">glm</span>(re78 <span class="op">~</span><span class="st"> </span>treat, <span class="dt">data =</span> data[index,], <span class="dt">weights =</span> W.out<span class="op">$</span>weights)</span>
+<span id="cb20-7"><a href="#cb20-7"></a>  <span class="kw">return</span>(<span class="kw">coef</span>(fit)[<span class="st">&quot;treat&quot;</span>])</span>
+<span id="cb20-8"><a href="#cb20-8"></a>}</span>
+<span id="cb20-9"><a href="#cb20-9"></a>boot.out &lt;-<span class="st"> </span><span class="kw">boot</span>(est.fun, <span class="dt">data =</span> lalonde, <span class="dt">R =</span> <span class="dv">999</span>)</span>
+<span id="cb20-10"><a href="#cb20-10"></a><span class="kw">boot.ci</span>(boot.out, <span class="dt">type =</span> <span class="st">&quot;bca&quot;</span>) <span class="co">#type shouldn&#39;t matter so much</span></span></code></pre></div>
 <pre><code>## BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
 ## Based on 999 bootstrap replicates
 ## 
@@ -679,7 +625,7 @@ treat
 ## 
 ## Intervals : 
 ## Level       BCa          
-## 95%   (-262, 3022 )  
+## 95%   ( -77, 2937 )  
 ## Calculations and Intervals on Original Scale</code></pre>
 <p>In this case, our confidence intervals were similar. Bootstrapping can take some time, especially with weight estimation methods that take longer, such as SuperLearner (<code>method = &quot;super&quot;</code>), covariate balancing propensity score estimation (<code>method = &quot;cbps&quot;</code>), or entropy balancing with <code>stabilize = TRUE</code>.</p>
 <p>If we wanted to produce a “doubly-robust” treatment effect estimate, we could add baseline covariates to the <code>glm()</code> (or <code>svyglm()</code>) model (in both the original effect estimation and the confidence interval estimation).</p>
@@ -687,8 +633,8 @@ treat
 <div id="estimating-the-effect-of-a-longitudinal-treatment" class="section level2">
 <h2>Estimating the Effect of a Longitudinal Treatment</h2>
 <p><code>WeightIt</code> can estimate weights for longitudinal treatment marginal structural models as well. This time, we’ll use the sample data set from <code>twang</code> to estimate our weights. Data must be in “wide” format; to go from long to wide, see the example at <code>?weightitMSM</code>.</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb21-1" data-line-number="1"><span class="kw">data</span>(<span class="st">&quot;iptwExWide&quot;</span>, <span class="dt">package =</span> <span class="st">&quot;twang&quot;</span>)</a>
-<a class="sourceLine" id="cb21-2" data-line-number="2"><span class="kw">head</span>(iptwExWide)</a></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1"></a><span class="kw">data</span>(<span class="st">&quot;iptwExWide&quot;</span>, <span class="dt">package =</span> <span class="st">&quot;twang&quot;</span>)</span>
+<span id="cb22-2"><a href="#cb22-2"></a><span class="kw">head</span>(iptwExWide)</span></code></pre></div>
 <div class="kable-table">
 <table>
 <thead>
@@ -776,18 +722,18 @@ treat
 </div>
 <p>We have our outcome variable (<code>outcome</code>), our time-stable baseline variables (<code>gender</code> and <code>age</code>), our pre-treatment time-varying variables (<code>use0</code>, measured before the first treatment, <code>use1</code>, and <code>use2</code>), and our three time-varying treatment variables (<code>tx1</code>, <code>tx2</code>, and <code>tx3</code>). We are interested in the joint, unique, causal effects of each treatment period on the outcome. At each treatment time point, we need to achieve balance on all variables measured prior to that treatment, including previous treatments.</p>
 <p>Using <code>cobalt</code>, we can examine the initial imbalance at each time point and overall:</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb22-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;cobalt&quot;</span>) <span class="co">#if not already attached</span></a>
-<a class="sourceLine" id="cb22-2" data-line-number="2"><span class="kw">bal.tab</span>(<span class="kw">list</span>(tx1 <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</a>
-<a class="sourceLine" id="cb22-3" data-line-number="3">             tx2 <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</a>
-<a class="sourceLine" id="cb22-4" data-line-number="4">             tx3 <span class="op">~</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>use2 <span class="op">+</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0),</a>
-<a class="sourceLine" id="cb22-5" data-line-number="5">        <span class="dt">data =</span> iptwExWide, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>,</a>
-<a class="sourceLine" id="cb22-6" data-line-number="6">        <span class="dt">which.time =</span> .all)</a></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1"></a><span class="kw">library</span>(<span class="st">&quot;cobalt&quot;</span>) <span class="co">#if not already attached</span></span>
+<span id="cb23-2"><a href="#cb23-2"></a><span class="kw">bal.tab</span>(<span class="kw">list</span>(tx1 <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</span>
+<span id="cb23-3"><a href="#cb23-3"></a>             tx2 <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</span>
+<span id="cb23-4"><a href="#cb23-4"></a>             tx3 <span class="op">~</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>use2 <span class="op">+</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0),</span>
+<span id="cb23-5"><a href="#cb23-5"></a>        <span class="dt">data =</span> iptwExWide, <span class="dt">stats =</span> <span class="kw">c</span>(<span class="st">&quot;m&quot;</span>, <span class="st">&quot;ks&quot;</span>), <span class="dt">thresholds =</span> <span class="kw">c</span>(<span class="dt">m =</span> <span class="fl">.05</span>),</span>
+<span id="cb23-6"><a href="#cb23-6"></a>        <span class="dt">which.time =</span> .all)</span></code></pre></div>
 <pre><code>## Balance by Time Point
 ## 
 ##  - - - Time: 1 - - - 
 ## Balance Measures
 ##           Type Diff.Un      M.Threshold.Un  KS.Un
-## age    Contin.  0.3799 Not Balanced, &gt;0.05 0.2099
+## age    Contin.  0.3799 Not Balanced, &gt;0.05 0.2127
 ## gender  Binary  0.2945 Not Balanced, &gt;0.05 0.2945
 ## use0   Contin.  0.2668 Not Balanced, &gt;0.05 0.1681
 ## 
@@ -807,11 +753,11 @@ treat
 ##  - - - Time: 2 - - - 
 ## Balance Measures
 ##           Type Diff.Un      M.Threshold.Un  KS.Un
-## age    Contin.  0.2240 Not Balanced, &gt;0.05 0.1331
-## gender  Binary  0.1927 Not Balanced, &gt;0.05 0.1927
-## use0   Contin.  0.1169 Not Balanced, &gt;0.05 0.0913
 ## tx1     Binary  0.1695 Not Balanced, &gt;0.05 0.1695
 ## use1   Contin.  0.0848 Not Balanced, &gt;0.05 0.0763
+## age    Contin.  0.2240 Not Balanced, &gt;0.05 0.1311
+## gender  Binary  0.1927 Not Balanced, &gt;0.05 0.1927
+## use0   Contin.  0.1169 Not Balanced, &gt;0.05 0.0913
 ## 
 ## Balance tally for mean differences
 ##                     count
@@ -829,13 +775,13 @@ treat
 ##  - - - Time: 3 - - - 
 ## Balance Measures
 ##           Type Diff.Un      M.Threshold.Un  KS.Un
-## age    Contin.  0.3431 Not Balanced, &gt;0.05 0.1863
-## gender  Binary  0.1532 Not Balanced, &gt;0.05 0.1532
-## use0   Contin.  0.1859 Not Balanced, &gt;0.05 0.1350
-## tx1     Binary  0.1071 Not Balanced, &gt;0.05 0.1071
-## use1   Contin.  0.1662 Not Balanced, &gt;0.05 0.1397
 ## tx2     Binary  0.2423 Not Balanced, &gt;0.05 0.2423
 ## use2   Contin.  0.1087 Not Balanced, &gt;0.05 0.1161
+## tx1     Binary  0.1071 Not Balanced, &gt;0.05 0.1071
+## use1   Contin.  0.1662 Not Balanced, &gt;0.05 0.1397
+## age    Contin.  0.3431 Not Balanced, &gt;0.05 0.1846
+## gender  Binary  0.1532 Not Balanced, &gt;0.05 0.1532
+## use0   Contin.  0.1859 Not Balanced, &gt;0.05 0.1350
 ## 
 ## Balance tally for mean differences
 ##                     count
@@ -849,34 +795,13 @@ treat
 ## Sample sizes
 ##     Control Treated
 ## All     415     585
-##  - - - - - - - - - - - 
-## 
-## Balance summary across all time points
-##          Times    Type Max.Diff.Un      M.Threshold.Un Max.KS.Un
-## age    1, 2, 3 Contin.      0.3799 Not Balanced, &gt;0.05    0.2099
-## gender 1, 2, 3  Binary      0.2945 Not Balanced, &gt;0.05    0.2945
-## use0   1, 2, 3 Contin.      0.2668 Not Balanced, &gt;0.05    0.1681
-## tx1       2, 3  Binary      0.1695 Not Balanced, &gt;0.05    0.1695
-## use1      2, 3 Contin.      0.1662 Not Balanced, &gt;0.05    0.1397
-## tx2          3  Binary      0.2423 Not Balanced, &gt;0.05    0.2423
-## use2         3 Contin.      0.1087 Not Balanced, &gt;0.05    0.1161
-## 
-## Sample sizes
-##  - Time 1
-##     Control Treated
-## All     294     706
-##  - Time 2
-##     Control Treated
-## All     492     508
-##  - Time 3
-##     Control Treated
-## All     415     585</code></pre>
+##  - - - - - - - - - - -</code></pre>
 <p><code>bal.tab()</code> indicates significant imbalance on most covariates at most time points, so we need to do some work to eliminate that imbalance in our weighted data set. We’ll use the <code>weightitMSM()</code> function to specify our weight models. The syntax is similar both to that of <code>weightit()</code> for point treatments and to that of <code>bal.tab()</code> for longitudinal treatments. We’ll use <code>method = &quot;ps&quot;</code> for propensity score weights estimated using logistic regression.</p>
-<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb24-1" data-line-number="1">Wmsm.out &lt;-<span class="st"> </span><span class="kw">weightitMSM</span>(<span class="kw">list</span>(tx1 <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</a>
-<a class="sourceLine" id="cb24-2" data-line-number="2">             tx2 <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</a>
-<a class="sourceLine" id="cb24-3" data-line-number="3">             tx3 <span class="op">~</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>use2 <span class="op">+</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0),</a>
-<a class="sourceLine" id="cb24-4" data-line-number="4">        <span class="dt">data =</span> iptwExWide, <span class="dt">method =</span> <span class="st">&quot;ps&quot;</span>)</a>
-<a class="sourceLine" id="cb24-5" data-line-number="5">Wmsm.out</a></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1"></a>Wmsm.out &lt;-<span class="st"> </span><span class="kw">weightitMSM</span>(<span class="kw">list</span>(tx1 <span class="op">~</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</span>
+<span id="cb25-2"><a href="#cb25-2"></a>             tx2 <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0,</span>
+<span id="cb25-3"><a href="#cb25-3"></a>             tx3 <span class="op">~</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>use2 <span class="op">+</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>use1 <span class="op">+</span><span class="st"> </span>age <span class="op">+</span><span class="st"> </span>gender <span class="op">+</span><span class="st"> </span>use0),</span>
+<span id="cb25-4"><a href="#cb25-4"></a>        <span class="dt">data =</span> iptwExWide, <span class="dt">method =</span> <span class="st">&quot;ps&quot;</span>)</span>
+<span id="cb25-5"><a href="#cb25-5"></a>Wmsm.out</span></code></pre></div>
 <pre><code>## A weightitMSM object
 ##  - method: &quot;ps&quot; (propensity score weighting)
 ##  - number of obs.: 1000
@@ -891,7 +816,7 @@ treat
 ##     + after time 1: tx1, use1, age, gender, use0
 ##     + after time 2: tx2, use2, tx1, use1, age, gender, use0</code></pre>
 <p>No matter which method is selected, <code>weightitMSM()</code> estimates separate weights for each time period and then takes the product of the weights for each individual to arrive at the final estimated weights. Printing the output of <code>weightitMSM()</code> provides some details about the function call and the output. We can take a look at the quality of the weights with <code>summary()</code>, just as we could for point treatments.</p>
-<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb26-1" data-line-number="1"><span class="kw">summary</span>(Wmsm.out)</a></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1"></a><span class="kw">summary</span>(Wmsm.out)</span></code></pre></div>
 <pre><code>##                  Summary of weights
 ## 
 ##                        Time 1                       
@@ -903,17 +828,17 @@ treat
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                                 
-##              642     350     324     299     228
+##              906     477     442     409     307
 ##  treated 13.4464 13.6233 13.7059  14.436 15.5292
-##              288     176     147      72      52
+##              980     641     547     282     206
 ##  control 44.8027 46.1355 58.4164 79.8919 82.2349
 ## 
 ## - Weight statistics:
 ## 
-##         Coef of Var   MAD  Entropy
-## treated       0.481 0.376 1317.833
-## control       0.768 0.494  819.850
-## overall       0.857 0.520 2314.014
+##         Coef of Var   MAD Entropy # Zeros
+## treated       0.481 0.376   1.867       0
+## control       0.768 0.494   2.789       0
+## overall       0.857 0.520   2.314       0
 ## 
 ## - Effective Sample Sizes:
 ## 
@@ -930,17 +855,17 @@ treat
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                                 
-##              497     338     290     286      22
+##              980     641     561     553      34
 ##  treated  33.371 34.7405 42.9442 58.4164 82.2349
-##              265     139     103      47      39
+##              547     282     206     109      95
 ##  control 39.7862 42.2256 44.8027 46.1355 79.8919
 ## 
 ## - Weight statistics:
 ## 
-##         Coef of Var   MAD  Entropy
-## treated       0.960 0.653 1218.348
-## control       0.737 0.384 1095.956
-## overall       0.857 0.520 2314.014
+##         Coef of Var   MAD Entropy # Zeros
+## treated       0.960 0.653   2.398       0
+## control       0.737 0.384   2.228       0
+## overall       0.857 0.520   2.314       0
 ## 
 ## - Effective Sample Sizes:
 ## 
@@ -957,17 +882,17 @@ treat
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                                 
-##              548     450     382     124      67
+##              936     763     650     206     109
 ##  treated  26.003  26.471 28.0582 39.7862 44.8027
-##              403     264     226     224     110
+##              980     641     553     547     282
 ##  control 42.9442 46.1355 58.4164 79.8919 82.2349
 ## 
 ## - Weight statistics:
 ## 
-##         Coef of Var   MAD  Entropy
-## treated       0.773 0.565 1267.537
-## control       0.873 0.469 1023.060
-## overall       0.857 0.520 2314.014
+##         Coef of Var   MAD Entropy # Zeros
+## treated       0.773 0.565   2.167       0
+## control       0.873 0.469   2.465       0
+## overall       0.857 0.520   2.314       0
 ## 
 ## - Effective Sample Sizes:
 ## 
@@ -975,16 +900,14 @@ treat
 ## Unweighted 415.000 585.000
 ## Weighted   235.672 366.399</code></pre>
 <p>Displayed are summaries of how the weights perform at each time point with respect to variability. Next, we’ll examine how well they perform with respect to covariate balance.</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb28-1" data-line-number="1"><span class="kw">bal.tab</span>(Wmsm.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>, <span class="dt">which.time =</span> .none)</a></code></pre></div>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1"></a><span class="kw">bal.tab</span>(Wmsm.out, <span class="dt">m.threshold =</span> <span class="fl">.05</span>, <span class="dt">disp.ks =</span> <span class="ot">TRUE</span>, <span class="dt">which.time =</span> .none)</span></code></pre></div>
 <pre><code>## Call
-##  weightitMSM(formula.list = list(tx1 ~ age + gender + use0, tx2 ~ 
-##     tx1 + use1 + age + gender + use0, tx3 ~ tx2 + use2 + tx1 + 
-##     use1 + age + gender + use0), data = iptwExWide, method = &quot;ps&quot;)
+##  weightitMSM(formula.list = list(tx1 ~ age + gender + use0, tx2 ~ tx1 + use1 + age + gender + use0, tx3 ~ tx2 + use2 + tx1 + use1 + age + gender + use0), data = iptwExWide, method = &quot;ps&quot;)
 ## 
 ## Balance summary across all time points
 ##              Times     Type Max.Diff.Adj         M.Threshold Max.KS.Adj
-## prop.score 1, 2, 3 Distance       0.0251                         0.0935
-## age        1, 2, 3  Contin.       0.0703 Not Balanced, &gt;0.05     0.0796
+## prop.score 1, 2, 3 Distance       0.0251     Balanced, &lt;0.05     0.0935
+## age        1, 2, 3  Contin.       0.0703 Not Balanced, &gt;0.05     0.0819
 ## gender     1, 2, 3   Binary       0.0263     Balanced, &lt;0.05     0.0263
 ## use0       1, 2, 3  Contin.       0.0558 Not Balanced, &gt;0.05     0.0938
 ## tx1           2, 3   Binary       0.0171     Balanced, &lt;0.05     0.0171
@@ -1006,103 +929,40 @@ treat
 ## Unadjusted 415.000 585.000
 ## Adjusted   235.672 366.399</code></pre>
 <p>By setting <code>which.time = .none</code> in <code>bal.tab()</code>, we can focus on the overall balance assessment, which displays the greatest imbalance for each covariate across time points. We can see that our estimated weights balance all covariates all time points with respect to means and variances. Now we can estimate our treatment effects. We’ll sequentially simplify our model by checking whether interaction terms are needed (implying that specific patterns of treatment yield different outcomes), then by checking whether different coefficients are needed for the treatments (implying that outcomes depend on which treatments are received).</p>
-<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb30-1" data-line-number="1"><span class="kw">library</span>(<span class="st">&quot;survey&quot;</span>)</a>
-<a class="sourceLine" id="cb30-2" data-line-number="2">d.w.msm &lt;-<span class="st"> </span><span class="kw">svydesign</span>(<span class="dt">ids =</span> <span class="op">~</span><span class="dv">1</span>, <span class="dt">weights =</span> Wmsm.out<span class="op">$</span>weights,</a>
-<a class="sourceLine" id="cb30-3" data-line-number="3">                     <span class="dt">data =</span> iptwExWide)</a>
-<a class="sourceLine" id="cb30-4" data-line-number="4">full.fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(outcome <span class="op">~</span><span class="st"> </span>tx1<span class="op">*</span>tx2<span class="op">*</span>tx3, <span class="dt">design =</span> d.w.msm)</a>
-<a class="sourceLine" id="cb30-5" data-line-number="5">main.effects.fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(outcome <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>tx3, <span class="dt">design =</span> d.w.msm)</a>
-<a class="sourceLine" id="cb30-6" data-line-number="6"><span class="kw">anova</span>(full.fit, main.effects.fit)</a></code></pre></div>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1"></a><span class="kw">library</span>(<span class="st">&quot;survey&quot;</span>)</span>
+<span id="cb31-2"><a href="#cb31-2"></a>d.w.msm &lt;-<span class="st"> </span><span class="kw">svydesign</span>(<span class="dt">ids =</span> <span class="op">~</span><span class="dv">1</span>, <span class="dt">weights =</span> Wmsm.out<span class="op">$</span>weights,</span>
+<span id="cb31-3"><a href="#cb31-3"></a>                     <span class="dt">data =</span> iptwExWide)</span>
+<span id="cb31-4"><a href="#cb31-4"></a>full.fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(outcome <span class="op">~</span><span class="st"> </span>tx1<span class="op">*</span>tx2<span class="op">*</span>tx3, <span class="dt">design =</span> d.w.msm)</span>
+<span id="cb31-5"><a href="#cb31-5"></a>main.effects.fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(outcome <span class="op">~</span><span class="st"> </span>tx1 <span class="op">+</span><span class="st"> </span>tx2 <span class="op">+</span><span class="st"> </span>tx3, <span class="dt">design =</span> d.w.msm)</span>
+<span id="cb31-6"><a href="#cb31-6"></a><span class="kw">anova</span>(full.fit, main.effects.fit)</span></code></pre></div>
 <pre><code>## Working (Rao-Scott+F) LRT for tx1:tx2 tx1:tx3 tx2:tx3 tx1:tx2:tx3
 ##  in svyglm(formula = outcome ~ tx1 * tx2 * tx3, design = d.w.msm)
 ## Working 2logLR =  7.798048 p= 0.10163 
 ## (scale factors:  1.2 1.1 0.91 0.72 );  denominator df= 992</code></pre>
-<p>Based on the non-significant p-value, we don’t have to assume specific treatment patterns yield different outcomes, but rather only that which treatments received or the number of treatments received are sufficient to explain variation in the outcome. Next we’ll narrow down these options by comparing the main effects fit to one that constrains the coefficients to be equal (implying that the cumulative number of treatments received is what matters), as Robins et al. (2000) describe.</p>
-<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb32-1" data-line-number="1">cum.fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(outcome <span class="op">~</span><span class="st"> </span><span class="kw">I</span>(tx1<span class="op">+</span>tx2<span class="op">+</span>tx3), <span class="dt">design =</span> d.w.msm)</a>
-<a class="sourceLine" id="cb32-2" data-line-number="2"><span class="kw">anova</span>(main.effects.fit, cum.fit)</a></code></pre></div>
+<p>Based on the non-significant p-value, we don’t have to assume specific treatment patterns yield different outcomes, but rather only that which treatments received or the number of treatments received are sufficient to explain variation in the outcome. Next we’ll narrow down these options by comparing the main effects fit to one that constrains the coefficients to be equal (implying that the cumulative number of treatments received is what matters), as Robins et al. (2000) describe.</p>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1"></a>cum.fit &lt;-<span class="st"> </span><span class="kw">svyglm</span>(outcome <span class="op">~</span><span class="st"> </span><span class="kw">I</span>(tx1<span class="op">+</span>tx2<span class="op">+</span>tx3), <span class="dt">design =</span> d.w.msm)</span>
+<span id="cb33-2"><a href="#cb33-2"></a><span class="kw">anova</span>(main.effects.fit, cum.fit)</span></code></pre></div>
 <pre><code>## Working (Rao-Scott+F) LRT for tx1 tx2 tx3 - I(tx1 + tx2 + tx3)
 ##  in svyglm(formula = outcome ~ tx1 + tx2 + tx3, design = d.w.msm)
 ## Working 2logLR =  3.756596 p= 0.15446 
 ## (scale factors:  1.1 0.94 );  denominator df= 996</code></pre>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb34-1" data-line-number="1"><span class="kw">anova</span>(full.fit, cum.fit)</a></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1"></a><span class="kw">anova</span>(full.fit, cum.fit)</span></code></pre></div>
 <pre><code>## Working (Rao-Scott+F) LRT for tx1 tx2 tx3 tx1:tx2 tx1:tx3 tx2:tx3 tx1:tx2:tx3 - I(tx1 + tx2 + tx3)
 ##  in svyglm(formula = outcome ~ tx1 * tx2 * tx3, design = d.w.msm)
 ## Working 2logLR =  11.64059 p= 0.074118 
 ## (scale factors:  1.4 1.2 0.93 0.89 0.85 0.7 );  denominator df= 992</code></pre>
 <p>Based on the non-significant p-value, we can assume the effects of each treatment are close enough to be treated as the same, indicating that the number of treatments received is the relevant predictor of the outcome. Now we can examine what that treatment effect is with <code>summ()</code> in <code>jtools</code> (or <code>summary()</code>).</p>
-<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb36-1" data-line-number="1"><span class="kw">summ</span>(cum.fit, <span class="dt">confint =</span> <span class="ot">TRUE</span>, </a>
-<a class="sourceLine" id="cb36-2" data-line-number="2">     <span class="dt">model.fit =</span> <span class="ot">FALSE</span>, <span class="dt">model.info =</span> <span class="ot">FALSE</span>) </a></code></pre></div>
-<table class="table table-striped table-hover table-condensed table-responsive" style="width: auto !important; margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:left;">
-</th>
-<th style="text-align:right;">
-Est.
-</th>
-<th style="text-align:right;">
-2.5%
-</th>
-<th style="text-align:right;">
-97.5%
-</th>
-<th style="text-align:right;">
-t val.
-</th>
-<th style="text-align:right;">
-p
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left;font-weight: bold;">
-(Intercept)
-</td>
-<td style="text-align:right;">
-0.11
-</td>
-<td style="text-align:right;">
-0.00
-</td>
-<td style="text-align:right;">
-0.22
-</td>
-<td style="text-align:right;">
-1.96
-</td>
-<td style="text-align:right;">
-0.05
-</td>
-</tr>
-<tr>
-<td style="text-align:left;font-weight: bold;">
-I(tx1 + tx2 + tx3)
-</td>
-<td style="text-align:right;">
--0.15
-</td>
-<td style="text-align:right;">
--0.20
-</td>
-<td style="text-align:right;">
--0.09
-</td>
-<td style="text-align:right;">
--5.18
-</td>
-<td style="text-align:right;">
-0.00
-</td>
-</tr>
-</tbody>
-<tfoot>
-<tr>
-<td style="padding: 0; border: 0;" colspan="100%">
-<sup></sup> Standard errors: Robust
-</td>
-</tr>
-</tfoot>
-</table>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1"></a><span class="kw">summ</span>(cum.fit, <span class="dt">confint =</span> <span class="ot">TRUE</span>, </span>
+<span id="cb37-2"><a href="#cb37-2"></a>     <span class="dt">model.fit =</span> <span class="ot">FALSE</span>, <span class="dt">model.info =</span> <span class="ot">FALSE</span>) </span></code></pre></div>
+<pre><code>## Standard errors: Robust
+## ----------------------------------------------------------------
+##                             Est.    2.5%   97.5%   t val.      p
+## ------------------------ ------- ------- ------- -------- ------
+## (Intercept)                 0.11    0.00    0.22     1.96   0.05
+## I(tx1 + tx2 + tx3)         -0.15   -0.20   -0.09    -5.18   0.00
+## ----------------------------------------------------------------
+## 
+## Estimated dispersion parameter = 0.5</code></pre>
 <p>For each additional treatment received, the outcome is expected to decrease by 0.15 points. The confidence interval excludes 0, so there is evidence of a treatment effect in the population.</p>
 <p>There is more we can do, as well. We could have fit different types of models to estimate the weights, and we could have stabilized the weights with <code>stabilize = TRUE</code> or by including stabilization factors in our weights using <code>num.formula</code> (see Cole &amp; Hernán, 2008, for more details on doing so). There are other ways of computing confidence intervals for our effect estimates (although model comparison is the most straightforward with the method we used).</p>
 </div>

@@ -1,10 +1,10 @@
 \name{get_w_from_ps}
 \alias{get_w_from_ps}
 \title{
-Get weights from propensity scores corresponding to different estimands
+Compute weights from propensity scores
 }
 \description{
-Given a vector or matrix of propensity scores, output a vector of weights that target the provided estimand.
+Given a vector or matrix of propensity scores, outputs a vector of weights that target the provided estimand.
 }
 \usage{
 get_w_from_ps(ps,
@@ -20,10 +20,10 @@ get_w_from_ps(ps,
 A vector, matrix, or data frame of propensity scores. See Details.
 }
   \item{treat}{
-A vector of treatment statuses for each individual. See Details.
+A vector of treatment status for each individual. See Details.
 }
   \item{estimand}{
-The desired estimand that the weights should target. Current options include "ATE" (average treatment effect), "ATT" (average treatment effect on the treated), "ATC" (average treatment effect on the control), "ATO" (average treatment effect in the overlap), and "ATM" (average treatment effect in the matched sample). See \code{\link{method_ps}} for additional information and references.
+The desired estimand that the weights should target. Current options include "ATE" (average treatment effect), "ATT" (average treatment effect on the treated), "ATC" (average treatment effect on the control), "ATO" (average treatment effect in the overlap), "ATM" (average treatment effect in the matched sample), and "ATOS" (average treatment effect in the optimal subset).
 }
   \item{focal}{
 When the estimand is the ATT or ATC, which group should be consider the (focal) "treated" or "control" group, respectively. If not \code{NULL} and \code{estimand} is not "ATT" or "ATC", \code{estimand} will automatically be set to "ATT".
@@ -50,7 +50,7 @@ When \code{subclass} is not \code{NULL}, marginal mean weighting through stratif
 \code{get_w_from_ps} is not compatible with continuous treatments.
 }
 \value{
-A vector of weights.
+A vector of weights. When \code{subclass} is not \code{NULL}, the subclasses are returned as the \code{"subclass"} attribute. When \code{estimand = "ATOS"}, the chosen value of \code{alpha} (the smallest propensity score allowed to remain in the sample) is returned in the \code{"alpha"} attribute.
 }
 
 \author{
@@ -66,6 +66,10 @@ Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via prope
  - \code{estimand = "ATM"}
 
 Li, L., & Greene, T. (2013). A Weighting Analogue to Pair Matching in Propensity Score Analysis. The International Journal of Biostatistics, 9(2). \doi{10.1515/ijb-2012-0030}
+
+ - \code{estimand = "ATOS"}
+
+Crump, R. K., Hotz, V. J., Imbens, G. W., & Mitnik, O. A. (2009). Dealing with limited overlap in estimation of average treatment effects. Biometrika, 96(1), 187–199. \doi{10.1093/biomet/asn055}
 
  - Other estimands
 

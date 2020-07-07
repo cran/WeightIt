@@ -1,6 +1,30 @@
 WeightIt News and Updates
 ======
 
+Version 0.10.0
+
+* Added support for energy balancing with `method = "energy"`. This method minimizes the energy distance between samples, which is a multivariate distance measure. This method uses code written specifically for `WeightIt` (i.e., it does not call a package specifically designed for energy balancing) using the `osqp` package for the optimization (same as `optweight`). See Huling & Mak (2020) for details on this method. Also included is an option to require exact balance on moments of the covariates while minimizing the energy distance. The method works for binary and multinomial treatments with the ATE, ATT, or ATC. Sampling weights are supported. Because the method requires the calculation and manipulation of a distance matrix for all units, it can be slow and/or memory intensive for large datasets.
+
+* Improvements to `method = "gbm"` and to `method = "super"` with `SL.method = "method.balance"`. A new suite of `stop.method`s are allowed. For binary treatments, these include the energy distance, sample Mahalanobis distance, and pseudo-R2 of the weighted treatment model, among others. See `?stop.method` for allowable options. In addition, performance for both is quite a bit faster.
+
+* With multinomial treatments with `link = "logit"` (the default), if the `mnlogit` package is installed, it can be requested for estimating the propensity score by setting the option `use.mnlogit = TRUE`. It should give the same results as the default, which uses `mlogit`, but can be faster for large datasets.
+
+* Added option `estimand = "ATOS"` for the "optimal subset" treatment effect as described by Crump et al. (2009). This estimand finds the subset of units who, with ATE weights applied, yields a treatment effect with the lowest variance, assuming homoscedasticity (and other assumptions). It is only available for binary treatments with `method = "ps"`. In general it makes more sense to use `estimand = "ATO"` if you want a low-variance estimate and don't care about the target population, but I added this here for completeness. It is available in `get_w_from_ps()` as well.
+
+* `make_full_rank()` is now faster.
+
+* Cleaning up of some error messages.
+
+* Fixed a bug when using `link = "log"` for `method = "ps"` with binary treatments.
+
+* Fixed a bug when using `method = "cbps"` with continuous treatments and sampling weights. Previously the returned weights included the sampling weights multiplied in; now they are separated, as they are in all other scenarios and for all other methods.
+
+* Improved processing of non-0/1 binary treatments, including for `method = "gbm"`. A guess will be made as to which treatment is considered "treated"; this only affects produced propensity scores but not weights.
+
+* Changed default value of `at` in `trim()` from .99 to 0.
+
+* Added output for the number of weights equal to zero in `summary.weightit`. This can be especially helpful when using `"optweight"` or `"energy"` methods or when using `estimand = "ATOS"`.
+
 Version 0.9.0
 
 * Added support for entropy balancing (`method = "ebal"`) for continuous treatments as described by Tübbicke (2020). Relies on hand-written code contributed by Stefan Tübbicke rather than another R package. Sampling weights and base weights are both supported as they are with binary and multi-category treatments.

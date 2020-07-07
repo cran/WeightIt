@@ -3,47 +3,36 @@ make_full_rank <- function(mat, with.intercept = TRUE) {
 
   if (is.data.frame(mat)) {
     is.mat <- FALSE
-    if (!all(vapply(mat, is.numeric, logical(1L)))) stop("All columns in mat must be numeric.", call. = FALSE)
+    if (!all(vapply(mat, is.numeric, logical(1L)))) stop("All columns in 'mat' must be numeric.", call. = FALSE)
     mat <- as.matrix(mat)
   }
   else if (is.matrix(mat)) {
     is.mat <- TRUE
-    if (!is.numeric(mat)) stop("mat must be a numeric matrix.", call. = FALSE)
+    if (!is.numeric(mat)) stop("'mat' must be a numeric matrix.", call. = FALSE)
   }
   else {
-    stop("mat must be a numeric matrix or data.frame.", call. = FALSE)
+    stop("'mat' must be a numeric matrix or data.frame.", call. = FALSE)
   }
 
-  if (anyNA(mat)) stop("Missing values are not allowed in mat.", call. = FALSE)
+  if (anyNA(mat)) stop("Missing values are not allowed in 'mat'.", call. = FALSE)
 
-  keep <- setNames(rep(TRUE, ncol(mat)), colnames(mat))
-
-  #Variables that have only 1 value can be removed
-  all.the.same <- apply(mat, 2, all_the_same)
-  keep[all.the.same] <- FALSE
+  keep <- rep(TRUE, ncol(mat))
 
   #If intercept is to be included in check, add column of 1s
-  if (with.intercept) mat1 <- cbind(mat, rep(1, nrow(mat)))
-  else mat1 <- mat
-
-  for (i in colnames(mat)[keep]) {
-    #Add extra value for intercept if desired
-    keep1 <- c(keep, TRUE[with.intercept])
-
-    #Create vector of keep with ith entry FALSE to compare rank with full vector
-    keep1. <- keep1
-    keep1[i] <- FALSE
-
-    #Check if rank without is the same as rank with; if so, remove variable i
-    if (qr(mat1[, keep1., drop = FALSE])$rank == qr(mat1[, keep1, drop = FALSE])$rank) {
-      keep[i] <- FALSE
-    }
+  if (with.intercept) {
+    q <- qr(cbind(1, mat))
+    keep[q$pivot[-seq(q$rank)]-1] <- FALSE
+  }
+  else {
+    q <- qr(mat)
+    keep[q$pivot[-seq(q$rank)]] <- FALSE
   }
 
   if (is.mat) return(mat[, keep, drop = FALSE])
   else return(as.data.frame(mat[, keep, drop = FALSE]))
 
 }
+
 get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = NULL, subclass = NULL, stabilize = FALSE) {
   #ps must be a matrix/df with columns named after treat levels
 
@@ -51,19 +40,21 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
 
   treat.type <- get.treat.type(treat)
 
+  if (treat.type == "continuous") {
+    stop("get_w_from_ps can only be used with binary or multinomial treatments.", call. = FALSE)
+  }
+
+  estimand <- process.estimand(estimand, method = "ps", treat.type = treat.type)
+
   processed.estimand <- process.focal.and.estimand(focal, estimand, treat, treat.type, treated)
   estimand <- processed.estimand$estimand
   focal <- processed.estimand$focal
   assumed.treated <- processed.estimand$treated
 
-  if (treat.type == "continuous") {
-    stop("get_w_from_ps can only be used with binary or multinomial treatments.", call. = FALSE)
-  }
-
   ps_mat <- ps_to_ps_mat(ps, treat, assumed.treated, treat.type, treated, estimand)
 
   if (nrow(ps_mat) != length(treat)) {
-    stop("ps and treat must have the same number of units.", call. = FALSE)
+    stop("'ps' and 'treat' must have the same number of units.", call. = FALSE)
   }
 
   w <- rep(0, nrow(ps_mat))
@@ -87,13 +78,33 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     w <- w*rowSums(1/ps_mat)^-1 #Li & Li (2019)
   }
   else if (toupper(estimand) == "ATM") {
-    w <- w*do.call(pmin, lapply(seq_len(ncol(ps_mat)), function(x) ps_mat[,x]))
+    w <- w*do.call("pmin", lapply(seq_len(ncol(ps_mat)), function(x) ps_mat[,x]), quote = TRUE)
   }
-  else w <- NULL
+  else if (toupper(estimand) == "ATOS") {
+    #Crump et al. (2009)
+    ps.sorted <- sort(c(ps_mat[,2], 1 - ps_mat[,2]))
+    q <- ps_mat[,2]*(1-ps_mat[,2])
+    alpha.opt <- 0
+    for (i in 1:sum(ps_mat[,2] < .5)) {
+      if (i == 1 || !check_if_zero(ps.sorted[i] - ps.sorted[i-1])) {
+        alpha <- ps.sorted[i]
+        a <- alpha*(1-alpha)
+        if (1/a <= 2*sum(1/q[q >= a])/sum(q >= a)) {
+          alpha.opt <- alpha
+          break
+        }
+      }
+    }
+    w[!between(ps_mat[,2], c(alpha.opt, 1 - alpha.opt))] <- 0
+  }
+  else return(numeric(0))
 
   if (stabilize) w <- stabilize_w(w, treat)
 
   names(w) <- rownames(ps_mat)
+
+  attr(w, "subclass") <- attr(ps_mat, "sub_mat")
+  if (toupper(estimand) == "ATOS") attr(w, "alpha") <- alpha.opt
 
   return(w)
 }
