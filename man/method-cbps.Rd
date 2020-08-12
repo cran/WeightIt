@@ -6,7 +6,7 @@
 \description{
 This page explains the details of estimating weights from covariate balancing propensity scores by setting \code{method = "cbps"} in the call to \code{\link{weightit}} or \code{\link{weightitMSM}}. This method can be used with binary, multinomial, and continuous treatments.
 
-In general, this method relies on estimating propensity scores using generalized method of moments and then converting those propensity scores into weights using a formula that depends on the desired estimand. This method relies on \code{\link[CBPS]{CBPS}} from the \pkg{CBPS} package.
+In general, this method relies on estimating propensity scores using generalized method of moments and then converting those propensity scores into weights using a formula that depends on the desired estimand. This method relies on \code{\link[CBPS]{CBPS}} from the \CRANpkg{CBPS} package.
 
 \subsection{Binary Treatments}{
 For binary treatments, this method estimates the propensity scores and weights using \code{\link[CBPS]{CBPS}}. The following estimands are allowed: ATE, ATT, and ATC. The weights are taken from the output of the \code{CBPS} fit object. When the estimand is the ATE, the return propensity score is the probability of being in the "second" treatment group, i.e., \code{levels(factor(treat))[2]}; when the estimand is the ATC, the returned propensity score is the probability of being in the control (i.e., non-focal) group.
@@ -53,9 +53,9 @@ When \code{include.obj = TRUE}, the CB(G)PS model fit. For binary treatments, mu
 }
 }
 \details{
-CBPS estimates the coefficients of a logistic (for binary treatments), multinomial logistic (form multinomial treatments), or linear (for continuous treatments) regression model that is used to compute (generalized) propensity scores, from which the weights are computed. It involves augmenting the standard regression score equations with the balance constraints in an over-identified generalized method of moments estimation. The idea is to nudge the estimation of the coefficients toward those that produce balance in the weighted sample. The just-identified version (with \code{exact = FALSE}) does away with the score equations for the coefficients so that only the balance constraints (and the score equation for the variance of the error with a continuous treatment) are used. The just-identified version will therefore produce superior balance on the means (i.e., corresponding to the balance constraints) for binary and multinomial treatments and linear terms for continuous treatments than will the over-identified version.
+CBPS estimates the coefficients of a logistic regression model (for binary treatments), multinomial logistic regression model (form multinomial treatments), or linear regression model (for continuous treatments) that is used to compute (generalized) propensity scores, from which the weights are computed. It involves augmenting the standard regression score equations with the balance constraints in an over-identified generalized method of moments estimation. The idea is to nudge the estimation of the coefficients toward those that produce balance in the weighted sample. The just-identified version (with \code{exact = FALSE}) does away with the score equations for the coefficients so that only the balance constraints (and the score equation for the variance of the error with a continuous treatment) are used. The just-identified version will therefore produce superior balance on the means (i.e., corresponding to the balance constraints) for binary and multinomial treatments and linear terms for continuous treatments than will the over-identified version.
 
-Note that \pkg{WeightIt} provides less functionality than does the \pkg{CBPS} package in terms of the version of CBPS available; for extension to CBPS, the \pkg{CBPS} package may be preferred.
+Note that \pkg{WeightIt} provides less functionality than does the \pkg{CBPS} package in terms of the versions of CBPS available; for extensions to CBPS, the \pkg{CBPS} package may be preferred.
 }
 \references{
 \strong{Binary treatments}
@@ -75,9 +75,11 @@ Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing propensity score f
 }
 \seealso{
 \code{\link{weightit}}, \code{\link{weightitMSM}}
+
+\code{\link[CBPS:CBPS]{CBPS::CBPS}} for the fitting function
 }
 \note{
-When sampling weights are used with \code{CBPS}, the estimated weights already incorporate the sampling weights. When \code{weightit} is used with \code{method = "cbps"}, the estimated weights are separated from the sampling weights, as they are with all other methods.
+When sampling weights are used with \code{CBPS::CBPS}, the estimated weights already incorporate the sampling weights. When \code{weightit} is used with \code{method = "cbps"}, the estimated weights are separated from the sampling weights, as they are with all other methods.
 }
 \examples{
 library("cobalt")

@@ -6,10 +6,10 @@
 \description{
 This page explains the details of estimating weights from SuperLearner-based propensity scores by setting \code{method = "super"} in the call to \code{\link{weightit}} or \code{\link{weightitMSM}}. This method can be used with binary, multinomial, and continuous treatments.
 
-In general, this method relies on estimating propensity scores using the SuperLearner algorithm for stacking predictions and then converting those propensity scores into weights using a formula that depends on the desired estimand. For binary and multinomial treatments, one or more binary classification algorithms are used to estimate the propensity scores as the predicted probability of being in each treatment given the covariates. For continuous treatments, regression algorithms are used to estimate generalized propensity scores as the conditional density of treatment given the covariates.
+In general, this method relies on estimating propensity scores using the SuperLearner algorithm for stacking predictions and then converting those propensity scores into weights using a formula that depends on the desired estimand. For binary and multinomial treatments, one or more binary classification algorithms are used to estimate the propensity scores as the predicted probability of being in each treatment given the covariates. For continuous treatments, regression algorithms are used to estimate generalized propensity scores as the conditional density of treatment given the covariates. This method relies on \code{\link[SuperLearner]{SuperLearner}} from the \CRANpkg{SuperLearner} package.
 
 \subsection{Binary Treatments}{
-For binary treatments, this method estimates the propensity scores using \code{\link[SuperLearner]{SuperLearner}} in the \pkg{SuperLearner} package. The following estimands are allowed: ATE, ATT, ATC, ATO, and ATM. The weights for the ATE, ATT, and ATC are computed from the estimated propensity scores using the standard formulas, the weights for the ATO are computed as in Li & Li (2018), and the weights for the ATM (i.e., average treatment effect in the equivalent sample "pair-matched" with calipers) are computed as in Yoshida et al. (2017). Weights can also be computed using marginal mean weighting through stratification for the ATE, ATT, and ATC. See \code{\link{get_w_from_ps}} for details.
+For binary treatments, this method estimates the propensity scores using \code{\link[SuperLearner]{SuperLearner}}. The following estimands are allowed: ATE, ATT, ATC, ATO, and ATM. The weights for the ATE, ATT, and ATC are computed from the estimated propensity scores using the standard formulas, the weights for the ATO are computed as in Li & Li (2018), and the weights for the ATM (i.e., average treatment effect in the equivalent sample "pair-matched" with calipers) are computed as in Yoshida et al. (2017). Weights can also be computed using marginal mean weighting through stratification for the ATE, ATT, and ATC. See \code{\link{get_w_from_ps}} for details.
 }
 \subsection{Multinomial Treatments}{
 For multinomial treatments, the propensity scores are estimated using several calls to \code{\link[SuperLearner]{SuperLearner}}, one for each treatment group, and the treatment probabilities are normalized to sum to 1. The following estimands are allowed: ATE, ATT, ATO, and ATM. The weights for each estimand are computed using the standard formulas or those mentioned above. Weights can also be computed using marginal mean weighting through stratification for the ATE, ATT, and ATC. See \code{\link{get_w_from_ps}} for details.
@@ -89,11 +89,11 @@ When \code{include.obj = TRUE}, the SuperLearner fit(s) used to generate the pre
 SuperLearner works by fitting several machine learning models to the treatment and covariates and then taking a weighted combination of the generated predicted values to use as the propensity scores, which are then used to construct weights. The machine learning models used are supplied using the \code{SL.library} argument; the more models are supplied, the higher the chance of correctly modeling the propensity score. The predicted values are combined using the method supplied in the \code{SL.method} argument (which is nonnegative least squares by default). A benefit of SuperLearner is that, asymptotically, it is guaranteed to perform as well as or better than the best-performing method included in the library. Using Balance SuperLearner by setting \code{SL.method = "method.balance"} works by selecting the combination of predicted values that minimizes an imbalance measure.
 }
 \references{
-- Binary treatments
+\strong{Binary treatments}
 
 Pirracchio, R., Petersen, M. L., & van der Laan, M. (2015). Improving Propensity Score Estimators’ Robustness to Model Misspecification Using Super Learner. American Journal of Epidemiology, 181(2), 108–119. \doi{10.1093/aje/kwu253}
 
-- Continuous treatments
+\strong{Continuous treatments}
 
 Kreif, N., Grieve, R., Díaz, I., & Harrison, D. (2015). Evaluation of the Effect of a Continuous Treatment: A Machine Learning Approach with an Application to Treatment for Traumatic Brain Injury. Health Economics, 24(9), 1213–1228. \doi{10.1002/hec.3189}
 

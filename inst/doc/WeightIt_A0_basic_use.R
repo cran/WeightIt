@@ -1,5 +1,6 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, warnings = FALSE, messages = FALSE)
+set.seed(1000)
 
 ## -----------------------------------------------------------------------------
 data("lalonde", package = "cobalt")

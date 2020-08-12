@@ -289,8 +289,8 @@ process.by <- function(by, data, treat, treat.name = NULL, by.arg = "by") {
   return(by.components)
 }
 process.moments.int <- function(moments, int, method) {
-  if (!is.function(method)) {
-    if (method %in% c("npcbps", "ebal", "ebcw", "optweight", "energy")) {
+  # if (!is.function(method)) {
+    if (is.function(method) || method %in% c("npcbps", "ebal", "ebcw", "optweight", "energy")) {
       if (length(int) != 1 || !is.logical(int)) {
         stop("int must be a logical (TRUE/FALSE) of length 1.", call. = FALSE)
       }
@@ -307,7 +307,7 @@ process.moments.int <- function(moments, int, method) {
         }
       }
       else {
-        if (method == "energy") moments <- 0L
+        if (!is.function(method) && method == "energy") moments <- 0L
         else moments <- 1L
       }
     }
@@ -318,7 +318,9 @@ process.moments.int <- function(moments, int, method) {
       int <- FALSE
     }
     moments <- as.integer(moments)
-  }
+  # }
+  # else {
+  # }
   return(list(moments = moments, int = int))
 }
 process.MSM.method <- function(is.MSM.method, method) {
@@ -478,7 +480,7 @@ int.poly.f <- function(d, ex = NULL, int = FALSE, poly = 1, center = TRUE, ortho
   }
   else int_terms <- int_co.names <- list()
 
-  if (is_not_null(poly_terms) && is_not_null(int_terms)) {
+  if (is_not_null(poly_terms) || is_not_null(int_terms)) {
     out <- do.call("cbind", c(poly_terms, int_terms))
     out_co.names <- c(do.call("c", poly_co.names), do.call("c", int_co.names))
 
@@ -878,7 +880,7 @@ subclass_ps <- function(ps_mat, treat, estimand = "ATE", focal = NULL, subclass)
   if (length(subclass) != 1 || !is.numeric(subclass)) {
     stop("'subclass' must be a single number.", call. = FALSE)
   }
-  else if (round(subclass) < 1) {
+  else if (round(subclass) <= 1) {
     stop("'subclass' must be greater than 1.", call. = FALSE)
   }
   subclass <- round(subclass)
@@ -932,9 +934,10 @@ subclass_ps <- function(ps_mat, treat, estimand = "ATE", focal = NULL, subclass)
   attr(ps_sub, "sub_mat") <- sub_mat
   return(ps_sub)
 }
-subclass_scoot <- function(sub, treat, x) {
+subclass_scoot <- function(sub, treat, x, min.n = 1) {
   #Reassigns subclasses so there are no empty subclasses
-  #for each treatment group.
+  #for each treatment group. min.n is the smallest a
+  #subclass is allowed to be.
   treat <- as.character(treat)
   unique.treat <- unique(treat, nmax = 2)
 
@@ -948,7 +951,7 @@ subclass_scoot <- function(sub, treat, x) {
   sub <- setNames(setNames(seq_len(nsub), sort(unique(sub)))[as.character(sub)],
                   original.order)
 
-  if (any(table(treat) < nsub)) {
+  if (any(table(treat) < nsub * min.n)) {
     stop("Too many subclasses were requested.", call. = FALSE)
   }
 
@@ -967,31 +970,35 @@ subclass_scoot <- function(sub, treat, x) {
     }
 
     for (t in unique.treat) {
-      while (any(sub_tab[t,] == 0)) {
-        first_0 <- which(sub_tab[t,] == 0)[1]
+      for (n in seq_len(min.n)) {
+        while (any(sub_tab[t,] == 0)) {
+          first_0 <- which(sub_tab[t,] == 0)[1]
 
-        if (first_0 == nsub ||
-            (first_0 != 1 &&
-             sum(soft_thresh(sub_tab[t, seq(1, first_0 - 1)]) / abs(first_0 - seq(1, first_0 - 1))) >=
-             sum(soft_thresh(sub_tab[t, seq(first_0 + 1, nsub)]) / abs(first_0 - seq(first_0 + 1, nsub))))) {
-          #If there are more and closer nonzero subs to the left...
-          first_non0_to_left <- max(seq(1, first_0 - 1)[sub_tab[t, seq(1, first_0 - 1)] > 0])
+          if (first_0 == nsub ||
+              (first_0 != 1 &&
+               sum(soft_thresh(sub_tab[t, seq(1, first_0 - 1)]) / abs(first_0 - seq(1, first_0 - 1))) >=
+               sum(soft_thresh(sub_tab[t, seq(first_0 + 1, nsub)]) / abs(first_0 - seq(first_0 + 1, nsub))))) {
+            #If there are more and closer nonzero subs to the left...
+            first_non0_to_left <- max(seq(1, first_0 - 1)[sub_tab[t, seq(1, first_0 - 1)] > 0])
 
-          name_to_move <- names(sub)[which(x == max(x[treat == t & sub == first_non0_to_left]) & treat == t & sub == first_non0_to_left)[1]]
+            name_to_move <- names(sub)[which(x == max(x[treat == t & sub == first_non0_to_left]) & treat == t & sub == first_non0_to_left)[1]]
 
-          sub[name_to_move] <- first_0
-          sub_tab[t, first_0] <- 1L
-          sub_tab[t, first_non0_to_left] <- sub_tab[t, first_non0_to_left] - 1L
+            sub[name_to_move] <- first_0
+            sub_tab[t, first_0] <- 1L
+            sub_tab[t, first_non0_to_left] <- sub_tab[t, first_non0_to_left] - 1L
 
+          }
+          else {
+            #If there are more and closer nonzero subs to the right...
+            first_non0_to_right <- min(seq(first_0 + 1, nsub)[sub_tab[t, seq(first_0 + 1, nsub)] > 0])
+            name_to_move <- names(sub)[which(x == min(x[treat == t & sub == first_non0_to_right]) & treat == t & sub == first_non0_to_right)[1]]
+            sub[name_to_move] <- first_0
+            sub_tab[t, first_0] <- 1L
+            sub_tab[t, first_non0_to_right] <- sub_tab[t, first_non0_to_right] - 1L
+          }
         }
-        else {
-          #If there are more and closer nonzero subs to the right...
-          first_non0_to_right <- min(seq(first_0 + 1, nsub)[sub_tab[t, seq(first_0 + 1, nsub)] > 0])
-          name_to_move <- names(sub)[which(x == min(x[treat == t & sub == first_non0_to_right]) & treat == t & sub == first_non0_to_right)[1]]
-          sub[name_to_move] <- first_0
-          sub_tab[t, first_0] <- 1L
-          sub_tab[t, first_non0_to_right] <- sub_tab[t, first_non0_to_right] - 1L
-        }
+
+        sub_tab[t,] <- sub_tab[t,] - 1
       }
     }
 
@@ -1016,18 +1023,24 @@ stabilize_w <- function(weights, treat) {
 get_cont_weights <- function(ps, treat, s.weights, dens.num, densfun = dnorm, use.kernel = FALSE,
                              densControl = list(bw = "nrd0", n = 10*length(treat),
                                                 adjust = 1, kernel = "gaussian")) {
+
+  if (!is.matrix(ps)) ps <- matrix(ps, ncol = 1)
+
   p.denom <- treat - ps
 
-  if (isTRUE(densControl[["use.kernel"]])) {
-    d.d <- density(p.denom, n = densControl[["n"]],
-                   weights = s.weights/sum(s.weights), give.Rkern = FALSE,
-                   bw = densControl[["bw"]], adjust = densControl[["adjust"]],
-                   kernel = densControl[["kernel"]])
-    dens.denom <- with(d.d, approxfun(x = x, y = y))(p.denom)
+  if (use.kernel) {
+    s.weights <- s.weights/sum(s.weights)
+    dens.denom <- apply(p.denom, 2, function(p) {
+      d.d <- density(p, n = densControl[["n"]],
+                     weights = s.weights, give.Rkern = FALSE,
+                     bw = densControl[["bw"]], adjust = densControl[["adjust"]],
+                     kernel = densControl[["kernel"]])
+      with(d.d, approxfun(x = x, y = y))(p)
+    })
   }
   else {
-    dens.denom <- densfun(p.denom/sd(p.denom))
-    if (is_null(dens.denom) || !is.atomic(dens.denom) || anyNA(dens.denom)) {
+    dens.denom <- densfun(mat_div(p.denom, sqrt(col.w.v(p.denom))))
+    if (is_null(dens.denom) || !is.numeric(dens.denom) || anyNA(dens.denom)) {
       stop("There was a problem with the output of 'density.' Try another density function or leave it blank to use the normal density.", call. = FALSE)
     }
     else if (any(dens.denom <= 0)) {
@@ -1036,7 +1049,7 @@ get_cont_weights <- function(ps, treat, s.weights, dens.num, densfun = dnorm, us
 
   }
 
-  w <- dens.num/dens.denom
+  w <- drop(dens.num/dens.denom)
 
   return(w)
 }
@@ -1044,6 +1057,9 @@ get_cont_weights <- function(ps, treat, s.weights, dens.num, densfun = dnorm, us
 get.w.from.ps <- function(ps, treat, estimand = "ATE", focal = NULL, subclass = NULL, stabilize = FALSE) {
   #Batch turn PS into weights; primarily for output of predict.gbm
   # Assumes a (0,1) treatment if binary, with ATT already processed
+  if (is_null(dim(ps))) {
+    ps <- matrix(ps, ncol = 1)
+  }
 
   if (length(dim(ps)) == 2) {
     if (is_not_null(focal)) focal <- "1"
@@ -1111,6 +1127,23 @@ get.w.from.ps <- function(ps, treat, estimand = "ATE", focal = NULL, subclass = 
   else stop("Don't know how to process more than 3 dims.")
 
   return(w)
+}
+
+plot_density <- function(d.n, d.d) {
+  d.d_ <- cbind(as.data.frame(d.d[c("x", "y")]), dens = "Denominator Density", stringsAsfactors = FALSE)
+  d.n_ <- cbind(as.data.frame(d.n[c("x", "y")]), dens = "Numerator Density", stringsAsfactors = FALSE)
+  d.all <- rbind(d.d_, d.n_)
+  d.all$dens <- factor(d.all$dens, levels = c("Numerator Density", "Denominator Density"))
+  pl <- ggplot(d.all, aes(x = x, y = y)) + geom_line() +
+    labs(title = "Weight Component Densities", x = "E[Treat|X]", y = "Density") +
+    facet_grid(rows = vars(dens)) + theme(panel.background = element_rect(fill = "white"),
+                                          panel.border = element_rect(fill = NA, color = "black"),
+                                          axis.text.x = element_text(color = "black"),
+                                          axis.text.y = element_text(color = "black"),
+                                          panel.grid.major = element_blank(),
+                                          panel.grid.minor = element_blank()
+    )
+  print(pl)
 }
 
 #For balance SuperLearner
@@ -1182,7 +1215,7 @@ method.balance.cont <- function(stop.method) {
       init <- attr(control$trimLogit, "vals")$init
       bal_fun <- attr(control$trimLogit, "vals")$bal_fun
 
-      w_mat<- apply(Z, 2, get_cont_weights, treat = Y, s.weights = obsWeights,
+      w_mat<- get_cont_weights(Z, treat = Y, s.weights = obsWeights,
                     dens.num = dens.num, densfun = densfun, use.kernel = use.kernel,
                     densControl = densControl)
       cvRisk <- apply(w_mat, 2, function(w) bal_fun(init = init, weights = w))
