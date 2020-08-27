@@ -1,7 +1,7 @@
-b0f00979e28282d9028281120a5cb666 *DESCRIPTION
+35386ac938aaf36aa9a4c8a1f439d743 *DESCRIPTION
 3da8f54d04037c62cf6b3581228b3451 *NAMESPACE
-835d0d6c414d99b0e892c26e4290a784 *NEWS.md
-d604b4699612aae27fdbb6b1c401559d *R/SHARED.R
+939deb90afbbc879a0d75da707b5ec69 *NEWS.md
+a64655e9404168079cf20d8cc7d2487d *R/SHARED.R
 cc6c43ec55cb9a63af7c1e5c48b64947 *R/as.weightit.R
 d797ed273fd9f731678cf02a82138e56 *R/balance.criteria.R
 06793cd280a9fa5bfb1be7d684f2b9f2 *R/functions_for_processing.R
@@ -12,14 +12,14 @@ aa7efe4671e76cc2a92e58954c193dcc *R/trim.R
 0bdb9939c51a469ca47d7155aaa358f0 *R/utilities.R
 48b12798f5d97ef6391036e40c7fab32 *R/weightit.R
 560fc5ab7e74cafad98325fa583b7cd8 *R/weightit.fit.R
-8b2a7e0f61173ee552752e08f5bedefe *R/weightit2method.R
+8ec30e3611b06f66ee29f4419ed62d74 *R/weightit2method.R
 92b0ccc58a7ea623be6b3ac3071c30b6 *R/weightitMSM.R
 c06c53712af3edf6636b3baca7ced2fa *README.md
-9250b49a958195be4179c031ffed4c3b *build/partial.rdb
-bf63b77ea2b8afecc031e6aa653eff94 *build/vignette.rds
-3bdebd69b82b22ec1d0c9d3b8d9ab939 *inst/doc/WeightIt_A0_basic_use.R
-a5ef9a9b4c8d23f1e9fdc230f5f9ff28 *inst/doc/WeightIt_A0_basic_use.Rmd
-246af9712562c26e0138c169b44ea5b9 *inst/doc/WeightIt_A0_basic_use.html
+a7c88c44e400e434b44aefd3e06776c3 *build/partial.rdb
+fdab4fc187c435e4ca5c970be7947952 *build/vignette.rds
+3bdebd69b82b22ec1d0c9d3b8d9ab939 *inst/doc/WeightIt.R
+a5ef9a9b4c8d23f1e9fdc230f5f9ff28 *inst/doc/WeightIt.Rmd
+07f39bb08cc3f3393a4cfedfaa40c730 *inst/doc/WeightIt.html
 1ed1439acd1d86c570df8382ed1c1541 *man/ESS.Rd
 bdfa859eafde8d9d2399045697cbbbb2 *man/as.weightit.Rd
 17c6786d03c201f9474c3049ebe8d18c *man/get_w_from_ps.Rd
@@ -42,4 +42,4 @@ d04693044caa13ffbe250cb26516e7a7 *man/stop.method.Rd
 140b13e6a7a178997770bf40e3e22cab *man/trim.Rd
 6d10820889f4708d964de89dd6038235 *man/weightit.Rd
 62026f0572f87464e474848ae7680fec *man/weightitMSM.Rd
-a5ef9a9b4c8d23f1e9fdc230f5f9ff28 *vignettes/WeightIt_A0_basic_use.Rmd
+a5ef9a9b4c8d23f1e9fdc230f5f9ff28 *vignettes/WeightIt.Rmd
