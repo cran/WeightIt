@@ -6,22 +6,40 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   A <- list(...)
 
+
   #Checks
-  if (is_null(ps)) {
-    if (is_null(formula) || is_null(class(formula)) || !is.formula(formula, 2)) {
-      stop("'formula' must be a formula relating treatment to covariates.", call. = FALSE)
-    }
+  if (is_null(formula) || is_null(class(formula)) || !is.formula(formula, 2)) {
+    stop("'formula' must be a formula relating treatment to covariates.", call. = FALSE)
   }
-  else {
-    if (!(is.character(ps) && length(ps) == 1) && !is.numeric(ps)) {
-      stop("The argument to 'ps' must be a vector or data frame of propensity scores or the (quoted) names of variables in 'data' that contain propensity scores.", call. = FALSE)
-    }
-    if (is.character(ps) && length(ps)==1) {
-      if (ps %in% names(data)) {
-        ps <- data[[ps]]
-      }
-      else stop("The name supplied to 'ps' is not the name of a variable in 'data'.", call. = FALSE)
-    }
+
+
+
+  #Process treat and covs from formula and data
+  t.c <- get.covs.and.treat.from.formula(formula, data)
+  reported.covs <- t.c[["reported.covs"]]
+  covs <- t.c[["model.covs"]]
+  treat <- t.c[["treat"]]
+  # treat.name <- t.c[["treat.name"]]
+
+  if (is_null(covs)) stop("No covariates were specified.", call. = FALSE)
+  if (is_null(treat)) stop("No treatment variable was specified.", call. = FALSE)
+  if (length(treat) != nrow(covs)) {
+    stop("The treatment and covariates must have the same number of units.", call. = FALSE)
+  }
+
+  n <- length(treat)
+
+  if (anyNA(treat)) {
+    stop("No missing values are allowed in the treatment variable.", call. = FALSE)
+  }
+
+  #Get treat type
+  treat <- assign.treat.type(treat)
+  treat.type <- get.treat.type(treat)
+
+  #Process ps
+  ps <- process.ps(ps, data, treat)
+  if (is_not_null(ps)) {
     method <- "ps"
   }
 
@@ -38,33 +56,9 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
     attr(method, "name") <- method.name
   }
 
-  #Process treat and covs from formula and data
-  t.c <- get.covs.and.treat.from.formula(formula, data)
-  reported.covs <- t.c[["reported.covs"]]
-  covs <- t.c[["model.covs"]]
-  treat <- t.c[["treat"]]
-  # treat.name <- t.c[["treat.name"]]
-
-  if (is_null(covs)) stop("No covariates were specified.", call. = FALSE)
-  if (is_null(treat)) stop("No treatment variable was specified.", call. = FALSE)
-  if (length(treat) != nrow(covs)) {
-    stop("Treatment and covariates must have the same number of units.", call. = FALSE)
-  }
-
-  n <- length(treat)
-
-
-  if (anyNA(treat)) {
-    stop("No missing values are allowed in the treatment variable.", call. = FALSE)
-  }
-
-  #Get treat type
-  treat <- assign.treat.type(treat)
-  treat.type <- get.treat.type(treat)
-
   #Process estimand and focal
   estimand <- process.estimand(estimand, method, treat.type)
-  f.e.r <- process.focal.and.estimand(focal, estimand, treat, treat.type)
+  f.e.r <- process.focal.and.estimand(focal, estimand, treat)
   focal <- f.e.r[["focal"]]
   estimand <- f.e.r[["estimand"]]
   reported.estimand <- f.e.r[["reported.estimand"]]
@@ -76,7 +70,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   else missing <- ""
 
   #Check subclass
-  if(is_not_null(subclass)) check.subclass(method, treat.type)
+  if (is_not_null(subclass)) check.subclass(method, treat.type)
 
   #Process s.weights
   s.weights <- process.s.weights(s.weights, data)
@@ -103,28 +97,24 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   ## Running models ----
 
-  if (verbose) eval.verbose <- base::eval
-  else eval.verbose <- utils::capture.output
-
-  eval.verbose({
-    #Returns weights (w) and propensty score (ps)
-      obj <- weightit.fit(treat = treat,
-                          covs = covs,
-                          treat.type = treat.type,
-                          s.weights = s.weights,
-                          by.factor = attr(processed.by, "by.factor"),
-                          estimand = estimand,
-                          focal = focal,
-                          stabilize = stabilize,
-                          method = method,
-                          moments = moments,
-                          int = int,
-                          subclass = subclass,
-                          ps = ps,
-                          missing = missing,
-                          include.obj = include.obj,
-                          ...)
-  })
+  #Returns weights (w) and propensty score (ps)
+  obj <- weightit.fit(treat = treat,
+                      covs = covs,
+                      treat.type = treat.type,
+                      s.weights = s.weights,
+                      by.factor = attr(processed.by, "by.factor"),
+                      estimand = estimand,
+                      focal = focal,
+                      stabilize = stabilize,
+                      method = method,
+                      moments = moments,
+                      int = int,
+                      subclass = subclass,
+                      ps = ps,
+                      missing = missing,
+                      verbose = verbose,
+                      include.obj = include.obj,
+                      ...)
 
   if (all_the_same(obj$w)) stop(paste0("All weights are ", obj$w[1], "."), call. = FALSE)
 
@@ -198,12 +188,12 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
 
   if (treat.type == "continuous") {
     out$weight.range <- list(all = c(min(w[w > 0]),
-                          max(w[w > 0])))
+                                     max(w[w > 0])))
     top.weights <- sort(w, decreasing = TRUE)[seq_len(top)]
     out$weight.top <- list(all = sort(setNames(top.weights, which(w %in% top.weights)[seq_len(top)])))
     out$coef.of.var <- c(all = sd(w)/mean_fast(w))
-    out$scaled.mad <- c(all = mean.abs.dev(w)/mean_fast(w))
-    out$negative.entropy <- c(all = sum(w[w>0]*log(w[w>0]))/sum(w[w>0]))
+    out$scaled.mad <- c(all = mean.abs.dev(w/mean_fast(w)))
+    out$negative.entropy <- c(all = neg_ent(w))
     out$num.zeros <- c(overall = sum(check_if_zero(w)))
 
     nn <- make_df("Total", c("Unweighted", "Weighted"))
@@ -226,17 +216,13 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
                         control = sort(w[t == 0], decreasing = TRUE)[seq_len(top0["control"])])
 
     out$coef.of.var <- c(treated = sd(w[t==1])/mean_fast(w[t==1]),
-                         control = sd(w[t==0])/mean_fast(w[t==0]),
-                         overall = sd(w)/mean_fast(w))
-    out$scaled.mad <- c(treated = mean.abs.dev(w[t==1])/mean_fast(w[t==1]),
-                        control = mean.abs.dev(w[t==0])/mean_fast(w[t==0]),
-                        overall = mean.abs.dev(w)/mean_fast(w))
-    out$negative.entropy <- c(treated = sum(w[t==1 & w>0]*log(w[t==1 & w>0]))/sum(w[t==1 & w>0]),
-                              control = sum(w[t==0 & w>0]*log(w[t==0 & w>0]))/sum(w[t==0 & w>0]),
-                              overall = sum(w[w>0]*log(w[w>0]))/sum(w[w>0]))
+                         control = sd(w[t==0])/mean_fast(w[t==0]))
+    out$scaled.mad <- c(treated = mean.abs.dev(w[t==1]/mean_fast(w[t==1])),
+                        control = mean.abs.dev(w[t==0]/mean_fast(w[t==0])))
+    out$negative.entropy <- c(treated = neg_ent(w[t==1]),
+                              control = neg_ent(w[t==0]))
     out$num.zeros <- c(treated = sum(check_if_zero(w[t==1])),
-                       control = sum(check_if_zero(w[t==0])),
-                       overall = sum(check_if_zero(w)))
+                       control = sum(check_if_zero(w[t==0])))
 
     #dc <- weightit$discarded
 
@@ -248,20 +234,16 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
   }
   else if (treat.type == "multinomial") {
     out$weight.range <- setNames(lapply(levels(t), function(x) c(min(w[w > 0 & t == x]),
-                                                        max(w[w > 0 & t == x]))),
+                                                                 max(w[w > 0 & t == x]))),
                                  levels(t))
     top.weights <- setNames(lapply(levels(t), function(x) sort(w[t == x], decreasing = TRUE)[seq_len(top)]),
                             levels(t))
     out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w %in% top.weights[[x]] & t == x)[seq_len(top)]))),
                                names(top.weights))
-    out$coef.of.var <- c(vapply(levels(t), function(x) sd(w[t==x])/mean_fast(w[t==x]), numeric(1L)),
-                         overall = sd(w)/mean_fast(w))
-    out$scaled.mad <- c(vapply(levels(t), function(x) mean.abs.dev(w[t==x])/mean_fast(w[t==x]), numeric(1L)),
-                        overall = mean.abs.dev(w)/mean_fast(w))
-    out$negative.entropy <- c(vapply(levels(t), function(x) sum(w[t==x & w>0]*log(w[t==x & w>0]))/sum(w[t==x & w>0]), numeric(1L)),
-                         overall = sum(w[w>0]*log(w[w>0]))/sum(w[w>0]))
-    out$num.zeros <- c(vapply(levels(t), function(x) sum(check_if_zero(w[t==x])), numeric(1L)),
-                       overall = sum(check_if_zero(w)))
+    out$coef.of.var <- c(vapply(levels(t), function(x) sd(w[t==x])/mean_fast(w[t==x]), numeric(1L)))
+    out$scaled.mad <- c(vapply(levels(t), function(x) mean.abs.dev(w[t==x])/mean_fast(w[t==x]), numeric(1L)))
+    out$negative.entropy <- c(vapply(levels(t), function(x) neg_ent(w[t==x]), numeric(1L)))
+    out$num.zeros <- c(vapply(levels(t), function(x) sum(check_if_zero(w[t==x])), numeric(1L)))
 
     nn <- make_df(levels(t), c("Unweighted", "Weighted"))
     for (i in levels(t)) {
@@ -276,10 +258,10 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
   out$effective.sample.size <- nn
 
   if (is_not_null(object$focal)) {
-    w <- w[t != object$focal]
     attr(w, "focal") <- object$focal
   }
   attr(out, "weights") <- w
+  attr(out, "treat") <- t
   class(out) <- "summary.weightit"
   return(out)
 }
@@ -292,9 +274,9 @@ print.summary.weightit <- function(x, ...) {
     print.data.frame(round_df_char(text_box_plot(x$weight.range, 28), 4), ...)
   })
   df <- setNames(data.frame(do.call("c", lapply(names(x$weight.top), function(x) c(" ", x))),
-                   matrix(do.call("c", lapply(x$weight.top, function(x) c(names(x), rep("", top - length(x)), round(x, 4), rep("", top - length(x))))),
-               byrow = TRUE, nrow = 2*length(x$weight.top))),
-               rep("", 1 + top))
+                            matrix(do.call("c", lapply(x$weight.top, function(x) c(names(x), rep("", top - length(x)), round(x, 4), rep("", top - length(x))))),
+                                   byrow = TRUE, nrow = 2*length(x$weight.top))),
+                 rep("", 1 + top))
   cat("\n- " %+% italic("Units with", top, "greatest weights by group") %+% ":\n")
   print.data.frame(df, row.names = FALSE)
   cat("\n- " %+% italic("Weight statistics") %+% ":\n\n")
@@ -302,27 +284,62 @@ print.summary.weightit <- function(x, ...) {
                                                               x$scaled.mad,
                                                               x$negative.entropy,
                                                               x$num.zeros)),
-                                        c("Coef of Var", "MAD", "Entropy", "# Zeros")), 3))
+                                          c("Coef of Var", "MAD", "Entropy", "# Zeros")), 3))
   cat("\n- " %+% italic("Effective Sample Sizes") %+% ":\n\n")
   print.data.frame(round_df_char(x$effective.sample.size, 2, pad = " "))
   invisible(x)
 }
-plot.summary.weightit <- function(x, ...) {
+plot.summary.weightit <- function(x, binwidth = NULL, bins = NULL, ...) {
   w <- attr(x, "weights")
+  t <- attr(x, "treat")
   focal <- attr(w, "focal")
+  treat.type <- get.treat.type(t)
+
+  A <- list(...)
+  if (is_not_null(A[["breaks"]])) {
+    breaks <- hist(w, breaks = A[["breaks"]], plot = FALSE)$breaks
+    bins <- binwidth <- NULL
+  }
+  else {
+    breaks <- NULL
+    if (is_null(bins)) bins <- 20
+  }
 
   if (is_not_null(focal)) subtitle <- paste0("For Units Not in Treatment Group \"", focal, "\"")
   else subtitle <- NULL
 
+  if (treat.type == "continuous") {
   p <- ggplot(data = data.frame(w), mapping = aes(x = w)) +
-    geom_histogram(breaks = hist(w, plot = FALSE,
-                                 ...)$breaks,
-                   color = "black",
-                   fill = "gray", alpha = .8) +
-    scale_y_continuous(expand = expand_scale(c(0, .05))) +
-    geom_vline(xintercept = mean(w), linetype = "12") +
-    labs(x = "Weight", y = "Count", title = "Distribution of Weights",
-         subtitle = subtitle) +
+    geom_histogram(binwidth = binwidth,
+                   bins = bins,
+                   breaks = breaks,
+                   center = mean(w),
+                   color = "gray70",
+                   fill = "gray70", alpha = 1) +
+    scale_y_continuous(expand = expansion(c(0, .05))) +
+    geom_vline(xintercept = mean(w), linetype = "12", color = "blue", size = .75) +
+    labs(x = "Weight", y = "Count", title = "Distribution of Weights") +
     theme_bw()
+  }
+  else {
+    d <- data.frame(w, t = factor(t))
+    if (is_not_null(focal)) d <- d[t != focal,]
+
+    levels(d$t) <- paste("Treat =", levels(d$t))
+    w_means <- aggregate(w ~ t, data = d, FUN = mean)
+
+    p <- ggplot(data = d, mapping = aes(x = w)) +
+      geom_histogram(binwidth = binwidth,
+                     bins = bins,
+                     breaks = breaks,
+                     # center = mean(w),
+                     color = "gray70",
+                     fill = "gray70", alpha = 1) +
+      scale_y_continuous(expand = expansion(c(0, .05))) +
+      geom_vline(data = w_means, aes(xintercept = w), linetype = "12", color = "red") +
+      labs(x = "Weight", y = "Count", title = "Distribution of Weights") +
+      theme_bw() + facet_wrap(vars(t), ncol = 1, scales = "free") +
+      theme(panel.background = element_blank(), panel.border = element_rect(fill = NA, color = "black", size = .25))
+  }
   p
 }

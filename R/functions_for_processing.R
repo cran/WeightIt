@@ -9,6 +9,7 @@ method.to.proper.method <- function(method) {
   else if (method %in% c("ebcw", "ate")) return("ebcw")
   else if (method %in% c("optweight", "opt", "sbw")) return("optweight")
   else if (method %in% c("super", "superlearner")) return("super")
+  else if (method %in% c("bart")) return("bart")
   else if (method %in% c("energy")) return("energy")
   # else if (method %in% c("kbal")) return("kbal")
   else return(method)
@@ -26,6 +27,7 @@ check.acceptable.method <- function(method, msm = FALSE, force = FALSE) {
                           , "optweight", "opt", "sbw"
                           , "super", "superlearner"
                           , "energy"
+                          , "bart"
                           # "kbal",
   )
 
@@ -61,7 +63,7 @@ method.to.phrase <- function(method) {
   else {
     method <- method.to.proper.method(method)
     if (method %in% c("ps")) return("propensity score weighting")
-    else if (method %in% c("gbm")) return("generalized boosted modeling")
+    else if (method %in% c("gbm")) return("propensity score weighting with GBM")
     else if (method %in% c("twang")) return("generalized boosted modeling with TWANG")
     else if (method %in% c("cbps")) return("covariate balancing propensity score weighting")
     else if (method %in% c("npcbps")) return("non-parametric covariate balancing propensity score weighting")
@@ -69,6 +71,7 @@ method.to.phrase <- function(method) {
     else if (method %in% c("ebcw")) return("empirical balancing calibration weighting")
     else if (method %in% c("optweight")) return("targeted stable balancing weights")
     else if (method %in% c("super")) return("propensity score weighting with SuperLearner")
+    else if (method %in% c("bart")) return("propensity score weighting with BART")
     else if (method %in% c("energy")) return("energy balancing")
     # else if (method %in% c("kbal")) return("kernel balancing")
     else return("the chosen method of weighting")
@@ -87,6 +90,7 @@ process.estimand <- function(estimand, method, treat.type) {
                   , optweight = c("ATT", "ATC", "ATE")
                   , super = c("ATT", "ATC", "ATE", "ATO", "ATM")
                   , energy = c("ATT", "ATC", "ATE")
+                  , bart = c("ATT", "ATC", "ATE", "ATO", "ATM")
                   # , kbal = c("ATT", "ATC", "ATE")
     ),
     multinomial = list(ps = c("ATT", "ATC", "ATE", "ATO", "ATM")
@@ -99,6 +103,7 @@ process.estimand <- function(estimand, method, treat.type) {
                        , optweight = c("ATT", "ATC", "ATE")
                        , super = c("ATT", "ATC", "ATE", "ATO", "ATM")
                        , energy = c("ATT", "ATC", "ATE")
+                       , bart = c("ATT", "ATC", "ATE", "ATO", "ATM")
                        # , kbal = c("ATT", "ATE")
     ))
 
@@ -125,6 +130,7 @@ check.subclass <- function(method, treat.type) {
                   , optweight = FALSE
                   , super = TRUE
                   , energy = FALSE
+                  , bart = TRUE
                   # , kbal = FALSE
     ),
     multinomial = list(ps = TRUE
@@ -137,6 +143,7 @@ check.subclass <- function(method, treat.type) {
                        , optweight = FALSE
                        , super = TRUE
                        , energy = FALSE
+                       , bart = TRUE
     ))
 
   if (treat.type != "continuous" && !is.function(method) &&
@@ -145,17 +152,47 @@ check.subclass <- function(method, treat.type) {
                 " with ", treat.type, " treatments."), call. = FALSE)
   }
 }
-process.focal.and.estimand <- function(focal, estimand, treat, treat.type, treated = NULL) {
+process.ps <- function(ps, data = NULL, treat) {
+  #Process s.weights
+  if (is_not_null(ps)) {
+    if (is.character(ps) && length(ps)==1) {
+      if (is_null(data)) {
+        stop("'ps' was specified as a string but there was no argument to 'data'.", call. = FALSE)
+      }
+      else if (ps %in% names(data)) {
+        ps <- data[[ps]]
+      }
+      else stop("The name supplied to 'ps' is not the name of a variable in 'ps'.", call. = FALSE)
+    }
+    else if (is.numeric(ps)) {
+      if (length(ps) != length(treat)) {
+        stop("'ps' must have teh same number of units as the treatment.", call. = FALSE)
+      }
+    }
+    else {
+      stop("The argument to 'ps' must be a vector of propensity scores or the (quoted) names of the variable in 'data' that contains sampling weights.", call. = FALSE)
+    }
+  }
+  else ps <- NULL
+  return(ps)
+}
+process.focal.and.estimand <- function(focal, estimand, treat, treated = NULL) {
   reported.estimand <- estimand
 
   if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
   treat.type <- get.treat.type(treat)
 
+  unique.treat <- unique(treat, nmax = switch(treat.type, "binary" = 2, "multinomial" = length(treat)/4))
+
   #Check focal
+  if (is_not_null(focal) && (length(focal) > 1L || focal %nin% unique.treat)) {
+    stop("The argument supplied to 'focal' must be the name of a level of treatment.", call. = FALSE)
+  }
+
   if (treat.type == "multinomial") {
-    unique.treat <- unique(treat, nmax = length(treat)/4)
+
     if (estimand %nin% c("ATT", "ATC") && is_not_null(focal)) {
-      warning(paste(estimand, "is not compatible with 'focal'. Setting 'estimand' to \"ATT\"."), call. = FALSE)
+      warning(paste(estimand, "is not compatible with 'focal'. Setting 'estimand' to \"ATT\"."), call. = FALSE, immediate. = TRUE)
       reported.estimand <- estimand <- "ATT"
     }
 
@@ -174,60 +211,54 @@ process.focal.and.estimand <- function(focal, estimand, treat, treat.type, treat
     }
   }
   else if (treat.type == "binary") {
-    unique.treat <- unique(treat, nmax = 2)
     unique.treat.bin <- unique(binarize(treat), nmax = 2)
     if (estimand %nin% c("ATT", "ATC") && is_not_null(focal)) {
-      warning(paste(estimand, "is not compatible with 'focal'. Setting 'estimand' to \"ATT\"."), call. = FALSE)
+      warning(paste(estimand, "is not compatible with 'focal'. Setting 'estimand' to \"ATT\"."), call. = FALSE, immediate. = TRUE)
       reported.estimand <- estimand <- "ATT"
     }
 
-    if (estimand == "ATT") {
+    if (is_null(treated) || treated %nin% unique.treat) {
       if (is_null(focal)) {
-        if (is_null(treated) || treated %nin% unique.treat) {
-          if (all(as.character(unique.treat.bin) == as.character(unique.treat))) {
-            #If is 0/1
-            treated <- unique.treat[unique.treat.bin == 1]
-          }
-          else {
-            treated <- names(which.min(table(treat))) #Smaller group is treated
+        if (all(as.character(unique.treat.bin) == as.character(unique.treat))) {
+          treated <- unique.treat[unique.treat.bin == 1]
+        }
+        else {
+          if (is.factor(treat)) treated <- levels(treat)[2]
+          else treated <- unique.treat[unique.treat.bin == 1]
+
+          if (estimand == "ATT") {
             message(paste0("Assuming ", word_list(treated, quotes = !is.numeric(treat), is.are = TRUE),
                            " the treated level. If not, supply an argument to 'focal'."))
-          }
-        }
-        focal <- treated
-      }
-      else {
-        if (is_null(treated) || treated %nin% unique.treat) {
-          treated <- focal
-        }
-      }
-    }
-    else if (estimand == "ATC") {
-      if (is_null(focal)) {
-        if (is_null(treated) || treated %nin% unique.treat) {
 
-          if (all(as.character(unique.treat.bin) == as.character(unique.treat))) {
-            treated <- unique.treat[unique.treat.bin == 1]
           }
-          else {
-            treated <- names(which.min(table(treat))) #Smaller group is treated
+          else if (estimand == "ATC") {
             message(paste0("Assuming ", word_list(unique.treat[unique.treat %nin% treated], quotes = !is.numeric(treat), is.are = TRUE),
                            " the control level. If not, supply an argument to 'focal'."))
           }
+
         }
-        focal <- unique.treat[unique.treat %nin% treated]
+        if (estimand == "ATT")
+          focal <- treated
+        else if (estimand == "ATC")
+          focal <- unique.treat[unique.treat %nin% treated]
       }
       else {
-        if (is_null(treated) || treated %nin% unique.treat) {
+        if (estimand == "ATT")
+          treated <- focal
+        else if (estimand == "ATC")
           treated <- unique.treat[unique.treat %nin% focal]
-        }
       }
-      estimand <- "ATT"
+      if (estimand == "ATC") estimand <- "ATT"
     }
-  }
-
-  if (is_not_null(focal) && (length(focal) > 1L || focal %nin% unique.treat)) {
-    stop("The argument supplied to 'focal' must be the name of a level of treatment.", call. = FALSE)
+    else {
+      if (is_null(focal)) {
+        if (estimand == "ATT")
+          focal <- treated
+        else if (estimand == "ATC")
+          focal <- unique.treat[unique.treat %nin% treated]
+      }
+      if (estimand == "ATC") estimand <- "ATT"
+    }
   }
 
   return(list(focal = as.character(focal),
@@ -290,34 +321,34 @@ process.by <- function(by, data, treat, treat.name = NULL, by.arg = "by") {
 }
 process.moments.int <- function(moments, int, method) {
   # if (!is.function(method)) {
-    if (is.function(method) || method %in% c("npcbps", "ebal", "ebcw", "optweight", "energy")) {
-      if (length(int) != 1 || !is.logical(int)) {
-        stop("int must be a logical (TRUE/FALSE) of length 1.", call. = FALSE)
-      }
-      if (is_not_null(moments)) {
-        if (length(moments) != 1 || !is.numeric(moments) ||
-            !check_if_zero(moments - round(moments))) {
-          if (method == "energy") {
-            if (moments < 0) stop("'moments' must be a nonnegative integer of length 1.", call. = FALSE)
-          }
-          else if (method %in% c("npcbps", "ebal", "ebcw", "optweight")) {
-            if (moments < 1) stop("'moments' must be a positive integer of length 1.", call. = FALSE)
-          }
-          moments <- as.integer(moments)
+  if (is.function(method) || method %in% c("npcbps", "ebal", "ebcw", "optweight", "energy")) {
+    if (length(int) != 1 || !is.logical(int)) {
+      stop("int must be a logical (TRUE/FALSE) of length 1.", call. = FALSE)
+    }
+    if (is_not_null(moments)) {
+      if (length(moments) != 1 || !is.numeric(moments) ||
+          !check_if_zero(moments - round(moments))) {
+        if (method == "energy") {
+          if (moments < 0) stop("'moments' must be a nonnegative integer of length 1.", call. = FALSE)
         }
-      }
-      else {
-        if (!is.function(method) && method == "energy") moments <- 0L
-        else moments <- 1L
+        else if (method %in% c("npcbps", "ebal", "ebcw", "optweight")) {
+          if (moments < 1) stop("'moments' must be a positive integer of length 1.", call. = FALSE)
+        }
+        moments <- as.integer(moments)
       }
     }
-    else if (is_not_null(moments) && any(mi0 <- c(as.integer(moments) != 1L, int))) {
-      warning(paste0(word_list(c("moments", "int")[mi0], and.or = "and", is.are = TRUE, quotes = 1),
-                     " not compatible with ", method.to.phrase(method), ". Ignoring ", word_list(c("moments", "int")[mi0], and.or = "and", quotes = 1), "."), call. = FALSE)
-      moments <- NULL
-      int <- FALSE
+    else {
+      if (!is.function(method) && method == "energy") moments <- 0L
+      else moments <- 1L
     }
-    moments <- as.integer(moments)
+  }
+  else if (is_not_null(moments) && any(mi0 <- c(as.integer(moments) != 1L, int))) {
+    warning(paste0(word_list(c("moments", "int")[mi0], and.or = "and", is.are = TRUE, quotes = 1),
+                   " not compatible with ", method.to.phrase(method), ". Ignoring ", word_list(c("moments", "int")[mi0], and.or = "and", quotes = 1), "."), call. = FALSE, immediate. = TRUE)
+    moments <- NULL
+    int <- FALSE
+  }
+  moments <- as.integer(moments)
   # }
   # else {
   # }
@@ -346,17 +377,20 @@ process.MSM.method <- function(is.MSM.method, method) {
 }
 process.missing <- function(missing, method, treat.type) {
   #Allowable estimands
-  AE <- list(binary = list(ps = c("ind", "saem")
-                           , gbm = c("ind", "surr")
-                           , twang = c("ind", "surr")
-                           , cbps = c("ind")
-                           , npcbps = c("ind")
-                           , ebal = c("ind")
-                           , ebcw = c("ind")
-                           , optweight = c("ind")
-                           , super = c("ind")
-                           , energy = c("ind")
-                           # , kbal = c("ind")
+  AE <- list(binary = list(ps = c("ind"
+                                  # , "saem"
+  )
+  , gbm = c("ind", "surr")
+  , twang = c("ind", "surr")
+  , cbps = c("ind")
+  , npcbps = c("ind")
+  , ebal = c("ind")
+  , ebcw = c("ind")
+  , optweight = c("ind")
+  , super = c("ind")
+  , bart = c("ind")
+  , energy = c("ind")
+  # , kbal = c("ind")
   ),
   multinomial = list(ps = c("ind")
                      , gbm = c("ind", "surr")
@@ -367,27 +401,31 @@ process.missing <- function(missing, method, treat.type) {
                      , ebcw = c("ind")
                      , optweight = c("ind")
                      , super = c("ind")
+                     , bart = c("ind")
                      , energy = c("ind")
                      # , kbal = c("ind")
   ),
-  continuous = list(ps = c("ind", "saem")
-                    , gbm = c("ind", "surr")
-                    , twang = c("ind", "surr")
-                    , cbps = c("ind")
-                    , npcbps = c("ind")
-                    , ebal = c("ind")
-                    , ebcw = c("ind")
-                    , optweight = c("ind")
-                    , super = c("ind")
-                    , energy = c("ind")
-                    # , kbal = c("ind")
+  continuous = list(ps = c("ind"
+                           # , "saem"
+  )
+  , gbm = c("ind", "surr")
+  , twang = c("ind", "surr")
+  , cbps = c("ind")
+  , npcbps = c("ind")
+  , ebal = c("ind")
+  , ebcw = c("ind")
+  , optweight = c("ind")
+  , super = c("ind")
+  , bart = c("ind")
+  , energy = c("ind")
+  # , kbal = c("ind")
   ))
-
 
   allowable.missings <- AE[[treat.type]][[method]]
   if (is_null(missing)) {
     missing <- allowable.missings[1]
-    warning(paste0("Missing values are present in the covariates. See ?WeightIt::method_", method, " for information on how these are handled."), call. = FALSE)
+    warning(paste0("Missing values are present in the covariates. See ?WeightIt::method_",
+                   method, " for information on how these are handled."), call. = FALSE, immediate. = TRUE)
   }
   else {
     if (!is.character(missing) || length(missing) != 1) stop("'missing' must be a string of length 1.", call. = FALSE)
@@ -554,7 +592,7 @@ int.poly.f <- function(d, ex = NULL, int = FALSE, poly = 1, center = TRUE, ortho
     }
     else {
       s.d.denom <- estimand <- character(ncol(weights))
-      for (i in seq_len(ncol(weights))) {
+      for (i in seq_col(weights)) {
         if (is_binary(treat)) {
           if (all_the_same(weights[[i]][treat==1 & !check_if_zero(weights[[i]])]) &&
               !all_the_same(weights[[i]][treat==0 & !check_if_zero(weights[[i]])])
@@ -630,10 +668,7 @@ get.s.d.denom.weightit <- function(s.d.denom = NULL, estimand = NULL, weights = 
       allowable.estimands <- c("ATT", "ATC", "ATE", "ATO", "ATM")
       try.estimand <- tryCatch(match_arg(toupper(estimand), allowable.estimands),
                                error = function(cond) NA_character_)
-      if (anyNA(try.estimand)) {
-        check.focal <- TRUE
-      }
-      else if (try.estimand %in% c("ATC", "ATT")) {
+      if (anyNA(try.estimand) || try.estimand %in% c("ATC", "ATT")) {
         check.focal <- TRUE
       }
       else {
@@ -1012,7 +1047,7 @@ stabilize_w <- function(weights, treat) {
   if (is.factor(treat)) t.levels <- levels(treat)
   else t.levels <- unique(treat)
   w.names <- names(weights)
-  tab <- vapply(t.levels, function(x) mean_fast(treat == x), numeric(1L))
+  tab <- setNames(vapply(t.levels, function(x) mean_fast(treat == x), numeric(1L)), t.levels)
   return(setNames(weights * tab[as.character(treat)], w.names))
 }
 `%+%` <- function(...) {
@@ -1065,7 +1100,7 @@ get.w.from.ps <- function(ps, treat, estimand = "ATE", focal = NULL, subclass = 
     if (is_not_null(focal)) focal <- "1"
     if (is_not_null(subclass)) {
       #Get MMW subclass propensity scores
-      for (p in seq_len(ncol(ps))) {
+      for (p in seq_col(ps)) {
         ps_mat <- matrix(c(1 - ps[,p], ps[,p]), ncol = 2, dimnames = list(rownames(ps), c("0", "1")))
         ps[,p] <- subclass_ps(ps_mat, treat, estimand, focal, subclass)[, 2]
       }
@@ -1146,6 +1181,12 @@ plot_density <- function(d.n, d.d) {
   print(pl)
 }
 
+neg_ent <- function(w) {
+  w <- w[w > 0]
+  w <- w/mean_fast(w)
+  mean(w*log(w))
+}
+
 #For balance SuperLearner
 method.balance <- function(stop.method) {
 
@@ -1216,8 +1257,8 @@ method.balance.cont <- function(stop.method) {
       bal_fun <- attr(control$trimLogit, "vals")$bal_fun
 
       w_mat<- get_cont_weights(Z, treat = Y, s.weights = obsWeights,
-                    dens.num = dens.num, densfun = densfun, use.kernel = use.kernel,
-                    densControl = densControl)
+                               dens.num = dens.num, densfun = densfun, use.kernel = use.kernel,
+                               densControl = densControl)
       cvRisk <- apply(w_mat, 2, function(w) bal_fun(init = init, weights = w))
       names(cvRisk) <- libraryNames
 

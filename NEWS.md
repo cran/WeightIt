@@ -1,13 +1,37 @@
 WeightIt News and Updates
 ======
 
+# WeightIt 0.11.0
+
+* Added support for estimating propensity scores using Bayesian additive regression trees (BART) with `method = "bart"`. This method fits a BART model for the treatment using functions in the `dbarts` package to estimate propensity scores that are used in weights. Binary, multinomial, and continuous treatments are supported. BART uses Bayesian priors for its hyperparameters, so no hyperparameter tuning is necessary to get well-performing predictions.
+
+* Fixed a bug when using `method = "gbm"` with `stop.method = "cv{#}"`.
+
+* Fixed a bug when setting `estimand = "ATC"` for methods that produce a propensity score. In the past, the output propensity score was the probability of being in the control group; now, it is the probability of being in the treated group, as it is for all other estimands. This does not affect the weights.
+
+* Setting `method = "twang"` is now deprecated. Use `method = "gbm"` for improved performance and increased functionality. `method = "twang"` relies on the `twang` package; `method = "gbm"` calls `gbm` directly.
+
+* Using `method = "ebal"` no longer requires the `ebal` package. Instead, `optim()` is used, as it has been with continuous treatments. Balance is a little better, but some options have been removed. 
+
+* When using `method = "ebal"` with continuous treatments, a new argument, `d.moments`, can now be specified. This controls the number of moments of the covariate and treatment distributions that are constrained to be the same in the weighted sample as they are in the original sample. Vegetabile et al. (2020) recommend setting `d.moments` to at least 3 to ensure generalizability and reduce bias due to effect modification.
+
+* Made some minor changes to `summary.weightit()` and `plot.summary.weightit()`. Fixed how negative entropy was computed.
+
+* The option `use.mnlogit` in `weightit()` with multi-category treatments and `method = "ps"` has been removed because `mnlogit` appears uncooperative.
+
+* Fixed a bug (#16) when using `method = "cbps"` with factor variables, thanks to @danielebottigliengo.
+
+* Fixed a bug when using binary factor treatments, thanks to Darren Stewart.
+
+* Cleaned up the documentation.
+
 # WeightIt 0.10.2
 
 * Fixed a bug where treatment values were accidentally switched for some methods.
 
 # WeightIt 0.10.1
 
-* With `method = "gbm"`, added the ability to tune hyperparameters like `interaction.depth` and `distribution` using the same critera as is used to select the optimal tree. A summary of the tuning results is included in `info` in the `weightit` output object.
+* With `method = "gbm"`, added the ability to tune hyperparameters like `interaction.depth` and `distribution` using the same criteria as is used to select the optimal tree. A summary of the tuning results is included in `info` in the `weightit` output object.
 
 * Fixed a bug where `moments` and `int` were ignored unless both were specified.
 

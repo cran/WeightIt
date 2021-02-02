@@ -32,17 +32,15 @@ summary(W.out)
 bal.tab(W.out, m.threshold = .05, disp.v.ratio = TRUE)
 
 ## ---- message=FALSE-----------------------------------------------------------
-library("survey")
-d.w <- svydesign(ids = ~1, weights = W.out$weights,
-                     data = lalonde)
+library(survey)
+d.w <- svydesign(~1, weights = W.out$weights, data = lalonde)
 fit <- svyglm(re78 ~ treat, design = d.w)
 coef(fit)
 
 ## -----------------------------------------------------------------------------
 #Robust standard errors and confidence intervals
-library("jtools")
-summ(fit, confint = TRUE, 
-     model.fit = FALSE, model.info = FALSE) 
+summary(fit)
+confint(fit)
 
 ## ---- warning=FALSE, message=FALSE--------------------------------------------
 #Bootstrapping
@@ -83,7 +81,7 @@ bal.tab(Wmsm.out, m.threshold = .05, disp.ks = TRUE, which.time = .none)
 
 ## ---- message=FALSE-----------------------------------------------------------
 library("survey")
-d.w.msm <- svydesign(ids = ~1, weights = Wmsm.out$weights,
+d.w.msm <- svydesign(~1, weights = Wmsm.out$weights,
                      data = iptwExWide)
 full.fit <- svyglm(outcome ~ tx1*tx2*tx3, design = d.w.msm)
 main.effects.fit <- svyglm(outcome ~ tx1 + tx2 + tx3, design = d.w.msm)
@@ -95,6 +93,6 @@ anova(main.effects.fit, cum.fit)
 anova(full.fit, cum.fit)
 
 ## -----------------------------------------------------------------------------
-summ(cum.fit, confint = TRUE, 
-     model.fit = FALSE, model.info = FALSE) 
+summary(cum.fit)
+confint(cum.fit)
 

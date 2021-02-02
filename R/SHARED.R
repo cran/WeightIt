@@ -145,7 +145,7 @@ text_box_plot <- function(range.list, width = 12) {
                  "character")
     d[["Min"]] <- vapply(range.list, function(x) x[1], numeric(1L))
     d[["Max"]] <- vapply(range.list, function(x) x[2], numeric(1L))
-    for (i in seq_len(nrow(d))) {
+    for (i in seq_row(d)) {
         spaces1 <- rescaled.range.list[[i]][1] - rescaled.full.range[1]
         #|
         dashes <- max(c(0, diff(rescaled.range.list[[i]]) - 2))
@@ -190,6 +190,7 @@ c.factor <- function(..., recursive=TRUE) {
     unlist(list(...), recursive=recursive)
 }
 can_str2num <- function(x) {
+    if (is.numeric(x) || is.logical(x)) return(TRUE)
     nas <- is.na(x)
     suppressWarnings(x_num <- as.numeric(as.character(x[!nas])))
     return(!anyNA(x_num))
@@ -697,6 +698,28 @@ get.treat.type <- function(treat) {
 has.treat.type <- function(treat) {
     is_not_null(get.treat.type(treat))
 }
+get.treated.level <- function(treat) {
+    if (!is_binary(treat)) stop("'treat' must be a binary variable.")
+    if (is.character(treat) || is.factor(treat)) {
+        treat <- factor(treat, nmax = 2)
+        unique.vals <- levels(treat)
+    }
+    else {
+        unique.vals <- unique(treat, nmax = 2)
+    }
+
+    if (can_str2num(unique.vals)) {
+        unique.vals.numeric <- str2num(unique.vals)
+    }
+    else {
+        unique.vals.numeric <- seq_along(unique.vals)
+    }
+
+    if (0 %in% unique.vals.numeric) treated <- unique.vals[unique.vals.numeric != 0]
+    else treated <- unique.vals[which.max(unique.vals.numeric)]
+
+    return(treated)
+}
 
 #Input processing
 process.bin.vars <- function(bin.vars, mat) {
@@ -962,6 +985,14 @@ len <- function(x, recursive = TRUE) {
     else if (length(dim(x)) > 1) NROW(x)
     else if (is.list(x) && recursive) vapply(x, len, numeric(1L), recursive = FALSE)
     else length(x)
+}
+seq_row <- function(x) {
+    if (length(dim(x)) != 2) stop("dim(x) must be 2")
+    seq_len(NROW(x))
+}
+seq_col <- function(x) {
+    if (length(dim(x)) != 2) stop("dim(x) must be 2")
+    seq_len(NCOL(x))
 }
 na.rem <- function(x) {
     #A faster na.omit for vectors

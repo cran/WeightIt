@@ -37,7 +37,6 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
   #ps must be a matrix/df with columns named after treat levels
 
   if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
-
   treat.type <- get.treat.type(treat)
 
   if (treat.type == "continuous") {
@@ -46,7 +45,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
 
   estimand <- process.estimand(estimand, method = "ps", treat.type = treat.type)
 
-  processed.estimand <- process.focal.and.estimand(focal, estimand, treat, treat.type, treated)
+  processed.estimand <- process.focal.and.estimand(focal, estimand, treat, treated)
   estimand <- processed.estimand$estimand
   focal <- processed.estimand$focal
   assumed.treated <- processed.estimand$treated
@@ -78,7 +77,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     w <- w*rowSums(1/ps_mat)^-1 #Li & Li (2019)
   }
   else if (toupper(estimand) == "ATM") {
-    w <- w*do.call("pmin", lapply(seq_len(ncol(ps_mat)), function(x) ps_mat[,x]), quote = TRUE)
+    w <- w*do.call("pmin", lapply(seq_col(ps_mat), function(x) ps_mat[,x]), quote = TRUE)
   }
   else if (toupper(estimand) == "ATOS") {
     #Crump et al. (2009)
@@ -101,7 +100,8 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
 
   if (stabilize) w <- stabilize_w(w, treat)
 
-  names(w) <- rownames(ps_mat)
+
+  names(w) <- if_null_then(rownames(ps_mat), names(treat), NULL)
 
   attr(w, "subclass") <- attr(ps_mat, "sub_mat")
   if (toupper(estimand) == "ATOS") attr(w, "alpha") <- alpha.opt
