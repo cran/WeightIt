@@ -22,7 +22,7 @@ weightit2user <- function(Fun, covs, treat, s.weights, subset, estimand, focal, 
 
   fun_args <- Fun_formal
   for (i in names(fun_args)) {
-    if (exists(i)) fun_args[i] <- list(get0(i))
+    if (exists(i, inherits = FALSE)) fun_args[i] <- list(get0(i, inherits = FALSE))
     else if (i %in% names(A)) {
       fun_args[i] <- A[i]
       A[[i]] <- NULL
@@ -84,7 +84,7 @@ weightitMSM2user <- function(Fun, covs.list, treat.list, s.weights, subset, stab
 
   fun_args <- Fun_formal
   for (i in names(fun_args)) {
-    if (is_not_null(get0(i))) fun_args[[i]] <- get0(i)
+    if (exists(i, inherits = FALSE)) fun_args[i] <- list(get0(i, inherits = FALSE))
     else if (is_not_null(A[[i]])) {
       fun_args[[i]] <- A[[i]]
       A[[i]] <- NULL
@@ -128,7 +128,7 @@ weightitMSM2user <- function(Fun, covs.list, treat.list, s.weights, subset, stab
 }
 
 #Propensity score estimation with regression
-weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabilize, subclass, missing, ps, ...) {
+weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabilize, subclass, missing, ps, .data, ...) {
   A <- list(...)
 
   fit.obj <- NULL
@@ -292,7 +292,46 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
         fit.obj <- fit
       }
       else if (A$link %in% c("logit", "probit")) {
-        if (!isFALSE(A$use.mlogit)) {
+        if (isTRUE(A$use.mclogit)) {
+          check.package("mclogit")
+
+          if (is_not_null(A$random)) {
+            random <- get.covs.and.treat.from.formula(A$random, data = .data)$reported.covs[subset,,drop = FALSE]
+            data <- cbind(data.frame(random), data.frame(treat = treat_sub, .s.weights = s.weights, covs))
+            covnames <- names(data)[-c(seq_col(random), ncol(random) + (1:2))]
+            tname <- names(data)[ncol(random) + 1]
+            ctrl_fun <- mclogit::mmclogit.control
+          }
+          else {
+            data <- data.frame(treat = treat_sub, .s.weights = s.weights, covs)
+            covnames <- names(data)[-c(1,2)]
+            tname <- names(data)[1]
+            ctrl_fun <- mclogit::mclogit.control
+          }
+          form <- reformulate(covnames, tname)
+
+          control <- do.call(ctrl_fun, c(A[["control"]], A[names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)]]))
+
+          tryCatch({
+            fit <- do.call(mclogit::mblogit, list(form,
+                                    data = data,
+                                    weights = quote(.s.weights),
+                                    random = A[["random"]],
+                                    method = A[["mclogit.method"]],
+                                    estimator = if_null_then(A[["estimator"]], eval(formals(mclogit::mclogit)[["estimator"]])),
+                                    dispersion = if_null_then(A[["dispersion"]], eval(formals(mclogit::mclogit)[["dispersion"]])),
+                                    groups = A[["groups"]],
+                                    control = control))
+
+          },
+          error = function(e) {stop(paste0("There was a problem fitting the multinomial ", A$link, " regression with mblogit().\n       Try again with use.mclogit = FALSE.\nError message (from mclogit):\n       ", conditionMessage(e)), call. = FALSE)}
+          )
+
+          ps <- fitted(fit)
+          colnames(ps) <- levels(treat_sub)
+          fit.obj <- fit
+        }
+        else if (!isFALSE(A$use.mlogit)) {
           check.package("mlogit")
 
           data <- data.frame(treat = treat_sub, .s.weights = s.weights, covs)
@@ -489,22 +528,22 @@ weightit2ps.cont <- function(covs, treat, s.weights, subset, stabilize, missing,
     else if (is.function(A[["density"]])) densfun <- A[["density"]]
     else if (is.character(A[["density"]]) && length(A[["density"]] == 1)) {
       splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
-      if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
+      if (is_not_null(splitdens1 <- get0(splitdens[1], mode = "function", envir = parent.frame()))) {
         if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
-          stop(paste(A[["density"]], "is not an appropriate argument to density because",
+          stop(paste(A[["density"]], "is not an appropriate argument to 'density' because",
                      word_list(splitdens[-1], and.or = "or", quotes = TRUE), "cannot be coerced to numeric."), call. = FALSE)
         }
         densfun <- function(x) {
-          tryCatch(do.call(get(splitdens[1]), c(list(x), as.list(str2num(splitdens[-1])))),
+          tryCatch(do.call(splitdens1, c(list(x), as.list(str2num(splitdens[-1])))),
                    error = function(e) stop(paste0("Error in applying density:\n  ", conditionMessage(e)), call. = FALSE))
         }
       }
       else {
-        stop(paste(A[["density"]], "is not an appropriate argument to density because",
+        stop(paste(A[["density"]], "is not an appropriate argument to 'density' because",
                    splitdens[1], "is not an available function."), call. = FALSE)
       }
     }
-    else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
+    else stop("The argument to 'density' cannot be evaluated as a density function.", call. = FALSE)
     use.kernel <- FALSE
   }
 
@@ -715,179 +754,6 @@ weightit2optweight.msm <- function(covs.list, treat.list, s.weights, subset, mis
 
 }
 
-#Generalized boosted modeling with twang
-weightit2twang <- function(covs, treat, s.weights, estimand, focal, subset, stabilize, subclass, missing, ...) {
-  A <- list(...)
-
-  warning("method = \"twang\" is deprecated; please use method = \"gbm\" for improved performance and increased functionality.", immediate. = TRUE, call. = FALSE)
-
-  if (is_null(A$stop.method)) {
-    warning("No stop.method was provided. Using \"es.mean\".",
-            call. = FALSE, immediate. = TRUE)
-    A$stop.method <- "es.mean"
-  }
-  else if (length(A$stop.method) > 1) {
-    warning("Only one stop.method is allowed at a time. Using just the first stop.method.",
-            call. = FALSE, immediate. = TRUE)
-    A$stop.method <- A$stop.method[1]
-  }
-
-  available.stop.methods <- c("ks.mean", "es.mean", "ks.max", "es.max")
-  s.m.matches <- charmatch(A[["stop.method"]], available.stop.methods)
-  if (is.na(s.m.matches) || s.m.matches == 0L) {stop(paste0("stop.method must be one of ", word_list(available.stop.methods, "or", quotes = TRUE), "."), call. = FALSE)}
-  else A[["stop.method"]] <- available.stop.methods[s.m.matches]
-
-  for (f in names(formals(twang::ps))) {
-    if (is_null(A[[f]])) A[[f]] <- formals(twang::ps)[[f]]
-  }
-
-  covs <- covs[subset, , drop = FALSE]
-  treat <- factor(treat[subset])
-
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
-
-  if (missing == "ind") {
-    missing.ind <- apply(covs[, anyNA_col(covs), drop = FALSE], 2, function(x) as.numeric(is.na(x)))
-    if (is_not_null(missing.ind)) {
-      colnames(missing.ind) <- paste0(colnames(missing.ind), ":<NA>")
-      # covs[is.na(covs)] <- 0
-      covs <- cbind(covs, missing.ind)
-    }
-  }
-
-  w <- rep(1, length(treat))
-  ps <- NULL
-
-  check.package("twang")
-
-  if (estimand == "ATT") {
-
-    control.levels <- levels(treat)[levels(treat) != focal]
-    fit.list <- make_list(control.levels)
-
-    for (i in control.levels) {
-      treat.in.i.focal <- treat %in% c(focal, i)
-      treat_ <- as.integer(treat[treat.in.i.focal] != i)
-      covs_ <- covs[treat.in.i.focal, , drop = FALSE]
-      new.data <- data.frame(treat_, covs_)
-
-      fit.list[[i]] <- twang::ps(formula(new.data),
-                                 data = new.data,
-                                 estimand = "ATT",
-                                 stop.method = A[["stop.method"]],
-                                 sampw = s.weights[subset][treat.in.i.focal],
-                                 verbose = TRUE,
-                                 print.level = 2,
-                                 n.trees = A[["n.trees"]],
-                                 interaction.depth = A[["interaction.depth"]],
-                                 shrinkage = A[["shrinkage"]],
-                                 bag.fraction = A[["bag.fraction"]],
-                                 perm.test.iters = A[["perm.test.iters"]],
-                                 iterlim = A[["iterlim"]],
-                                 multinom = FALSE)
-
-      s <- fit.list[[i]]$stopMethods[1]
-
-      w[treat == i] <- cobalt::get.w(fit.list[[i]], stop.method = s)[treat_ == 0]
-
-      if (nunique(treat) == 2) {
-        ps <- fit.list[[i]][["ps"]][[1]]
-        fit.list <- fit.list[[i]]
-      }
-
-    }
-  }
-  else if (estimand == "ATE") {
-    fit.list <- make_list(levels(treat))
-
-    for (i in levels(treat)) {
-      #Mimicking twang
-      #Seeks balance between weighted treat group and all others combined
-      #Note: Gives different answer than twang for some reason; has better balance though.
-      treat_i <- ifelse(treat == i, 0, 1)
-      new.data <- data.frame(treat_i, covs)
-
-      fit.list[[i]] <- twang::ps(formula(new.data),
-                                 data = new.data,
-                                 estimand = "ATE",
-                                 stop.method = A[["stop.method"]],
-                                 sampw = s.weights[subset],
-                                 verbose = TRUE,
-                                 print.level = 2,
-                                 n.trees = A[["n.trees"]],
-                                 interaction.depth = A[["interaction.depth"]],
-                                 shrinkage = A[["shrinkage"]],
-                                 bag.fraction = A[["bag.fraction"]],
-                                 perm.test.iters = A[["perm.test.iters"]],
-                                 iterlim = A[["iterlim"]],
-                                 multinom = FALSE)
-
-      s <- fit.list[[i]]$stopMethods[1]
-
-      if (nunique(treat) == 2) {
-        w <- cobalt::get.w(fit.list[[i]], stop.method = s)
-        ps <- fit.list[[i]][["ps"]][[1]]
-        fit.list <- fit.list[[i]]
-        break
-      }
-      else {
-        w[treat == i] <- cobalt::get.w(fit.list[[i]], stop.method = s)[treat == i]
-      }
-    }
-  }
-
-  if (stabilize) {
-    w <- stabilize_w(w, treat)
-  }
-
-  obj <- list(w = w, ps = ps, fit.obj = fit.list)
-  return(obj)
-}
-weightit2twang.cont <- function(covs, treat, s.weights, subset, stabilize, missing, ...) {
-  A <- list(...)
-
-  check.package("gbm")
-
-  warning("method = \"twang\" is deprecated; please use method = \"gbm\" for increased performance and functionality.", immediate. = TRUE)
-
-  A[c("formula", "data", "sampw", "verbose")] <- NULL
-  if (is_null(A[["stop.method"]])) {
-    warning("No stop.method was entered. Using \"p.mean\", the mean of the absolute Pearson correlations.",
-            call. = FALSE, immediate. = TRUE)
-    A[["stop.method"]] <- "p.mean"
-  }
-  else if (length(A$stop.method) > 1) {
-    warning("Only one stop.method is allowed at a time. Using just the first stop.method.",
-            call. = FALSE, immediate. = TRUE)
-    A$stop.method <- A$stop.method[1]
-  }
-
-  covs <- covs[subset, , drop = FALSE]
-  treat <- treat[subset]
-
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
-
-  if (missing == "ind") {
-    missing.ind <- apply(covs[, anyNA_col(covs), drop = FALSE], 2, function(x) as.numeric(is.na(x)))
-    if (is_not_null(missing.ind)) {
-      colnames(missing.ind) <- paste0(colnames(missing.ind), ":<NA>")
-      # covs[is.na(covs)] <- 0
-      covs <- cbind(covs, missing.ind)
-    }
-  }
-
-  new.data <- data.frame(treat, covs)
-
-  fit <- do.call(ps.cont, c(list(formula(new.data),
-                                 data = new.data,
-                                 sampw = s.weights[subset],
-                                 verbose = TRUE), A))
-  w <- cobalt::get.w(fit, stop.method = A[["stop.method"]])
-
-  obj <- list(w = w, fit.obj = fit)
-  return(obj)
-}
-
 #Generalized boosted modeling with gbm and cobalt
 weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabilize, subclass, missing, ...) {
 
@@ -972,7 +838,7 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
     else n.grid <- round(A[["n.grid"]])
 
     crit <- bal_criterion(treat.type, stop.method)
-    init <- crit$init(covs, treat, estimand = estimand, s.weights = s.weights, focal = focal)
+    init <- crit$init(covs, treat, estimand = estimand, s.weights = s.weights, focal = focal, ...)
   }
 
   A[["x"]] <- covs
@@ -1191,7 +1057,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, estimand, focal, subset, s
     else n.grid <- round(A[["n.grid"]])
 
     crit <- bal_criterion("continuous", stop.method)
-    init <- crit$init(covs, treat, s.weights = s.weights)
+    init <- crit$init(covs, treat, s.weights = s.weights, ...)
   }
 
   A[["x"]] <- covs
@@ -1951,7 +1817,7 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
     else stop.method <- available.stop.methods[s.m.matches]
 
     crit <- bal_criterion("binary", stop.method)
-    init <- crit$init(covs, treat, estimand = estimand, s.weights = s.weights, focal = focal)
+    init <- crit$init(covs, treat, estimand = estimand, s.weights = s.weights, focal = focal, ...)
     bal_fun <- crit$fun
 
     sneaky <- 0
@@ -2041,7 +1907,7 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
       splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
       if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
         if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
-          stop(paste(A[["density"]], "is not an appropriate argument to density because",
+          stop(paste(A[["density"]], "is not an appropriate argument to 'density' because",
                      word_list(splitdens[-1], and.or = "or", quotes = TRUE), "cannot be coerced to numeric."), call. = FALSE)
         }
         densfun <- function(x) {
@@ -2050,11 +1916,11 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
         }
       }
       else {
-        stop(paste(A[["density"]], "is not an appropriate argument to density because",
+        stop(paste(A[["density"]], "is not an appropriate argument to 'density' because",
                    splitdens[1], "is not an available function."), call. = FALSE)
       }
     }
-    else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
+    else stop("The argument to 'density' cannot be evaluated as a density function.", call. = FALSE)
     use.kernel <- FALSE
   }
 
@@ -2108,7 +1974,7 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
     else stop.method <- available.stop.methods[s.m.matches]
 
     crit <- bal_criterion("continuous", stop.method)
-    init <- crit$init(covs, treat, s.weights = s.weights)
+    init <- crit$init(covs, treat, s.weights = s.weights, ...)
     bal_fun <- crit$fun
 
     sneaky <- 0
@@ -2265,7 +2131,7 @@ weightit2bart.cont <- function(covs, treat, s.weights, subset, stabilize, missin
       splitdens <- strsplit(A[["density"]], "_", fixed = TRUE)[[1]]
       if (exists(splitdens[1], mode = "function", envir = parent.frame())) {
         if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
-          stop(paste(A[["density"]], "is not an appropriate argument to density because",
+          stop(paste(A[["density"]], "is not an appropriate argument to 'density' because",
                      word_list(splitdens[-1], and.or = "or", quotes = TRUE), "cannot be coerced to numeric."), call. = FALSE)
         }
         densfun <- function(x) {
@@ -2274,11 +2140,11 @@ weightit2bart.cont <- function(covs, treat, s.weights, subset, stabilize, missin
         }
       }
       else {
-        stop(paste(A[["density"]], "is not an appropriate argument to density because",
+        stop(paste(A[["density"]], "is not an appropriate argument to 'density' because",
                    splitdens[1], "is not an available function."), call. = FALSE)
       }
     }
-    else stop("The argument to density cannot be evaluated as a density function.", call. = FALSE)
+    else stop("The argument to 'density' cannot be evaluated as a density function.", call. = FALSE)
     use.kernel <- FALSE
   }
 
@@ -2361,12 +2227,14 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal, mis
                   sqrt(col.w.v(covs, s.weights)))
 
   if (is_not_null(A[["dist.mat"]])) {
-    if (!is.matrix(A[["dist.mat"]]) || !all(dim(A[["dist.mat"]]) == n) ||
-        !all(check_if_zero(diag(A[["dist.mat"]]))) || any(A[["dist.mat"]] < 0) ||
-        !isSymmetric(unname(A[["dist.mat"]]))) {
-      stop("'dist.mat' must be a square, symmetric distance matrix with a value for all pairs of units.", call. = FALSE)
+    if (inherits(A[["dist.mat"]], "dist")) A[["dist.mat"]] <- as.matrix(A[["dist.mat"]])
+
+    if (is.matrix(A[["dist.mat"]]) && all(dim(A[["dist.mat"]]) == n) &&
+        all(check_if_zero(diag(A[["dist.mat"]]))) && !any(A[["dist.mat"]] < 0) &&
+        isSymmetric(unname(A[["dist.mat"]]))) {
+      d <- unname(A[["dist.mat"]][subset, subset])
     }
-    else d <- unname(A[["dist.mat"]][subset, subset])
+    else stop("'dist.mat' must be a square, symmetric distance matrix with a value for all pairs of units.", call. = FALSE)
   }
   else d <- as.matrix(dist(covs))
 
@@ -2398,7 +2266,7 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal, mis
 
     if (!isFALSE(A[["improved"]])) {
       all_pairs <- combn(levels_treat, 2, simplify = FALSE)
-      M2_pairs_array <- vapply(all_pairs, function(p) -tcrossprod(J[[p[1]]]-J[[p[2]]]) * d, diagn)
+      M2_pairs_array <- vapply(all_pairs, function(p) -2 * tcrossprod(J[[p[1]]]-J[[p[2]]]) * d, diagn)
       M2 <- M2 + rowSums(M2_pairs_array, dims = 2)
     }
 
@@ -2423,6 +2291,9 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal, mis
     lvec <- c(ifelse_(check_if_zero(s.weights), min.w, treat == focal, 1, min.w), nt)
     uvec <- c(ifelse_(check_if_zero(s.weights), min.w, treat == focal, 1, Inf), nt)
   }
+
+  #Add weight penalty
+  if (is_not_null(A[["lambda"]])) diag(M2) <- diag(M2) + A[["lambda"]] / n
 
   if (moments != 0 || int) {
     #Exactly balance moments and/or interactions
@@ -2461,7 +2332,7 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal, mis
                                             pars = options.list),
                      quote = TRUE)
 
-  if (opt.out$info$status == "maximum iterations reached") {
+  if (identical(opt.out$info$status, "maximum iterations reached")) {
     warning("The optimization failed to converge. See Notes section at ?method_energy for information.", call. = FALSE)
   }
 

@@ -51,7 +51,7 @@ firstup <- function(x) {
     x
 }
 expand.grid_string <- function(..., collapse = "") {
-    return(apply(expand.grid(...), 1, paste, collapse = collapse))
+    return(do.call("paste", c(expand.grid(...), sep = collapse)))
 }
 num_to_superscript <- function(x) {
     nums <- setNames(c("\u2070",
@@ -197,8 +197,9 @@ can_str2num <- function(x) {
 }
 str2num <- function(x) {
     nas <- is.na(x)
-    suppressWarnings(x_num <- as.numeric(as.character(x)))
-    x_num[nas] <- NA
+    if (!is_(x, c("numeric", "logical"))) x <- as.character(x)
+    suppressWarnings(x_num <- as.numeric(x))
+    is.na(x_num[nas]) <- TRUE
     return(x_num)
 }
 trim_string <- function(x, char = " ", symmetrical = TRUE, recursive = TRUE) {
@@ -262,14 +263,17 @@ check_if_int <- function(x) {
 
 #Statistics
 binarize <- function(variable, zero = NULL, one = NULL) {
-    if (!is_binary(variable)) stop(paste0("Cannot binarize ", deparse1(substitute(variable)), ": more than two levels."))
+    var.name <- deparse1(substitute(variable))
     if (is.character(variable) || is.factor(variable)) {
-        variable <- factor(variable, nmax = 2)
+        variable <- factor(variable, nmax = if (is.factor(variable)) nlevels(variable) else NA)
         unique.vals <- levels(variable)
     }
     else {
-        unique.vals <- unique(variable, nmax = 2)
+        unique.vals <- unique(variable)
     }
+
+    if (length(unique.vals) == 1) return(setNames(rep(1, length(variable)), names(variable)))
+    else if (length(unique.vals) != 2) stop(paste0("Cannot binarize ", var.name, ": more than two levels."))
 
     if (is_null(zero)) {
         if (is_null(one)) {
@@ -277,7 +281,7 @@ binarize <- function(variable, zero = NULL, one = NULL) {
                 variable.numeric <- str2num(variable)
             }
             else {
-                variable.numeric <- as.numeric(variable)
+                variable.numeric <- as.numeric(as.factor(variable))
             }
 
             if (0 %in% variable.numeric) zero <- 0
@@ -319,7 +323,7 @@ center <- function(x, at = NULL, na.rm = TRUE) {
 }
 w.m <- function(x, w = NULL, na.rm = TRUE) {
     if (is_null(w)) w <- rep(1, length(x))
-    if (anyNA(x)) w[is.na(x)] <- NA
+    if (anyNA(x)) is.na(w[is.na(x)]) <- TRUE
     return(sum(x*w, na.rm=na.rm)/sum(w, na.rm=na.rm))
 }
 col.w.m <- function(mat, w = NULL, na.rm = TRUE) {
@@ -362,7 +366,7 @@ col.w.v <- function(mat, w = NULL, bin.vars = NULL, na.rm = TRUE) {
     else if (na.rm && anyNA(mat)) {
         # n <- nrow(mat)
         w <- array(w, dim = dim(mat))
-        w[is.na(mat)] <- NA
+        is.na(w[is.na(mat)]) <- TRUE
         s <- colSums(w, na.rm = na.rm)
         w <- mat_div(w, s)
         if (non.bin.vars.present) {
@@ -397,15 +401,15 @@ col.w.cov <- function(mat, y, w = NULL, na.rm = TRUE) {
     }
     if (is_null(w)) {
         y <- array(y, dim = dim(mat))
-        if (anyNA(mat)) y[is.na(mat)] <- NA
-        if (anyNA(y)) mat[is.na(y)] <- NA
+        if (anyNA(mat)) is.na(y[is.na(mat)]) <- TRUE
+        if (anyNA(y)) is.na(mat[is.na(y)]) <- TRUE
         den <- colSums(!is.na(mat*y)) - 1
         cov <- colSums(center(mat, na.rm = na.rm)*center(y, na.rm = na.rm), na.rm = na.rm)/den
     }
     else if (na.rm && anyNA(mat)) {
         n <- nrow(mat)
         w <- array(w, dim = dim(mat))
-        w[is.na(mat)] <- NA_real_
+        is.na(w[is.na(mat)]) <- TRUE
         s <- colSums(w, na.rm = na.rm)
         w <- mat_div(w, s)
         x <- w * center(mat, at = colSums(w * mat, na.rm = na.rm))
@@ -466,19 +470,108 @@ bw.nrd <- function(x) {
 }
 
 #Formulas
-subbars <- function(term) {
-    if (is.name(term) || !is.language(term))
-        return(term)
-    if (length(term) == 2) {
-        term[[2]] <- subbars(term[[2]])
-        return(term)
+hasbar <- function(term) {
+    any(c("|", "||") %in% all.names(term))
+}
+nobars <- function(term) {
+    #Replace formula with version without "|"s, i.e., random effects
+
+    isBar <- function(term) {
+        is.call(term) && (term[[1]] == as.name("|") || term[[1]] == as.name("||"))
+    }
+    isAnyArgBar <- function(term) {
+        if ((term[[1]] != as.name("~")) && (term[[1]] != as.name("("))) {
+            for (i in seq_along(term)) {
+                if (isBar(term[[i]])) return(TRUE)
+            }
+        }
+        FALSE
     }
 
-    if (is.call(term) && (term[[1]] == as.name("|") || term[[1]] == as.name("||"))) {
-        term[[1]] <- as.name("+")
+    nobars_ <- function(term) {
+        if (!hasbar(term))
+            return(term)
+        if (isBar(term))
+            return(NULL)
+        if (isAnyArgBar(term))
+            return(NULL)
+        if (length(term) == 2) {
+            nb <- nobars_(term[[2]])
+            if (is.null(nb))
+                return(NULL)
+            term[[2]] <- nb
+            return(term)
+        }
+        nb2 <- nobars_(term[[2]])
+        nb3 <- nobars_(term[[3]])
+        if (is.null(nb2))
+            return(nb3)
+        if (is.null(nb3))
+            return(nb2)
+        term[[2]] <- nb2
+        term[[3]] <- nb3
+        term
     }
-    for (j in 2:length(term)) term[[j]] <- subbars(term[[j]])
-    return(term)
+
+    nb <- nobars_(term)
+    if (is_(term, "formula") && length(term) == 3 && is.symbol(nb)) {
+        nb <- reformulate("1", response = deparse(nb))
+    }
+    if (is.null(nb)) {
+        nb <- if (is_(term, "formula")) {~1} else 1
+    }
+    nb
+}
+form2random <- function(term) {
+    if (!hasbar(term)) return(NULL)
+    if ("||" %in% all.names(term)) stop("|| in formulas are not accepted.", call. = FALSE)
+
+    fb <- function(term) {
+        if (is.name(term) || !is.language(term))
+            return(NULL)
+        if (term[[1]] == as.name("("))
+            return(fb(term[[2]]))
+        stopifnot(is.call(term))
+        if (term[[1]] == as.name("|"))
+            return(term)
+        if (length(term) == 2)
+            return(fb(term[[2]]))
+        c(fb(term[[2]]), fb(term[[3]]))
+    }
+    expandSlash <- function(bb) {
+        makeInteraction <- function(x) {
+            if (length(x) < 2)
+                return(x)
+            trm1 <- makeInteraction(x[[1]])
+            trm11 <- if (is.list(trm1))
+                trm1[[1]]
+            else trm1
+            list(substitute(foo:bar, list(foo = x[[2]], bar = trm11)),
+                 trm1)
+        }
+        slashTerms <- function(x) {
+            if (!("/" %in% all.names(x)))
+                return(x)
+            if (x[[1]] != as.name("/"))
+                stop("unparseable formula for grouping factor",
+                     call. = FALSE)
+            list(slashTerms(x[[2]]), slashTerms(x[[3]]))
+        }
+        if (!is.list(bb))
+            expandSlash(list(bb))
+        else unlist(lapply(bb, function(x) {
+            if (length(x) > 2 && is.list(trms <- slashTerms(x[[3]])))
+                lapply(unlist(makeInteraction(trms)), function(trm) substitute(foo |
+                                                                                   bar, list(foo = x[[2]], bar = trm)))
+            else x
+        }))
+    }
+    findbars <- function(term) {
+        modterm <- (if (is.formula(term)) term[[length(term)]] else term)
+        expandSlash(fb(modterm))
+    }
+
+    as.formula(paste("~", do.call(paste, c(lapply(findbars(term), deparse1), list(sep = " + ")))))
 }
 
 #treat/covs
@@ -505,7 +598,7 @@ get.covs.and.treat.from.formula <- function(f, data = NULL, terms = FALSE, sep =
 
     if (!is.formula(f)) stop("'f' must be a formula.")
 
-    eval.model.matrx <- identical(f, f <- subbars(f))
+    eval.model.matrx <- !hasbar(f)
 
     tryCatch(tt <- terms(f, data = data),
              error = function(e) {
@@ -771,12 +864,9 @@ process.s.weights <- function(s.weights, data = NULL) {
 #Uniqueness
 nunique <- function(x, nmax = NA, na.rm = TRUE) {
     if (is_null(x)) return(0)
-    else {
-        if (na.rm && anyNA(x)) x <- na.rem(x)
-        if (is.factor(x)) return(nlevels(x))
-        else return(length(unique(x, nmax = nmax)))
-    }
-
+    if (is.factor(x)) return(nlevels(x))
+    if (na.rm && anyNA(x)) x <- na.rem(x)
+    length(unique(x, nmax = nmax))
 }
 nunique.gt <- function(x, n, na.rm = TRUE) {
     if (missing(n)) stop("'n' must be supplied.")
@@ -806,6 +896,41 @@ is_binary_col <- function(dat, na.rm = TRUE) {
 }
 
 #R Processing
+.pkgenv <- environment() #Needed for get1()
+get1 <- function(name, env = .pkgenv, mode = "any", ifnotfound = NULL) {
+    #Replacement for get0 that only searches within package. Provided at
+    #https://stackoverflow.com/a/66897921/6348551 by user MrFlick.
+    get1_ <- function(name, env, mode, ifnotfound) {
+        if (identical(env, emptyenv())) {
+            ifnotfound
+        } else if (identical(env, globalenv())) {
+            # stop at global env
+            ifnotfound
+        } else if (exists(name, envir = env, mode = mode, inherits = FALSE)) {
+            env[[name]]
+        } else {
+            # try parent
+            if (!identical(parent.env(env), emptyenv()) && !identical(parent.env(env), globalenv())) {
+                get1_(name, parent.env(env), mode = mode, ifnotfound = ifnotfound)
+            }
+            else ifnotfound
+        }
+    }
+
+    if (identical(env, emptyenv())) {
+        ifnotfound
+    } else if (identical(env, globalenv())) {
+        get0(name, mode = mode, ifnotfound = ifnotfound)
+    } else if (exists(name, envir = env, mode = mode, inherits = FALSE)) {
+        env[[name]]
+    } else {
+        # try parent
+        if (!identical(parent.env(env), emptyenv()) && !identical(parent.env(env), globalenv())) {
+            get1_(name, parent.env(env), mode = mode, ifnotfound = ifnotfound)
+        }
+        else ifnotfound
+    }
+}
 make_list <- function(n) {
     if (length(n) == 1L && is.numeric(n)) {
         vector("list", as.integer(n))
@@ -874,27 +999,26 @@ is_ <- function(x, types, stop = FALSE, arg.to = FALSE) {
     if (is_not_null(x)) {
         for (i in types) {
             if (i == "list") it.is <- is.list(x) && !is.data.frame(x)
-            else if (is_not_null(get0(paste0("is_", i)))) {
-                it.is <- get0(paste0("is_", i))(x)
+            else if (is_not_null(fn <- get1(paste0("is_", i), mode = "function"))) {
+                it.is <- fn(x)
             }
-            else if (is_not_null(get0(paste.("is", i)))) {
-                it.is <- get0(paste.("is", i))(x)
+            else if (is_not_null(fn <- get1(paste.("is", i), mode = "function"))) {
+                it.is <- fn(x)
             }
             else it.is <- inherits(x, i)
-            if (it.is) break
+
+            if (isTRUE(it.is)) return(TRUE)
         }
     }
-    else it.is <- FALSE
 
     if (stop) {
-        if (!it.is) {
-            s0 <- ifelse(arg.to, "The argument to ", "")
-            s2 <- ifelse(any(types %in% c("factor", "character", "numeric", "logical")),
-                         "vector", "")
-            stop(paste0(s0, "'", s1, "' must be a ", word_list(types, and.or = "or"), " ", s2, "."), call. = FALSE)
-        }
+        s0 <- ifelse(arg.to, "The argument to ", "")
+        s2 <- ifelse(any(types %in% c("factor", "character", "numeric", "logical")),
+                     "vector", "")
+        stop(paste0(s0, "'", s1, "' must be a ", word_list(types, and.or = "or"), " ", s2, "."), call. = FALSE)
     }
-    return(it.is)
+
+    FALSE
 }
 is_null <- function(x) length(x) == 0L
 is_not_null <- function(x) !is_null(x)
@@ -937,7 +1061,7 @@ probably.a.bug <- function() {
     #Partial in w/ charmatch. TRUE if x at all in table.
     !is.na(charmatch(x, table))
 }
-null_or_error <- function(x) {is_null(x) || any(class(x) == "try-error")}
+null_or_error <- function(x) {is_null(x) || inherits(x, "try-error")}
 match_arg <- function(arg, choices, several.ok = FALSE) {
     #Replaces match.arg() but gives cleaner error message and processing
     #of arg.
@@ -1038,4 +1162,3 @@ is.formula <- function(f, sides = NULL) {
     }
     return(res)
 }
-if (getRversion() < 3.6) str2expression <- function(text) parse(text=text, keep.source=FALSE)

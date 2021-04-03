@@ -12,7 +12,7 @@
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2021-02-02" />
+<meta name="date" content="2021-04-03" />
 
 <title>Using WeightIt to Estimate Balancing Weights</title>
 
@@ -28,7 +28,14 @@
     </style>
 
 
-<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
 pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
@@ -133,7 +140,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 <h1 class="title toc-ignore">Using WeightIt to Estimate Balancing Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2021-02-02</h4>
+<h4 class="date">2021-04-03</h4>
 
 
 
@@ -234,20 +241,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 </div>
 <p>We have our outcome (<code>re78</code>), our treatment (<code>treat</code>), and the covariates for which balance is desired (<code>age</code>, <code>educ</code>, <code>race</code>, <code>married</code>, <code>nodegree</code>, <code>re74</code>, and <code>re75</code>). Using <code>cobalt</code>, we can examine the initial imbalance on the covariates:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;cobalt&quot;</span>)</span></code></pre></div>
-<pre><code>##  cobalt (Version 4.2.4.9000, Build Date: )</code></pre>
+<pre><code>##  cobalt (Version 4.3.1, Build Date: )</code></pre>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">bal.tab</span>(treat <span class="sc">~</span> age <span class="sc">+</span> educ <span class="sc">+</span> race <span class="sc">+</span> married <span class="sc">+</span> nodegree <span class="sc">+</span> re74 <span class="sc">+</span> re75,</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">data =</span> lalonde, <span class="at">estimand =</span> <span class="st">&quot;ATT&quot;</span>, <span class="at">m.threshold =</span> .<span class="dv">05</span>)</span></code></pre></div>
 <pre><code>## Balance Measures
-##                Type Diff.Un
-## age         Contin. -0.3094
-## educ        Contin.  0.0550
-## race_black   Binary  0.6404
-## race_hispan  Binary -0.0827
-## race_white   Binary -0.5577
-## married      Binary -0.3236
-## nodegree     Binary  0.1114
-## re74        Contin. -0.7211
-## re75        Contin. -0.2903
+##                Type Diff.Un      M.Threshold.Un
+## age         Contin. -0.3094 Not Balanced, &gt;0.05
+## educ        Contin.  0.0550 Not Balanced, &gt;0.05
+## race_black   Binary  0.6404 Not Balanced, &gt;0.05
+## race_hispan  Binary -0.0827 Not Balanced, &gt;0.05
+## race_white   Binary -0.5577 Not Balanced, &gt;0.05
+## married      Binary -0.3236 Not Balanced, &gt;0.05
+## nodegree     Binary  0.1114 Not Balanced, &gt;0.05
+## re74        Contin. -0.7211 Not Balanced, &gt;0.05
+## re75        Contin. -0.2903 Not Balanced, &gt;0.05
 ## 
 ## Balance tally for mean differences
 ##                     count
@@ -286,9 +293,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                            
-##               1      2      3      5      6
+##               6      5      3      2      1
 ##  treated      1      1      1      1      1
-##             597    573    411    381    303
+##             597    573    381    411    303
 ##  control 3.0301 3.0592 3.2397 3.5231 3.7432
 ## 
 ## - Weight statistics:
@@ -309,17 +316,17 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ##     re74 + re75, data = lalonde, method = &quot;ps&quot;, estimand = &quot;ATT&quot;)
 ## 
 ## Balance Measures
-##                 Type Diff.Adj V.Ratio.Adj
-## prop.score  Distance  -0.0205      1.0324
-## age          Contin.   0.1188      0.4578
-## educ         Contin.  -0.0284      0.6636
-## race_black    Binary  -0.0022           .
-## race_hispan   Binary   0.0002           .
-## race_white    Binary   0.0021           .
-## married       Binary   0.0186           .
-## nodegree      Binary   0.0184           .
-## re74         Contin.  -0.0021      1.3206
-## re75         Contin.   0.0110      1.3938
+##                 Type Diff.Adj         M.Threshold V.Ratio.Adj
+## prop.score  Distance  -0.0205     Balanced, &lt;0.05      1.0324
+## age          Contin.   0.1188 Not Balanced, &gt;0.05      0.4578
+## educ         Contin.  -0.0284     Balanced, &lt;0.05      0.6636
+## race_black    Binary  -0.0022     Balanced, &lt;0.05           .
+## race_hispan   Binary   0.0002     Balanced, &lt;0.05           .
+## race_white    Binary   0.0021     Balanced, &lt;0.05           .
+## married       Binary   0.0186     Balanced, &lt;0.05           .
+## nodegree      Binary   0.0184     Balanced, &lt;0.05           .
+## re74         Contin.  -0.0021     Balanced, &lt;0.05      1.3206
+## re75         Contin.   0.0110     Balanced, &lt;0.05      1.3938
 ## 
 ## Balance tally for mean differences
 ##                     count
@@ -348,9 +355,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                            
-##               1      2      3      4      5
+##               5      4      3      2      1
 ##  treated      1      1      1      1      1
-##             608    597    411    381    303
+##             608    381    597    303    411
 ##  control 7.1268 7.5013 7.9979 9.0355 9.4195
 ## 
 ## - Weight statistics:
@@ -371,16 +378,16 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ##     re74 + re75, data = lalonde, method = &quot;ebal&quot;, estimand = &quot;ATT&quot;)
 ## 
 ## Balance Measures
-##                Type Diff.Adj V.Ratio.Adj
-## age         Contin.        0      0.4097
-## educ        Contin.        0      0.6636
-## race_black   Binary        0           .
-## race_hispan  Binary       -0           .
-## race_white   Binary       -0           .
-## married      Binary       -0           .
-## nodegree     Binary       -0           .
-## re74        Contin.       -0      1.3264
-## re75        Contin.       -0      1.3350
+##                Type Diff.Adj     M.Threshold V.Ratio.Adj
+## age         Contin.        0 Balanced, &lt;0.05      0.4097
+## educ        Contin.        0 Balanced, &lt;0.05      0.6636
+## race_black   Binary        0 Balanced, &lt;0.05           .
+## race_hispan  Binary       -0 Balanced, &lt;0.05           .
+## race_white   Binary       -0 Balanced, &lt;0.05           .
+## married      Binary       -0 Balanced, &lt;0.05           .
+## nodegree     Binary       -0 Balanced, &lt;0.05           .
+## re74        Contin.       -0 Balanced, &lt;0.05      1.3264
+## re75        Contin.       -0 Balanced, &lt;0.05      1.3350
 ## 
 ## Balance tally for mean differences
 ##                     count
@@ -555,10 +562,19 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ##  - - - Time: 1 - - - 
 ## Balance Measures
-##           Type Diff.Un  KS.Un
-## age    Contin.  0.3799 0.2099
-## gender  Binary  0.2945 0.2945
-## use0   Contin.  0.2668 0.1681
+##           Type Diff.Un      M.Threshold.Un  KS.Un
+## age    Contin.  0.3799 Not Balanced, &gt;0.05 0.2099
+## gender  Binary  0.2945 Not Balanced, &gt;0.05 0.2945
+## use0   Contin.  0.2668 Not Balanced, &gt;0.05 0.1681
+## 
+## Balance tally for mean differences
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     3
+## 
+## Variable with the greatest mean difference
+##  Variable Diff.Un      M.Threshold.Un
+##       age  0.3799 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
@@ -566,12 +582,21 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ##  - - - Time: 2 - - - 
 ## Balance Measures
-##           Type Diff.Un  KS.Un
-## tx1     Binary  0.1695 0.1695
-## use1   Contin.  0.0848 0.0763
-## age    Contin.  0.2240 0.1331
-## gender  Binary  0.1927 0.1927
-## use0   Contin.  0.1169 0.0913
+##           Type Diff.Un      M.Threshold.Un  KS.Un
+## tx1     Binary  0.1695 Not Balanced, &gt;0.05 0.1695
+## use1   Contin.  0.0848 Not Balanced, &gt;0.05 0.0763
+## age    Contin.  0.2240 Not Balanced, &gt;0.05 0.1331
+## gender  Binary  0.1927 Not Balanced, &gt;0.05 0.1927
+## use0   Contin.  0.1169 Not Balanced, &gt;0.05 0.0913
+## 
+## Balance tally for mean differences
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     5
+## 
+## Variable with the greatest mean difference
+##  Variable Diff.Un      M.Threshold.Un
+##       age   0.224 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
@@ -579,14 +604,23 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ##  - - - Time: 3 - - - 
 ## Balance Measures
-##           Type Diff.Un  KS.Un
-## tx2     Binary  0.2423 0.2423
-## use2   Contin.  0.1087 0.1161
-## tx1     Binary  0.1071 0.1071
-## use1   Contin.  0.1662 0.1397
-## age    Contin.  0.3431 0.1863
-## gender  Binary  0.1532 0.1532
-## use0   Contin.  0.1859 0.1350
+##           Type Diff.Un      M.Threshold.Un  KS.Un
+## tx2     Binary  0.2423 Not Balanced, &gt;0.05 0.2423
+## use2   Contin.  0.1087 Not Balanced, &gt;0.05 0.1161
+## tx1     Binary  0.1071 Not Balanced, &gt;0.05 0.1071
+## use1   Contin.  0.1662 Not Balanced, &gt;0.05 0.1397
+## age    Contin.  0.3431 Not Balanced, &gt;0.05 0.1863
+## gender  Binary  0.1532 Not Balanced, &gt;0.05 0.1532
+## use0   Contin.  0.1859 Not Balanced, &gt;0.05 0.1350
+## 
+## Balance tally for mean differences
+##                     count
+## Balanced, &lt;0.05         0
+## Not Balanced, &gt;0.05     7
+## 
+## Variable with the greatest mean difference
+##  Variable Diff.Un      M.Threshold.Un
+##       age  0.3431 Not Balanced, &gt;0.05
 ## 
 ## Sample sizes
 ##     Control Treated
@@ -616,6 +650,8 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <pre><code>##                  Summary of weights
 ## 
 ##                        Time 1                       
+##                  Summary of weights
+## 
 ## - Weight ranges:
 ## 
 ##            Min                                   Max
@@ -624,9 +660,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                                 
-##              906     477     442     409     307
+##              477     442     307     409     906
 ##  treated 13.4464 13.6233 13.7059  14.436 15.5292
-##              980     641     547     282     206
+##              206     282     641     547     980
 ##  control 44.8027 46.1355 58.4164 79.8919 82.2349
 ## 
 ## - Weight statistics:
@@ -642,6 +678,8 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## Weighted    185.18   573.6
 ## 
 ##                        Time 2                       
+##                  Summary of weights
+## 
 ## - Weight ranges:
 ## 
 ##            Min                                   Max
@@ -650,9 +688,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                                 
-##              980     641     561     553      34
+##               34     561     553     641     980
 ##  treated  33.371 34.7405 42.9442 58.4164 82.2349
-##              547     282     206     109      95
+##              109      95     206     282     547
 ##  control 39.7862 42.2256 44.8027 46.1355 79.8919
 ## 
 ## - Weight statistics:
@@ -668,6 +706,8 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## Weighted     318.9  264.49
 ## 
 ##                        Time 3                       
+##                  Summary of weights
+## 
 ## - Weight ranges:
 ## 
 ##            Min                                   Max
@@ -676,9 +716,9 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 
 ## - Units with 5 greatest weights by group:
 ##                                                 
-##              936     763     650     206     109
+##              936     650     763     109     206
 ##  treated  26.003  26.471 28.0582 39.7862 44.8027
-##              980     641     553     547     282
+##              553     282     641     547     980
 ##  control 42.9442 46.1355 58.4164 79.8919 82.2349
 ## 
 ## - Weight statistics:
@@ -700,15 +740,15 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ##     use1 + age + gender + use0), data = iptwExWide, method = &quot;ps&quot;)
 ## 
 ## Balance summary across all time points
-##              Times     Type Max.Diff.Adj Max.KS.Adj
-## prop.score 1, 2, 3 Distance       0.0251     0.0935
-## age        1, 2, 3  Contin.       0.0703     0.0796
-## gender     1, 2, 3   Binary       0.0263     0.0263
-## use0       1, 2, 3  Contin.       0.0558     0.0938
-## tx1           2, 3   Binary       0.0171     0.0171
-## use1          2, 3  Contin.       0.0316     0.0692
-## tx2              3   Binary       0.0085     0.0085
-## use2             3  Contin.       0.0315     0.0659
+##              Times     Type Max.Diff.Adj         M.Threshold Max.KS.Adj
+## prop.score 1, 2, 3 Distance       0.0251     Balanced, &lt;0.05     0.0935
+## age        1, 2, 3  Contin.       0.0703 Not Balanced, &gt;0.05     0.0796
+## gender     1, 2, 3   Binary       0.0263     Balanced, &lt;0.05     0.0263
+## use0       1, 2, 3  Contin.       0.0558 Not Balanced, &gt;0.05     0.0938
+## tx1           2, 3   Binary       0.0171     Balanced, &lt;0.05     0.0171
+## use1          2, 3  Contin.       0.0316     Balanced, &lt;0.05     0.0692
+## tx2              3   Binary       0.0085     Balanced, &lt;0.05     0.0085
+## use2             3  Contin.       0.0315     Balanced, &lt;0.05     0.0659
 ## 
 ## Balance tally for mean differences
 ##                     count
