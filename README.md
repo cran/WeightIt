@@ -3,7 +3,14 @@
 
 # WeightIt: Weighting for Covariate Balance in Observational Studies <img src="man/figures/logo.png" align="right" width="150"/>
 
-## [![CRAN\_Status\_Badge](https://img.shields.io/cran/v/WeightIt?color=00622B)](https://cran.r-project.org/package=WeightIt) [![CRAN\_Downloads\_Badge](https://cranlogs.r-pkg.org/badges/WeightIt?color=00622B)](https://cran.r-project.org/package=WeightIt)
+<!-- badges: start -->
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/WeightIt?color=00622B)](https://CRAN.R-project.org/package=WeightIt)
+[![CRAN_Downloads_Badge](https://cranlogs.r-pkg.org/badges/WeightIt?color=00622B)](https://cran.r-project.org/package=WeightIt)
+<!-- badges: end -->
+
+------------------------------------------------------------------------
 
 ### Overview
 
@@ -21,7 +28,7 @@ matching, and `MatchIt` users will find the syntax familiar.
 
 For a complete vignette, see the
 [website](https://ngreifer.github.io/WeightIt/articles/WeightIt.html)
-for `WeightIt`.
+for `WeightIt` or `vignette("WeightIt")`.
 
 To install and load `WeightIt`, use the code below:
 
@@ -30,7 +37,7 @@ To install and load `WeightIt`, use the code below:
 install.packages("WeightIt")
 
 #Development version
-devtools::install_github("ngreifer/WeightIt")
+remotes::install_github("ngreifer/WeightIt")
 
 library("WeightIt")
 ```
@@ -108,11 +115,11 @@ summary(W)
     treated 1.1721 |---------------------------| 40.0773
     control 1.0092 |-|                            4.7432
 
-    - Units with 5 greatest weights by group:
+    - Units with 5 most extreme weights by group:
                                                     
-                 137     124     116      68      10
+                  68     116      10     137     124
      treated 13.5451 15.9884 23.2967 23.3891 40.0773
-                 597     573     411     381     303
+                 597     573     381     411     303
      control  4.0301  4.0592  4.2397  4.5231  4.7432
 
     - Weight statistics:
@@ -132,7 +139,9 @@ and large effective sample sizes.
 
 The table below contains the available methods in `WeightIt` for
 estimating weights for binary, multinomial, and continuous treatments
-using various methods and functions from various packages.
+using various methods and functions from various packages. See
+`vignette("installing-packages")` for information on how to install
+these packages.
 
 | Treatment type  | Method (`method =`)                                 | Package        |
 |-----------------|-----------------------------------------------------|----------------|

@@ -149,7 +149,6 @@ check.subclass <- function(method, treat.type) {
   }
 }
 process.ps <- function(ps, data = NULL, treat) {
-  #Process s.weights
   if (is_not_null(ps)) {
     if (is.character(ps) && length(ps)==1) {
       if (is_null(data)) {
@@ -162,7 +161,7 @@ process.ps <- function(ps, data = NULL, treat) {
     }
     else if (is.numeric(ps)) {
       if (length(ps) != length(treat)) {
-        stop("'ps' must have teh same number of units as the treatment.", call. = FALSE)
+        stop("'ps' must have the same number of units as the treatment.", call. = FALSE)
       }
     }
     else {
@@ -300,7 +299,7 @@ process.by <- function(by, data, treat, treat.name = NULL, by.arg = "by") {
     if (is_not_null(colnames(by))) names(by.components) <- colnames(by)
     else names(by.components) <- by.name
 
-    if (is_null(by)) by.factor <- factor(rep(1, n))
+    if (is_null(by)) by.factor <- factor(rep(1L, n), levels = 1L)
     else by.factor <- factor(by.components[[1]], levels = unique(by.components[[1]]),
                              labels = paste(names(by.components), "=", unique(by.components[[1]])))
     # by.vars <- acceptable.bys[vapply(acceptable.bys, function(x) equivalent.factors(by, data[[x]]), logical(1L))]
@@ -372,7 +371,7 @@ process.MSM.method <- function(is.MSM.method, method) {
 process.missing <- function(missing, method, treat.type) {
   #Allowable estimands
   AE <- list(binary = list(ps = c("ind"
-                                  # , "saem"
+                                  , "saem"
   )
   , gbm = c("ind", "surr")
   , cbps = c("ind")
@@ -398,7 +397,7 @@ process.missing <- function(missing, method, treat.type) {
                      # , kbal = c("ind")
   ),
   continuous = list(ps = c("ind"
-                           # , "saem"
+                           , "saem"
   )
   , gbm = c("ind", "surr")
   , cbps = c("ind")
@@ -479,7 +478,7 @@ int.poly.f <- function(d, ex = NULL, int = FALSE, poly = 1, center = TRUE, ortho
 
   binary.vars <- is_binary_col(d)
 
-  if (center) {
+  if (center && (int || !orthogonal_poly)) {
     d[,!binary.vars] <- center(d[, !binary.vars, drop = FALSE])
   }
   nd <- NCOL(d)
@@ -521,7 +520,9 @@ int.poly.f <- function(d, ex = NULL, int = FALSE, poly = 1, center = TRUE, ortho
       out <- out[, !single_value, drop = FALSE]
     }
   }
-  else out <- NULL
+  else {
+    out <- matrix(ncol = 0, nrow = nrow(d), dimnames = list(rownames(d), NULL))
+  }
 
   return(out)
 }
@@ -724,27 +725,34 @@ check_estimated_weights <- function(w, treat, treat.type, s.weights) {
   extreme.warn <- FALSE
   if (treat.type == "continuous") {
     if (all_the_same(w)) {
-      warning(paste0("All weights are ", w[1], ", possibly indicating an estimation failure."), call. = FALSE)
+      warning(sprintf("All weights are %s, possibly indicating an estimation failure.", w[1]), call. = FALSE)
     }
-    else if (sd(tw, na.rm = TRUE)/mean(tw, na.rm = TRUE) > 4) extreme.warn <- TRUE
+    else {
+      w.cv <- sd(tw, na.rm = TRUE)/mean(tw, na.rm = TRUE)
+      if (!is.finite(w.cv) || w.cv > 4) extreme.warn <- TRUE
+    }
   }
   else {
     if (all_the_same(w)) {
-      warning(paste0("All weights are ", w[1], ", possibly indicating an estimation failure."), call. = FALSE)
+      warning(sprintf("All weights are %s, possibly indicating an estimation failure.", w[1]), call. = FALSE)
     }
     else {
       t.levels <- unique(treat)
       bad.treat.groups <- setNames(rep(FALSE, length(t.levels)), t.levels)
       for (i in t.levels) {
         ti <- which(treat == i)
-        if (all(is.na(w[ti])) || all(w[ti] == 0)) bad.treat.groups[as.character(i)] <- TRUE
-        else if (!extreme.warn && sum(!is.na(tw[ti])) > 1 && sd(tw[ti], na.rm = TRUE)/mean(tw[ti], na.rm = TRUE) > 4) extreme.warn <- TRUE
+        if (all(is.na(w[ti])) || all(check_if_zero(w[ti]))) bad.treat.groups[as.character(i)] <- TRUE
+        else if (!extreme.warn && sum(is.finite(tw[ti])) > 1) {
+          w.cv <- sd(tw[ti], na.rm = TRUE)/mean(tw[ti], na.rm = TRUE)
+          if (!is.finite(w.cv) || w.cv > 4) extreme.warn <- TRUE
+        }
       }
 
       if (any(bad.treat.groups)) {
         n <- sum(bad.treat.groups)
-        warning(paste0("All weights are NA or 0 in treatment ", ngettext(n, "group ", "groups "),
-                       word_list(t.levels[bad.treat.groups], quotes = TRUE), "."), call. = FALSE)
+        warning(sprintf("All weights are NA or 0 in treatment %s %s.",
+                        ngettext(n, "group", "groups"),
+                        word_list(t.levels[bad.treat.groups], quotes = TRUE)), call. = FALSE)
       }
     }
   }
@@ -1104,6 +1112,28 @@ neg_ent <- function(w) {
   mean(w*log(w))
 }
 
+#Mahalanobis distance matrix
+mah_dist <- function(X, Y = X, Sinv) {
+  do.call("rbind", lapply(seq_len(nrow(X)), function(i) {
+    sqrt(mahalanobis(Y, X[i,], Sinv, inverted = TRUE))
+  }))
+}
+
+#Generalized matrix inverse (port of MASS::ginv)
+generalized_inverse <- function(sigma) {
+  sigmasvd <- svd(sigma)
+  pos <- sigmasvd$d > max(1e-9 * sigmasvd$d[1L], 0)
+  sigma_inv <- sigmasvd$v[, pos, drop = FALSE] %*% (sigmasvd$d[pos]^-1 * t(sigmasvd$u[, pos, drop = FALSE]))
+  return(sigma_inv)
+}
+
+#Choleski decomp for non-negative definite matrices
+chol2 <- function(Sinv) {
+  ch <- suppressWarnings(chol(Sinv, pivot = TRUE))
+  p <- order(attr(ch, "pivot"))
+  return(ch[,p])
+}
+
 #For balance SuperLearner
 method.balance <- function(stop.method) {
 
@@ -1121,7 +1151,7 @@ method.balance <- function(stop.method) {
       bal_fun <- attr(control$trimLogit, "vals")$bal_fun
 
       tol <- .001
-      for (i in 1:ncol(Z)) {
+      for (i in seq_col(Z)) {
         Z[Z[,i] < tol, i] <- tol
         Z[Z[,i] > 1-tol, i] <- 1-tol
       }

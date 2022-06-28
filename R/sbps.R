@@ -274,7 +274,7 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
 
       F_min <- Inf
 
-      for (i in 1:nrow(S)) {
+      for (i in seq_row(S)) {
         s_try <- S[i,]
         F_try <- get_F(s_try, moderator.factor, w_o, w_s, treat.type)
 
@@ -443,14 +443,14 @@ summary.weightit.sbps <- function(object, top = 5, ignore.s.weights = FALSE, ...
       out$weight.range <- setNames(lapply(levels(t), function(x) c(min(w[w > 0 & t == x]),
                                                                    max(w[w > 0 & t == x]))),
                                    levels(t))
-      out$weight.ratio <- setNames(c(sapply(out$weight.range, function(x) x[2]/x[1]),
+      out$weight.ratio <- setNames(c(vapply(out$weight.range, function(x) x[2]/x[1], numeric(1L)),
                                      max(unlist(out$weight.range)/min(unlist(out$weight.range)))),
                                    c(levels(t), "overall"))
       top.weights <- setNames(lapply(levels(t), function(x) sort(w[t == x], decreasing = TRUE)[seq_len(top)]),
                               levels(t))
       out$weight.top <- setNames(lapply(names(top.weights), function(x) sort(setNames(top.weights[[x]], which(w %in% top.weights[[x]] & t == x)[seq_len(top)]))),
                                  names(top.weights))
-      out$coef.of.var <- c(sapply(levels(t), function(x) sd(w[t==x])/mean(w[t==x])),
+      out$coef.of.var <- c(vapply(levels(t), function(x) sd(w[t==x])/mean(w[t==x]), numeric(1L)),
                            overall = sd(w)/mean(w))
 
       nn <- make_df(levels(t), c("Unweighted", "Weighted"))

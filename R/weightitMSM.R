@@ -44,22 +44,41 @@ weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FA
       if (is.formula(num.formula)) {
         if (is.formula(num.formula, sides = 1)) {
           rhs.vars.mentioned.lang <- attr(terms(num.formula), "variables")[-1]
-          rhs.vars.mentioned <- sapply(rhs.vars.mentioned.lang, deparse)
-          rhs.vars.failed <- sapply(rhs.vars.mentioned.lang, function(v) {
+          rhs.vars.mentioned <- vapply(rhs.vars.mentioned.lang, deparse1, character(1L))
+          rhs.vars.failed <- vapply(rhs.vars.mentioned.lang, function(v) {
             null_or_error(try(eval(v, c(data, .GlobalEnv)), silent = TRUE))
-          })
+          }, logical(1L))
 
           if (any(rhs.vars.failed)) {
-            stop(paste0(c("All variables in formula must be variables in data or objects in the global environment.\nMissing variables: ",
+            stop(paste0(c("All variables in 'num.formula' must be variables in 'data' or objects in the global environment.\nMissing variables: ",
                           paste(rhs.vars.mentioned[rhs.vars.failed], collapse=", "))), call. = FALSE)
           }
         }
         else {
-          stop("The argument to num.formula must have right hand side variables but not a response variable (e.g., ~ V1 + V2).", call. = FALSE)
+          stop("The argument to 'num.formula' must have right hand side variables but not a response variable (e.g., ~ V1 + V2).", call. = FALSE)
         }
       }
+      else if (is.list(num.formula)) {
+        if (length(num.formula) != length(formula.list)) {
+          stop("When supplied as a list, 'num.formula' must have as many entries as 'formula.list'.", call. = FALSE)
+        }
+        if (!all(vapply(num.formula, is.formula, logical(1L), sides = 1))) {
+          stop("'num.formula' must be a single formula with no response variable and with the stabilization factors on the right hand side or a list thereof.", call. = FALSE)
+        }
+        rhs.vars.mentioned.lang.list <- lapply(num.formula, function(nf) attr(terms(nf), "variables")[-1])
+        rhs.vars.mentioned <- unique(unlist(lapply(rhs.vars.mentioned.lang.list, function(r) vapply(r, deparse1, character(1L)))))
+        rhs.vars.failed <- vapply(rhs.vars.mentioned, function(v) {
+          null_or_error(try(eval(parse(text=v), c(data, .GlobalEnv)), silent = TRUE))
+        }, logical(1L))
+
+        if (any(rhs.vars.failed)) {
+          stop(paste0(c("All variables in 'num.formula' must be variables in 'data' or objects in the global environment.\nMissing variables: ",
+                        paste(rhs.vars.mentioned[rhs.vars.failed], collapse=", "))), call. = FALSE)
+        }
+
+      }
       else {
-        stop("The argument to num.formula must be a single formula with no response variable and with the stabilization factors on the right hand side.", call. = FALSE)
+        stop("'num.formula' must be a single formula with no response variable and with the stabilization factors on the right hand side or a list thereof.", call. = FALSE)
       }
     }
   }
@@ -201,6 +220,9 @@ weightitMSM <- function(formula.list, data = NULL, method = "ps", stabilize = FA
             stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~", paste(names(treat.list)[seq_along(names(treat.list)) < i], collapse = " * "))), as.formula(paste(num.formula, "+ .")))
           }
         }
+        else if (is.list(num.formula)) {
+          stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")), as.formula(paste(paste(num.formula[[i]], collapse = ""), "+ .")))
+        }
         else {
           if (i == 1) {
             stab.f <- as.formula(paste(names(treat.list)[i], "~ 1"))
@@ -278,36 +300,38 @@ print.weightitMSM <- function(x, ...) {
   cat(paste0(" - sampling weights: ", ifelse(all_the_same(x[["s.weights"]]), "none", "present"), "\n"))
   cat(paste0(" - number of time points: ", length(x[["treat.list"]]), " (", paste(names(x[["treat.list"]]), collapse = ", "), ")\n"))
   cat(paste0(" - treatment: \n",
-             paste0(sapply(1:length(x$covs.list), function(i) {
-
-               paste0("    + time ", i, ": ", ifelse(treat.types[i] == "continuous", "continuous", paste0(nunique(x[["treat.list"]][[i]]), "-category", ifelse(treat.types[i] == "multinomial", paste0(" (", paste(levels(x[["treat.list"]][[i]]), collapse = ", "), ")"), ""))), "\n")
-
-             }), collapse = ""), collapse = "\n"))
+             paste0(vapply(seq_along(x$covs.list), function(i) {
+               paste0("    + time ", i, ": ", if (treat.types[i] == "continuous") "continuous"
+                      else paste0(nunique(x[["treat.list"]][[i]]), "-category",
+                                  if (treat.types[i] == "multinomial") paste0(" (", paste(levels(x[["treat.list"]][[i]]), collapse = ", "), ")")
+                                  else ""
+                      ), "\n")
+             }, character(1L)), collapse = ""), collapse = "\n"))
   cat(paste0(" - covariates: \n",
-             paste0(sapply(1:length(x$covs.list), function(i) {
+             paste0(vapply(seq_along(x$covs.list), function(i) {
                if (i == 1) {
                  paste0("    + baseline: ", if (is_null(x$covs.list[[i]])) "(none)" else paste(names(x$covs.list[[i]]), collapse = ", "), "\n")
                }
                else {
                  paste0("    + after time ", i-1, ": ", paste(names(x$covs.list[[i]]), collapse = ", "), "\n")
                }
-             }), collapse = ""), collapse = "\n"))
+             }, character(1L)), collapse = ""), collapse = "\n"))
   if (is_not_null(x[["by"]])) {
     cat(paste0(" - by: ", paste(names(x[["by"]]), collapse = ", "), "\n"))
   }
   if (is_not_null(x$stabilization)) {
     cat(" - stabilized")
-    if (any(sapply(x$stabilization, function(s) is_not_null(all.vars(s))))) {
+    if (any(vapply(x$stabilization, function(s) is_not_null(all.vars(s)), logical(1L)))) {
       cat(paste0("; stabilization factors:\n", if (length(x$stabilization) == 1) paste0("      ", paste0(attr(terms(x[["stabilization"]][[1]]), "term.labels"), collapse = ", "))
                  else {
-                   paste0(sapply(1:length(x$stabilization), function(i) {
+                   paste0(vapply(seq_along(x$stabilization), function(i) {
                      if (i == 1) {
                        paste0("    + baseline: ", if (is_null(attr(terms(x[["stabilization"]][[i]]), "term.labels"))) "(none)" else paste(attr(terms(x[["stabilization"]][[i]]), "term.labels"), collapse = ", "))
                      }
                      else {
                        paste0("    + after time ", i-1, ": ", paste(attr(terms(x[["stabilization"]][[i]]), "term.labels"), collapse = ", "))
                      }
-                   }), collapse = "\n")
+                   }, character(1L)), collapse = "\n")
                  }))
     }
   }
@@ -341,9 +365,9 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
   for (ti in seq_along(object$treat.list)) {
     out <- make_list(outnames)
     if (treat.types[ti] == "continuous") {
-      out$weight.range <- list(all = c(min(w[w > 0]),
-                                       max(w[w > 0])))
-      out$weight.top <- list(all = rev(sort(w, decreasing = TRUE)[seq_len(top)]))
+      out$weight.range <- list(all = c(min(w[w != 0]),
+                                       max(w[w != 0])))
+      out$weight.top <- list(all = rev(w[order(abs(w), decreasing = TRUE)][seq_len(top)]))
       out$coef.of.var <- c(all = sd(w)/mean_fast(w))
       out$scaled.mad <- c(all = mean.abs.dev(w/mean_fast(w)))
       out$negative.entropy <- c(all = neg_ent(w))
@@ -363,12 +387,12 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
       t <- object$treat.list[[ti]]
       top0 <- c(treated = min(top, sum(t == 1)),
                 control = min(top, sum(t == 0)))
-      out$weight.range <- list(treated = c(min(w[w > 0 & t == 1]),
-                                           max(w[w > 0 & t == 1])),
-                               control = c(min(w[w > 0 & t == 0]),
-                                           max(w[w > 0 & t == 0])))
-      out$weight.top <- list(treated = rev(sort(w[t == 1], decreasing = TRUE)[seq_len(top0["treated"])]),
-                             control = rev(sort(w[t == 0], decreasing = TRUE)[seq_len(top0["control"])]))
+      out$weight.range <- list(treated = c(min(w[w != 0 & t == 1]),
+                                           max(w[w != 0 & t == 1])),
+                               control = c(min(w[w != 0 & t == 0]),
+                                           max(w[w != 0 & t == 0])))
+      out$weight.top <- list(treated = rev(w[t == 1][order(abs(w[t == 1]), decreasing = TRUE)][seq_len(top0["treated"])]),
+                             control = rev(w[t == 0][order(abs(w[t == 0]), decreasing = TRUE)][seq_len(top0["control"])]))
       out$coef.of.var <- c(treated = sd(w[t==1])/mean_fast(w[t==1]),
                            control = sd(w[t==0])/mean_fast(w[t==0]))
       out$scaled.mad <- c(treated = mean.abs.dev(w[t==1]/mean_fast(w[t==1])),
@@ -392,10 +416,10 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
     else if (treat.types[ti] == "multinomial") {
       t <- object$treat.list[[ti]]
       top0 <- setNames(lapply(levels(t), function(x) min(top, sum(t == x))), levels(t))
-      out$weight.range <- setNames(lapply(levels(t), function(x) c(min(w[w > 0 & t == x]),
-                                                                   max(w[w > 0 & t == x]))),
+      out$weight.range <- setNames(lapply(levels(t), function(x) c(min(w[w != 0 & t == x]),
+                                                                   max(w[w != 0 & t == x]))),
                                    levels(t))
-      out$weight.top <- setNames(lapply(levels(t), function(x) rev(sort(w[t == x], decreasing = TRUE)[seq_len(top0[[x]])])),
+      out$weight.top <- setNames(lapply(levels(t), function(x) rev(w[t == x][order(abs(w[t == x]), decreasing = TRUE)][seq_len(top0[[x]])])),
                                  levels(t))
       out$coef.of.var <- c(vapply(levels(t), function(x) sd(w[t==x])/mean_fast(w[t==x]), numeric(1L)),
                            overall = sd(w)/mean_fast(w))
@@ -449,10 +473,7 @@ summary.weightitMSM <- function(object, top = 5, ignore.s.weights = FALSE, ...) 
   return(out.list)
 }
 print.summary.weightitMSM <- function(x, ...) {
-  if (all(vapply(x, function(y) isTRUE(all.equal(x[[1]], y)), logical(1L)))) {
-    only.one <- TRUE
-  }
-  else only.one <- FALSE
+  only.one <- all(vapply(x, function(y) isTRUE(all.equal(x[[1]], y)), logical(1L)))
 
   cat(paste(rep(" ", 17), collapse = "") %+% underline("Summary of weights") %+% "\n\n")
   for (ti in seq_along(x)) {

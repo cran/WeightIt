@@ -1,6 +1,46 @@
 WeightIt News and Updates
 ======
 
+# WeightIt 0.13.1
+
+* For ordinal multicategory treatments, setting `link = "br.logit"` now uses `brglm2::bracl()` to fit a bias-reduced ordinal regression model.
+
+* Added the vignette "Installing Supporting Packages" to explain how to install the various packages that might be needed for `WeightIt` to use certain methods, including when the package is not on CRAN. See the vignette at `vignette("installing-packages")`.
+
+* Fixed a bug that would occur when a factor or character predictor with a single level was passed to `weightit()`.
+
+* Improved the code for entropy balancing, fixing a bug when using `s.weights` with a continuous treatment and improving messages when the optimization fails to converge. (#33)
+
+* Improved robustness of documentation to missing packages.
+
+* Updated the logo, thanks to [Ben Stillerman](https://stillben.com).
+
+# WeightIt 0.13.0
+
+* Fixed a bug that would occur when the `formula.tools` package was loaded, which would occur most commonly when `logistf` was loaded. It would cause the error `The treatment and covariates must have the same number of units.` (#25)
+
+* Fixed a bug where the `info` component would not be included in the output of `weightit()` when using `method = "super"`.
+
+* Added the ability to specify `num.formula` as a list of formulas in `weightitMSM()`. This is primarily to get around the fact that when `stabilize = TRUE`, a fully saturated model with all treatments is used to compute the stabilization factor, which, for many time points, is time-consuming and may be impossible (especially if not all treatment combinations are observed). Thanks to @maellecoursonnais for bringing up this issue (#27).
+
+* `ps.cont()` has been retired since the same functionality is available using `weightit()` with `method = "gbm"` and in the `twangContinuous` package.
+
+* With `method = "energy"`, a new argument, `lambda`, can be supplied, which puts a penalty on the square of the weights to control the effective sample size. Typically this is not needed but can help when the balancing is too aggressive.
+
+* With `method = "energy"`, `min.w` can now be negative, allowing for negative weights.
+
+* With `method = "energy"`, `dist.mat` can now be supplied as the name of a method to compute the distance matrix: `"scaled_euclidean"`, `"mahalanobis"`, or `"euclidean"`.
+
+* Support for negative weights added to `summary()`. Negative weights are possible (though not by default) when using `method = "energy"` or `method = "optweight"`.
+
+* Fixed a bug where `glm()` would fail to converge with `method = "ps"` for binary treatments due to bad starting values. (#31)
+
+* `miss = "saem"` can once again be used with `method = "ps"` when missing values are present in the covariates.
+
+* Fixed bugs with processing input formulas.
+
+* An error is now thrown if an incorrect `link` is supplied with `method = "ps"`.
+
 # WeightIt 0.12.0
 
 * The use of `method = "twang"` has been retired and will now give an error message. Use `method = "gbm"` for nearly identical functionality with more options, as detailed at `?method_gbm`.
@@ -63,7 +103,7 @@ WeightIt News and Updates
 
 * Fixed a bug when using `weightitMSM` with methods that process `int` and `moments` (though you probably shouldn't use them anyway). Thanks to Sven Reiger.
 
-* Fixed a bug when using `method = "npcbps"` where weights could be excessively small and mistaken for all being them. The weights now sum to the number of units.
+* Fixed a bug when using `method = "npcbps"` where weights could be excessively small and mistaken for all being the same. The weights now sum to the number of units.
 
 # WeightIt 0.10.0
 

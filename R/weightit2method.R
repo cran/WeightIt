@@ -31,18 +31,6 @@ weightit2user <- function(Fun, covs, treat, s.weights, subset, estimand, focal, 
   }
 
   if (has_dots) fun_args <- c(fun_args, A)
-  else {
-    if (is_not_null(A)) {
-      Anames <- names(A)
-      unnamedAnames <- Anames[Anames == ""]
-      namedAnames <- Anames[Anames != ""]
-      if (length(unnamedAnames) == 1) Anames <- c(namedAnames, "an unnamed argument")
-      else if (length(unnamedAnames) > 1) Anames <- c(namedAnames, paste(length(unnamedAnames), "unnamed arguments"))
-
-      if (length(Anames) > 1) warning(paste0("The following arguments were specified but are not suitable arguments to the provided function:\n\t", word_list(Anames)), call. = FALSE, immediate. = TRUE)
-      else warning(paste0("The following argument was specified but is not a suitable argument to the provided function:\n\t", Anames), call. = FALSE, immediate. = TRUE)
-    }
-  }
 
   obj <- do.call(Fun, fun_args)
 
@@ -93,18 +81,6 @@ weightitMSM2user <- function(Fun, covs.list, treat.list, s.weights, subset, stab
   }
 
   if (has_dots) fun_args <- c(fun_args, A)
-  else {
-    if (is_not_null(A)) {
-      Anames <- names(A)
-      unnamedAnames <- Anames[Anames == ""]
-      namedAnames <- Anames[Anames != ""]
-      if (length(unnamedAnames) == 1) Anames <- c(namedAnames, "an unnamed argument")
-      else if (length(unnamedAnames) > 1) Anames <- c(namedAnames, paste(length(unnamedAnames), "unnamed arguments"))
-
-      if (length(Anames) > 1) warning(paste0("The following arguments were specified but are not suitable arguments to the provided function:\n\t", word_list(Anames)), call. = FALSE, immediate. = TRUE)
-      else warning(paste0("The following argument was specified but is not a suitable argument to the provided function:\n\t", Anames), call. = FALSE, immediate. = TRUE)
-    }
-  }
 
   obj <- do.call(Fun, fun_args)
 
@@ -138,6 +114,7 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
     covs <- covs[subset, , drop = FALSE]
     treat_sub <- factor(treat[subset])
     s.weights <- s.weights[subset]
+
     bin.treat <- is_binary(treat_sub)
     ord.treat <- is.ordered(treat_sub)
 
@@ -161,28 +138,28 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
       covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
     }
 
-    if (is_null(A$link)) A$link <- "logit"
-    else {
-      if (ord.treat) acceptable.links <- c("logit", "probit", "loglog", "cloglog", "cauchit")
-      else if (bin.treat || isFALSE(A$use.mlogit)) {
-        if (missing == "saem") acceptable.links <- "logit"
-        else acceptable.links <- expand.grid_string(c("", "br."), c("logit", "probit", "cloglog", "identity", "log", "cauchit"))
-      }
-      else acceptable.links <- c("logit", "probit", "bayes.probit", "br.logit")
+    #Process link
+    if (ord.treat) acceptable.links <- c("logit", "probit", "loglog", "cloglog", "cauchit", "br.logit")
+    else if (bin.treat || isFALSE(A$use.mlogit)) {
+      if (missing == "saem") acceptable.links <- "logit"
+      else acceptable.links <- expand.grid_string(c("", "br."), c("logit", "probit", "cloglog", "identity", "log", "cauchit"))
+    }
+    else acceptable.links <- c("logit", "probit", "bayes.probit", "br.logit")
 
-      which.link <- acceptable.links[pmatch(A$link, acceptable.links, nomatch = 0)][1]
+    if (is_null(A[["link"]])) A$link <- acceptable.links[1]
+    else {
+      which.link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
       if (is.na(which.link)) {
-        A$link <- acceptable.links[1]
-        warning(paste0("Only ", word_list(acceptable.links, quotes = TRUE, is.are = TRUE), " allowed as the link for ",
-                       if (bin.treat) "binary" else if (ord.treat) "ordinal" else "multinomial",
-                       " treatments", if (missing == "saem") " with missing = \"saem\"",
-                       ". Using link = ", word_list(acceptable.links[1], quotes = TRUE), "."),
-                call. = FALSE, immediate. = TRUE)
+        A[["link"]] <- acceptable.links[1]
+        stop(paste0("Only ", word_list(acceptable.links, quotes = TRUE, is.are = TRUE), " allowed as the link for ",
+                    if (bin.treat) "binary" else if (ord.treat) "ordinal" else "multinomial",
+                    " treatments", if (missing == "saem") " with missing = \"saem\"", "."),
+             call. = FALSE)
       }
-      else A$link <- which.link
+      else A[["link"]] <- which.link
     }
 
-    use.br <- startsWith(A$link, "br.")
+    use.br <- startsWith(A[["link"]], "br.")
     # use.bayes <- startsWith(A$link, "bayes.")
     if (use.br) A$link <- substr(A$link, 4, nchar(A$link))
     # else if (use.bayes) A$link <- substr(A$link, 7, nchar(A$link))
@@ -192,54 +169,77 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
       t.lev <- get.treated.level(treat_sub)
       c.lev <- setdiff(levels(treat_sub), t.lev)
 
-      family <- binomial(link = A[["link"]])
-
       ps <- make_df(levels(treat_sub), nrow = length(treat_sub))
 
+      treat <- binarize(treat_sub, one = t.lev)
+
       if (missing == "saem") {
-        # check.package("misaem")
-        #
-        # newdata <- data.frame(binarize(treat_sub, one = t.lev), covs)
-        # fit <- misaem::miss.glm(formula(newdata), newdata)
-        #
-        # if (is_null(A[["saem.method"]])) A[["saem.method"]] <- "map"
-        #
-        # ps[[t.lev]] <- p.score <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
-        # ps[[c.lev]] <- 1 - ps[[t.lev]]
+        check.package("misaem")
+
+        data <- data.frame(treat, covs)
+
+        withCallingHandlers({
+          fit <- misaem::miss.glm(formula(data), data = data, control = as.list(A[["control"]]))
+        },
+        warning = function(w) {
+          if (conditionMessage(w) != "one argument not used by format '%i '") warning(w)
+          invokeRestart("muffleWarning")
+        })
+
+        if (is_null(A[["saem.method"]])) A[["saem.method"]] <- "map"
+
+        ps[[t.lev]] <- p.score <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
+        ps[[c.lev]] <- 1 - ps[[t.lev]]
       }
       else {
         if (use.br) {
+          check.package("brglm2")
           ctrl_fun <- brglm2::brglmControl
           glm_method <- brglm2::brglmFit
+          family <- binomial(link = A[["link"]])
         }
         else {
           ctrl_fun <- stats::glm.control
           glm_method <- if_null_then(A[["glm.method"]], stats::glm.fit)
+          family <- quasibinomial(link = A[["link"]])
         }
 
-        control <- A[names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)]]
+        control <- do.call(ctrl_fun, c(A[["control"]],
+                                       A[setdiff(names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)],
+                                                 names(A[["control"]]))]))
 
-        treat <- binarize(treat_sub, one = t.lev)
+        start <- mustart <- NULL
+
+        if (family$link %in% c("log", "identity")) {
+          #Need starting values because links are unbounded
+          start <- c(family$linkfun(w.m(treat, s.weights)), rep(0, ncol(covs)))
+        }
+        else {
+          #Default starting values from glm.fit() without weights; these
+          #work better with s.weights than usual default.
+          mustart <- .25 + .5*treat
+        }
 
         withCallingHandlers({
           if (isTRUE(A[["quick"]])) {
-            fit <- do.call(glm_method, c(list(y = treat,
-                                              x = cbind(1, covs),
-                                              start = c(family$linkfun(mean(treat)), rep(0, ncol(covs))),
-                                              weights = s.weights,
-                                              family = family),
-                                         control), quote = TRUE)
+            fit <- do.call(glm_method, list(y = treat,
+                                            x = cbind(`(Intercept)` = 1, covs),
+                                            mustart = mustart,
+                                            start = start,
+                                            weights = s.weights,
+                                            family = family,
+                                            control = control), quote = TRUE)
           }
           else {
             data <- data.frame(treat, covs)
             formula <- formula(data)
-            fit <- do.call(stats::glm, c(list(formula, data = data,
-                                              weights = s.weights,
-                                              start = c(family$linkfun(mean(treat)), rep(0, ncol(covs))),
-                                              family = family,
-                                              method = glm_method),
-                                         control), quote = TRUE)
-
+            fit <- do.call(stats::glm, list(formula, data = data,
+                                            weights = s.weights,
+                                            mustart = mustart,
+                                            start = start,
+                                            family = family,
+                                            method = glm_method,
+                                            control = control), quote = TRUE)
           }
         },
         warning = function(w) {
@@ -255,22 +255,44 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
       fit.obj <- fit
     }
     else if (ord.treat) {
-      if (A[["link"]] == "logit") A[["link"]] <- "logistic"
-      check.package("MASS")
-      # message(paste("Using ordinal", A$link, "regression."))
-      data <- data.frame(treat_sub, covs)
-      formula <- formula(data)
-      # control <- A[names(A) %nin% c("link", names(formals(MASS::polr)))]
-      tryCatch({fit <- do.call(MASS::polr,
-                               c(list(formula,
+      if (use.br) {
+        check.package("brglm2")
+
+        ctrl_fun <- brglm2::brglmControl
+        control <- do.call(ctrl_fun, c(A[["control"]],
+                                       A[setdiff(names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)],
+                                                 names(A[["control"]]))]))
+
+        data <- data.frame(treat_sub, covs)
+        formula <- formula(data)
+
+        tryCatch({fit <- do.call(brglm2::bracl, list(formula,
+                             data = data,
+                             weights = s.weights,
+                             control = control,
+                             parallel = if_null_then(A[["parallel"]], FALSE)),
+                       quote = TRUE)},
+                 error = function(e) stop("There was a problem with the bias-reduced ordinal logit regression. Try a different link.", call. = FALSE))
+      }
+      else {
+        if (A[["link"]] == "logit") A[["link"]] <- "logistic"
+        check.package("MASS")
+        # message(paste("Using ordinal", A$link, "regression."))
+        data <- data.frame(treat_sub, covs)
+        formula <- formula(data)
+
+        tryCatch({fit <- do.call(MASS::polr,
+                                 list(formula,
                                       data = data,
                                       weights = s.weights,
                                       Hess = FALSE,
                                       model = FALSE,
                                       method = A[["link"]],
-                                      contrasts = NULL)), quote = TRUE)},
-               error = function(e) {stop(paste0("There was a problem fitting the ordinal ", A$link, " regressions with polr().\n       Try again with an un-ordered treatment.",
-                                                "\n       Error message: ", conditionMessage(e)), call. = FALSE)})
+                                      contrasts = NULL), quote = TRUE)},
+                 error = function(e) {stop(paste0("There was a problem fitting the ordinal ", A$link, " regressions with polr().\n       Try again with an un-ordered treatment.",
+                                                  "\n       Error message: ", conditionMessage(e)), call. = FALSE)})
+      }
+
 
       ps <- fit$fitted.values
       fit.obj <- fit
@@ -281,11 +303,14 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
         check.package("brglm2")
         data <- data.frame(treat_sub, covs)
         formula <- formula(data)
-        control <- A[names(formals(brglm2::brglmControl))[pmatch(names(A), names(formals(brglm2::brglmControl)), 0)]]
+        ctrl_fun <- brglm2::brglmControl
+        control <- do.call(ctrl_fun, c(A[["control"]],
+                                       A[setdiff(names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)],
+                                                 names(A[["control"]]))]))
         tryCatch({fit <- do.call(brglm2::brmultinom,
-                                 c(list(formula, data,
-                                        weights = s.weights),
-                                   control), quote = TRUE)},
+                                 list(formula, data,
+                                      weights = s.weights,
+                                      control = control), quote = TRUE)},
                  error = function(e) stop("There was a problem with the bias-reduced multinomial logit regression. Try a different link.", call. = FALSE))
 
         ps <- fit$fitted.values
@@ -310,18 +335,19 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
           }
           form <- reformulate(covnames, tname)
 
-          control <- do.call(ctrl_fun, c(A[["control"]], A[names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)]]))
-
+          control <- do.call(ctrl_fun, c(A[["control"]],
+                                         A[setdiff(names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)],
+                                                   names(A[["control"]]))]))
           tryCatch({
             fit <- do.call(mclogit::mblogit, list(form,
-                                    data = data,
-                                    weights = quote(.s.weights),
-                                    random = A[["random"]],
-                                    method = A[["mclogit.method"]],
-                                    estimator = if_null_then(A[["estimator"]], eval(formals(mclogit::mclogit)[["estimator"]])),
-                                    dispersion = if_null_then(A[["dispersion"]], eval(formals(mclogit::mclogit)[["dispersion"]])),
-                                    groups = A[["groups"]],
-                                    control = control))
+                                                  data = data,
+                                                  weights = quote(.s.weights),
+                                                  random = A[["random"]],
+                                                  method = A[["mclogit.method"]],
+                                                  estimator = if_null_then(A[["estimator"]], eval(formals(mclogit::mclogit)[["estimator"]])),
+                                                  dispersion = if_null_then(A[["dispersion"]], eval(formals(mclogit::mclogit)[["dispersion"]])),
+                                                  groups = A[["groups"]],
+                                                  control = control))
 
           },
           error = function(e) {stop(paste0("There was a problem fitting the multinomial ", A$link, " regression with mblogit().\n       Try again with use.mclogit = FALSE.\nError message (from mclogit):\n       ", conditionMessage(e)), call. = FALSE)}
@@ -357,7 +383,10 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
         else {
           ps <- make_df(levels(treat_sub), nrow = length(treat_sub))
 
-          control <- A[names(formals(stats::glm.control))[pmatch(names(A), names(formals(stats::glm.control)), 0)]]
+          ctrl_fun <- stats::glm.control
+          control <- do.call(ctrl_fun, c(A[["control"]],
+                                         A[setdiff(names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)],
+                                                   names(A[["control"]]))]))
           fit.list <- make_list(levels(treat_sub))
 
           for (i in levels(treat_sub)) {
@@ -369,10 +398,10 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal, stabili
             }
             t_i <- as.numeric(treat_sub == i)
             data_i <- data.frame(t_i, covs)
-            fit.list[[i]] <- do.call(stats::glm, c(list(formula(data_i), data = data_i,
-                                                        family = quasibinomial(link = A$link),
-                                                        weights = s.weights),
-                                                   control), quote = TRUE)
+            fit.list[[i]] <- do.call(stats::glm, list(formula(data_i), data = data_i,
+                                                      family = quasibinomial(link = A$link),
+                                                      weights = s.weights,
+                                                      control = control), quote = TRUE)
             ps[[i]] <- fit.list[[i]]$fitted.values
           }
           if (isTRUE(A[["test2"]])) ps <- ps/rowSums(ps)
@@ -570,25 +599,40 @@ weightit2ps.cont <- function(covs, treat, s.weights, subset, stabilize, missing,
   if (is_null(ps)) {
 
     if (missing == "saem") {
-      # check.package("misaem")
-      #
-      # tryCatch({fit <- misaem::miss.lm(formula, data)},
-      #          error = function(e) {
-      #            if (trimws(conditionMessage(e)) == "object 'p' not found") {
-      #              stop("missing = \"saem\" cannot be used with continuous treatments due to a bug in the misaem package.", call. = FALSE)
-      #            }
-      #          })
-      #
-      # if (is_null(A[["saem.method"]])) A[["saem.method"]] <- "map"
-      #
-      # gp.score <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
+      check.package("misaem")
 
+      withCallingHandlers({
+        fit <- misaem::miss.lm(formula, data, control = as.list(A[["control"]]))
+      },
+      warning = function(w) {
+        if (conditionMessage(w) != "one argument not used by format '%i '") warning(w)
+        invokeRestart("muffleWarning")
+      })
+
+      if (is_null(A[["saem.method"]])) A[["saem.method"]] <- "map"
+
+      gp.score <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
     }
     else {
-      if (is_null(A$link)) A$link <- "identity"
+      if (is_null(A[["link"]])) A[["link"]] <- "identity"
+      else {
+        if (missing == "saem") acceptable.links <- "identity"
+        else acceptable.links <- c("identity", "log", "inverse")
+
+        which.link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
+        if (is.na(which.link)) {
+          A[["link"]] <- acceptable.links[1]
+          stop(paste0("Only ", word_list(acceptable.links, quotes = TRUE, is.are = TRUE),
+                      " allowed as the link for continuous treatments",
+                      if (missing == "saem") " with missing = \"saem\"", "."),
+               call. = FALSE)
+        }
+        else A[["link"]] <- which.link
+      }
+
       fit <- do.call("glm", c(list(formula, data = data,
                                    weights = s.weights,
-                                   family = gaussian(link = A$link),
+                                   family = gaussian(link = A[["link"]]),
                                    control = as.list(A$control))),
                      quote = TRUE)
 
@@ -1526,10 +1570,9 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal, stabi
     else bw <- A[["base.weight"]]
   }
 
-  eb <- function(C, M, s.weights_t, Q) {
-    #X_t : covariates in control group;
-    #Returns weights for control group
+  reltol <- if_null_then(A[["reltol"]], sqrt(.Machine$double.eps))
 
+  eb <- function(C, s.weights_t, Q) {
     n <- nrow(C)
 
     W <- function(Z) {
@@ -1537,27 +1580,37 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal, stabi
     }
 
     objective.EB <- function(Z) {
-      log(sum(W(Z))) + sum(M * Z)
+      log(sum(W(Z)))
     }
 
     gradient.EB <- function(Z) {
       w <- W(Z)
-      drop(M - w %*% C/sum(w))
+      drop(-(w %*% C)/sum(w))
     }
 
     opt.out <- optim(par = rep(0, ncol(C)),
                      fn = objective.EB,
                      gr = gradient.EB,
                      method = "BFGS",
-                     control = list(trace = 0,
-                                    reltol = if_null_then(A[["reltol"]], sqrt(.Machine$double.eps)),
+                     control = list(trace = 1,
+                                    reltol = reltol,
                                     maxit = if_null_then(A[["maxit"]], 200)))
 
     w <- W(opt.out$par)
+    opt.out$gradient <- gradient.EB(opt.out$par)
+
+    if (opt.out$convergence == 1) {
+      warning("The optimization failed to converge in the alotted number of iterations. Try increasing 'maxit'.", call. = FALSE)
+    }
+    else if (any(abs(opt.out$gradient) > 1e-3)) {
+      warning("The estimated weights do not balance the covariates, indicating the optimization arrived at a degenerate solution. Try decreasing the number of variables supplied to the optimization.", call. = FALSE)
+    }
+
+    if (sum(w) > n*.Machine$double.eps) w <- w*n/sum(w)
 
     list(Z = setNames(opt.out$par, colnames(C)),
-         w = w/(mean(w) * s.weights_t),
-                opt.out = opt.out)
+         w = w/s.weights_t,
+         opt.out = opt.out)
   }
 
   w <- rep(1, length(treat))
@@ -1570,12 +1623,13 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal, stabi
     groups_to_weight <- levels(treat)
     targets <- cobalt::col_w_mean(covs, s.weights = s.weights)
   }
+  covs <- sweep(covs, 2, targets, check.margin = FALSE)
 
   fit.list <- make_list(groups_to_weight)
   for (i in groups_to_weight) {
 
-    fit.list[[i]] <- eb(covs[treat == i,,drop = FALSE], targets,
-                        s.weights[treat == i], bw[treat == i])
+    fit.list[[i]] <- eb(covs[treat == i,,drop = FALSE], s.weights[treat == i],
+                        bw[treat == i])
 
     w[treat == i] <- fit.list[[i]]$w
   }
@@ -1598,67 +1652,107 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, moments, int, mis
     }
   }
 
-  d.moments <- max(if_null_then(A[["d.moments"]], 1), moments)
-  k <- ncol(covs)
-
-  poly.covs <- int.poly.f(covs, poly = d.moments)
-  int.covs <- int.poly.f(covs, int = int)
-  covs <- cbind(covs, poly.covs, int.covs)
-
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
-  # colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
-  # covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
-
   if (is_not_null(A[["base.weights"]])) A[["base.weight"]] <- A[["base.weights"]]
   if (is_null(A[["base.weight"]])) {
-    q <- rep(1, length(treat))
+    bw <- rep(1, length(treat))
   }
   else {
     if (!is.numeric(A[["base.weight"]]) || length(A[["base.weight"]]) != length(treat)) {
       stop("The argument to base.weight must be a numeric vector with length equal to the number of units.", call. = FALSE)
     }
-    else q <- A[["base.weight"]]
+    else bw <- A[["base.weight"]]
   }
 
-  t.mat <- poly(treat, degree = d.moments)
+  bw <- bw[subset]
 
-  treat_sc <- mat_div(center(t.mat, at = cobalt::col_w_mean(t.mat, s.weights)),
-                     cobalt::col_w_sd(t.mat, s.weights))
-  covs_sc <- mat_div(center(covs, at = cobalt::col_w_mean(covs, s.weights)),
-                     cobalt::col_w_sd(covs, s.weights))
+  reltol <- if_null_then(A[["reltol"]], sqrt(.Machine$double.eps))
 
-  kp <- ncol(poly.covs)/(d.moments-1)
-  cov_include <- c(seq_len(k),
-                   if (moments > 1) k + unlist(lapply(seq_len(moments - 1), function(i) i + (d.moments - 1)*(seq_len(kp)-1))),
-                   if (int) seq_col(covs)[-seq_len(k + ncol(poly.covs))])
+  d.moments <- max(if_null_then(A[["d.moments"]], 1), moments)
+  k <- ncol(covs)
 
-  gTX <- do.call("cbind", c(list(treat_sc, covs_sc, treat_sc[,1] * covs_sc[,cov_include])))
+  poly.covs <- int.poly.f(covs, poly = moments)
+  int.covs <- int.poly.f(covs, int = int)
 
-  #----Code written by Stefan Tubbicke---#
-  #define objective function (Lagrange dual)
-  objective.EBCT <- function(theta) {
-    f <- log(mean(q*s.weights*exp(gTX %*% theta)))*nrow(gTX)
-    return(f)
+  treat <- make.closer.to.1(treat)
+  for (i in seq_col(poly.covs)) poly.covs[,i] <- make.closer.to.1(poly.covs[,i])
+  for (i in seq_col(int.covs)) int.covs[,i] <- make.closer.to.1(int.covs[,i])
+  if (d.moments == moments) {
+    d.poly.covs <- poly.covs
+  }
+  else {
+    d.poly.covs <- int.poly.f(covs, poly = d.moments)
+    for (i in seq_col(d.poly.covs)) d.poly.covs[,i] <- make.closer.to.1(d.poly.covs[,i])
+  }
+  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+
+  covs <- cbind(covs, poly.covs, int.covs, d.poly.covs)
+  # colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
+  # covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
+
+  t.mat <- matrix(treat, ncol = 1, dimnames = list(NULL, "treat"))
+  if (d.moments > 1) t.mat <- cbind(t.mat, int.poly.f(t.mat, poly = d.moments))
+
+  treat_c <- sweep(t.mat, 2, cobalt::col_w_mean(t.mat, s.weights))
+  covs_c <- sweep(covs, 2, cobalt::col_w_mean(covs, s.weights))
+
+  covs.ind <- seq_len(k)
+  poly.covs.ind <- k + seq_col(poly.covs)
+  int.covs.ind <- k + ncol(poly.covs) + seq_col(int.covs)
+  d.poly.covs.ind <- k + ncol(poly.covs) + ncol(int.covs) + seq_col(d.poly.covs)
+
+  C <- cbind(treat_c, covs_c[, c(covs.ind, int.covs.ind, d.poly.covs.ind)],
+             treat_c[,1] * covs_c[, c(covs.ind, int.covs.ind, poly.covs.ind)])
+
+  colnames(C) <- c(paste(colnames(treat_c), "(mean)"),
+                   paste(colnames(covs_c)[c(covs.ind, int.covs.ind, d.poly.covs.ind)], "(mean)"),
+                   colnames(covs_c)[c(covs.ind, int.covs.ind, poly.covs.ind)])
+
+  eb <- function(C, s.weights, Q) {
+    n <- nrow(C)
+
+    W <- function(Z) {
+      drop(Q * exp(-C %*% Z))
+    }
+
+    objective.EB <- function(Z) {
+      log(sum(W(Z)))
+    }
+
+    gradient.EB <- function(Z) {
+      w <- W(Z)
+      drop(-(w %*% C)/sum(w))
+    }
+
+    opt.out <- optim(par = rep(0, ncol(C)),
+                     fn = objective.EB,
+                     gr = gradient.EB,
+                     method = "BFGS",
+                     control = list(trace = 0,
+                                    reltol = reltol,
+                                    maxit = if_null_then(A[["maxit"]], 200)))
+
+    w <- W(opt.out$par)
+    opt.out$gradient <- gradient.EB(opt.out$par)
+
+    if (opt.out$convergence == 1) {
+      warning("The optimization failed to converge in the alotted number of iterations. Try increasing 'maxit'.", call. = FALSE)
+    }
+    else if (any(abs(opt.out$gradient) > 1e-3)) {
+      warning("The estimated weights do not balance the covariates, indicating the optimization arrived at a degenerate solution. Try decreasing the number of variables supplied to the optimization.", call. = FALSE)
+    }
+
+    if (sum(w) > n*.Machine$double.eps) w <- w*n/sum(w)
+
+    list(Z = setNames(opt.out$par, colnames(C)),
+         w = w/s.weights,
+         opt.out = opt.out)
   }
 
-  #define gradient function (LHS of equations 8 in Tubbicke (2020))
-  gradient.EBCT<- function(theta) {
-    g <- t(gTX) %*% (q*s.weights*exp(gTX %*% theta)/(mean(q*s.weights*exp(gTX %*% theta))))
-    return(g)
-  }
+  fit <- eb(C, s.weights, bw)
 
-  opt.out <- optim(par = rep(0, ncol(gTX)),
-                   fn = objective.EBCT,
-                   gr = gradient.EBCT,
-                   method = "BFGS",
-                   control = list(trace = TRUE,
-                                  reltol = if_null_then(A[["reltol"]], sqrt(.Machine$double.eps)),
-                                  maxit = if_null_then(A[["maxit"]], 200)))
+  w <- fit$w
 
-  w <-  q*exp(gTX %*% opt.out$par)/(mean(q*exp(gTX %*% opt.out$par)))
-  #--------------------------------------#
-
-  obj <- list(w = w, fit.obj = opt.out)
+  obj <- list(w = w, fit.obj = fit$opt.out)
 
   return(obj)
 }
@@ -1835,7 +1929,7 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
     if (treat.type == "binary" && i == last(levels(treat))) {
       ps[[i]] <- 1 - ps[[1]]
       fit.list <- fit.list[[1]]
-      info <- info[[i]]
+      info <- info[[1]]
       next
     }
 
@@ -2207,44 +2301,61 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal, mis
 
   A <- list(...)
 
-  n <- length(treat)
-  covs <- covs[subset, , drop = FALSE]
-  treat <- factor(treat[subset])
-  s.weights <- s.weights[subset]
-
-  if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
-  treat.type <- get.treat.type(treat)
-
   if (missing == "ind") {
-    missing.ind <- apply(covs[, anyNA_col(covs), drop = FALSE], 2, function(x) as.numeric(is.na(x)))
+    missing.ind <- apply(covs[subset, anyNA_col(covs), drop = FALSE], 2, function(x) as.numeric(is.na(x)))
     if (is_not_null(missing.ind)) {
       covs[is.na(covs)] <- 0
       covs <- cbind(covs, missing.ind)
     }
   }
 
-  covs <- mat_div(center(covs, at = col.w.m(covs, s.weights)),
-                  sqrt(col.w.v(covs, s.weights)))
+  dist.mat <- if_null_then(A[["dist.mat"]], "scaled_euclidean")
+  A[["dist.mat"]] <- NULL
 
-  if (is_not_null(A[["dist.mat"]])) {
-    if (inherits(A[["dist.mat"]], "dist")) A[["dist.mat"]] <- as.matrix(A[["dist.mat"]])
+  if (is.character(dist.mat) && length(dist.mat) == 1L) {
+    dist.covs <- transform_covariates(data = covs, method = dist.mat,
+                                      s.weights = s.weights, discarded = !subset)
+    d <- unname(eucdist_internal(dist.covs))
 
-    if (is.matrix(A[["dist.mat"]]) && all(dim(A[["dist.mat"]]) == n) &&
-        all(check_if_zero(diag(A[["dist.mat"]]))) && !any(A[["dist.mat"]] < 0) &&
-        isSymmetric(unname(A[["dist.mat"]]))) {
-      d <- unname(A[["dist.mat"]][subset, subset])
-    }
-    else stop("'dist.mat' must be a square, symmetric distance matrix with a value for all pairs of units.", call. = FALSE)
+    # dist.mat <- match_arg(dist.mat, c("mahalanobis", "scaled_euclidean", "euclidean"))
+    #
+    # dist.mat <- {
+    #   if (dist.mat == "mahalanobis") {
+    #     mahSigma_inv <- generalized_inverse(cov.wt(covs, s.weights)$cov)
+    #     as.matrix(dist(tcrossprod(covs, chol2(mahSigma_inv))))
+    #   }
+    #   else if (dist.mat == "scaled_euclidean") {
+    #     as.matrix(dist(mat_div(covs, sqrt(col.w.v(covs, s.weights)))))
+    #   }
+    #   else if (dist.mat == "euclidean") {
+    #     as.matrix(dist(covs))
+    #   }
+    # }
   }
-  else d <- as.matrix(dist(covs))
+  else {
+    if (inherits(dist.mat, "dist")) dist.mat <- as.matrix(dist.mat)
+
+    if (!is.matrix(dist.mat) || !all(dim(dist.mat) == length(treat)) ||
+        !all(check_if_zero(diag(dist.mat))) || any(dist.mat < 0) ||
+        !isSymmetric(unname(dist.mat))) {
+      stop(sprintf("'dist.mat' must be one of %s or a square, symmetric distance matrix with a value for all pairs of units.",
+                   word_list(weightit_distances(), "or", quotes = TRUE)), call. = FALSE)
+    }
+
+    d <- unname(dist.mat[subset, subset])
+  }
+
+  covs <- covs[subset, , drop = FALSE]
+  treat <- factor(treat[subset])
+  s.weights <- s.weights[subset]
 
   n <- length(treat)
   levels_treat <- levels(treat)
   diagn <- diag(n)
 
   min.w <- if_null_then(A[["min.w"]], 1e-8)
-  if (!is.numeric(min.w) || length(min.w) != 1 || min.w < 0) {
-    warning("'min.w' must be a nonnegative number. Setting min.w = 1e-8.", call. = FALSE, immediate. = TRUE)
+  if (!is.numeric(min.w) || length(min.w) != 1) {
+    warning("'min.w' must be a single number. Setting min.w = 1e-8.", call. = FALSE, immediate. = TRUE)
     min.w <- 1e-8
   }
 
@@ -2293,7 +2404,7 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal, mis
   }
 
   #Add weight penalty
-  if (is_not_null(A[["lambda"]])) diag(M2) <- diag(M2) + A[["lambda"]] / n
+  if (is_not_null(A[["lambda"]])) diag(M2) <- diag(M2) + A[["lambda"]] / n^2
 
   if (moments != 0 || int) {
     #Exactly balance moments and/or interactions

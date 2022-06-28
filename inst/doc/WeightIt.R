@@ -9,27 +9,30 @@ head(lalonde)
 ## -----------------------------------------------------------------------------
 library("cobalt")
 bal.tab(treat ~ age + educ + race + married + nodegree + re74 + re75,
-        data = lalonde, estimand = "ATT", m.threshold = .05)
+        data = lalonde, estimand = "ATT", thresholds = c(m = .05))
 
 ## -----------------------------------------------------------------------------
 library("WeightIt")
 W.out <- weightit(treat ~ age + educ + race + married + nodegree + re74 + re75,
-        data = lalonde, estimand = "ATT", method = "ps")
+                  data = lalonde, estimand = "ATT", method = "ps")
 W.out #print the output
 
 ## -----------------------------------------------------------------------------
 summary(W.out)
 
 ## -----------------------------------------------------------------------------
-bal.tab(W.out, m.threshold = .05, disp.v.ratio = TRUE)
+bal.tab(W.out, stats = c("m", "v"), thresholds = c(m = .05))
 
 ## -----------------------------------------------------------------------------
 W.out <- weightit(treat ~ age + educ + race + married + nodegree + re74 + re75,
-        data = lalonde, estimand = "ATT", method = "ebal")
+                  data = lalonde, estimand = "ATT", method = "ebal")
 summary(W.out)
 
 ## -----------------------------------------------------------------------------
-bal.tab(W.out, m.threshold = .05, disp.v.ratio = TRUE)
+bal.tab(W.out, stats = c("m", "v"), thresholds = c(m = .05))
+
+## ---- include=FALSE-----------------------------------------------------------
+knitr::opts_chunk$set(eval = requireNamespace("survey", quietly = TRUE))
 
 ## ---- message=FALSE-----------------------------------------------------------
 library(survey)
@@ -42,17 +45,23 @@ coef(fit)
 summary(fit)
 confint(fit)
 
+## ---- include=FALSE, eval=TRUE------------------------------------------------
+knitr::opts_chunk$set(eval = requireNamespace("boot", quietly = TRUE))
+
 ## ---- warning=FALSE, message=FALSE--------------------------------------------
 #Bootstrapping
 library("boot")
 est.fun <- function(data, index) {
   W.out <- weightit(treat ~ age + educ + race + married + nodegree + re74 + re75,
-        data = data[index,], estimand = "ATT", method = "ebal")
+                    data = data[index,], estimand = "ATT", method = "ebal")
   fit <- glm(re78 ~ treat, data = data[index,], weights = W.out$weights)
   return(coef(fit)["treat"])
 }
 boot.out <- boot(est.fun, data = lalonde, R = 999)
 boot.ci(boot.out, type = "bca") #type shouldn't matter so much
+
+## ---- include=FALSE, eval=TRUE------------------------------------------------
+knitr::opts_chunk$set(eval = all(sapply(c("twang", "survey"), requireNamespace, quietly = TRUE)))
 
 ## -----------------------------------------------------------------------------
 data("iptwExWide", package = "twang")
@@ -68,16 +77,18 @@ bal.tab(list(tx1 ~ age + gender + use0,
 
 ## -----------------------------------------------------------------------------
 Wmsm.out <- weightitMSM(list(tx1 ~ age + gender + use0,
-             tx2 ~ tx1 + use1 + age + gender + use0,
-             tx3 ~ tx2 + use2 + tx1 + use1 + age + gender + use0),
-        data = iptwExWide, method = "ps")
+                             tx2 ~ tx1 + use1 + age + gender + use0,
+                             tx3 ~ tx2 + use2 + tx1 + use1 + age + gender + use0),
+                        data = iptwExWide, method = "ps",
+                        stabilize = TRUE)
 Wmsm.out
 
 ## -----------------------------------------------------------------------------
 summary(Wmsm.out)
 
 ## -----------------------------------------------------------------------------
-bal.tab(Wmsm.out, m.threshold = .05, disp.ks = TRUE, which.time = .none)
+bal.tab(Wmsm.out, stats = c("m", "ks"), thresholds = c(m = .05),
+        which.time = .none)
 
 ## ---- message=FALSE-----------------------------------------------------------
 library("survey")
@@ -95,4 +106,7 @@ anova(full.fit, cum.fit)
 ## -----------------------------------------------------------------------------
 summary(cum.fit)
 confint(cum.fit)
+
+## ---- include=FALSE, eval=TRUE------------------------------------------------
+knitr::opts_chunk$set(eval = TRUE)
 

@@ -43,7 +43,7 @@ All arguments take on the defaults of those in \code{ATE}.
 \section{Additional Outputs}{
 \describe{
 \item{\code{obj}}{
-When \code{include.obj = TRUE}, the empirical balancing calibration model fit. For binary treatments with \code{estimand = "ATT"}, the output of the call to \pkgfun2{ATE}{ATE}{ATE::ATE}. For binary treatments with \code{estimand = "ATE"} and multinomial treatments, a list of outputs of calls to \code{ATE::ATE()}.
+When \code{include.obj = TRUE}, the empirical balancing calibration model fit. For binary treatments with \code{estimand = "ATT"}, the output of the call to \pkgfun{ATE}{ATE}. For binary treatments with \code{estimand = "ATE"} and multinomial treatments, a list of outputs of calls to \code{ATE::ATE()}.
 }
 }
 }
@@ -56,7 +56,7 @@ Chan, K. C. G., Yam, S. C. P., & Zhang, Z. (2016). Globally efficient non-parame
 \fun{weightit}
 }
 
-\examples{
+\examples{\dontshow{if (requireNamespace("ATE", quietly = TRUE)) force(\{ # examplesIf}
 library("cobalt")
 data("lalonde", package = "cobalt")
 
@@ -73,5 +73,4 @@ bal.tab(W1)
                 method = "ebcw", estimand = "ATE"))
 summary(W2)
 bal.tab(W2)
-
-}
+\dontshow{\}) # examplesIf}}

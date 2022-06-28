@@ -54,7 +54,7 @@ A data frame of dual variables for each balance constraint.
 }
 }
 \item{\code{obj}}{
-When \code{include.obj = TRUE}, the output of the call to \pkgfun2{optweight}{optweight}{optweight::optweight}.
+When \code{include.obj = TRUE}, the output of the call to \pkgfun{optweight}{optweight}.
 }
 }
 }
@@ -88,9 +88,9 @@ Greifer, N. (2020). Estimating Balancing Weights for Continuous Treatments Using
 \seealso{
 \fun{weightit}, \fun{weightitMSM}
 
-\pkgfun2{optweight}{optweight}{optweight::optweight} for the fitting function
+\pkgfun{optweight}{optweight} for the fitting function
 }
-\examples{
+\examples{\dontshow{if (all(sapply(c("optweight", "osqp"), requireNamespace, quietly = TRUE))) force(\{ # examplesIf}
 library("cobalt")
 data("lalonde", package = "cobalt")
 
@@ -116,4 +116,4 @@ bal.tab(W2)
                 method = "optweight", tols = .05))
 summary(W3)
 bal.tab(W3)
-}
+\dontshow{\}) # examplesIf}}
