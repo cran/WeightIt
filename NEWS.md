@@ -1,9 +1,37 @@
 WeightIt News and Updates
 ======
 
+# WeightIt 0.14.0
+
+* Added energy balancing for continuous treatments, requested using `method = "energy"`, as described in [Huling et al. (2021)](https://arxiv.org/abs/2107.07086). These weights minimize the distance covariance between the treatment and covariates while maintaining representativeness. This method supports exact balance constraints, distributional balance constraints, and sampling weights. The implementation is similar to that in the `independenceWeights` package. See `?method_energy` for details.
+
+* Added a new vignette on estimating effects after weighting, accessible using `vignette("estimating-effects", package = "WeightIt")`. The new workflow relies on the `marginaleffects` package. The main vignette (`vignette("WeightIt")`) has been modernized as well.
+
+* Added a new dataset, `msmdata`, to demonstrate capabilities for longitudinal treatments. `twang` is no longer a dependency.
+
+* Methods that use a balance criterion to select a tuning parameter, in particular GBM and balance Super Learner, now rely on `cobalt`'s `bal.init()` and `bal.compute()` functionality, which adds new balance criteria. The `stop.method` argument for these functions has been renamed to `criterion` and `help("stop.method")` has been removed; the same page is now available at `help("bal.compute", package = "cobalt")`, which describes the additional statistics available. This also fixes some bugs that were present in some balance criteria.
+
+* Renamed `method = "ps"` to `method = "glm"`. `"ps"` continues to work as it always had for back compatibility. `"glm"` is a more descriptive name since many methods use propensity scores; what distinguishes this method is that it uses generalized linear models.
+
+* Using `method = "ebcw"` for empirical balancing calibration weighting is no longer available because the `ATE` package has been removed. Use `method = "ebal"` for entropy balancing instead, which is essentially identical.
+
+* Updated the `trim()` documentation to clarify the form of trimming that is implemented (i.e., winsorizing). Suggested by David Novgorodsky.
+
+* Fixed bugs when some `s.weights` are equal to zero with `method = "ebal"`, "`cbps"`, and `"energy"`. Suggested by @statzhero. (#41)
+
+* Improved performance of `method = "energy"` for the ATT.
+
+* Fixed a bug when using `method = "energy"` with `by`.
+
+* With `method = "energy"`, setting `int = TRUE` automatically sets `moments = 1` if unspecified.
+
+* Errors and warnings have been updated to use `chk`.
+
+* The missingness indicator approach now imputes the variable median rather than 0 for missing values. This will not change the performance of most methods, but change others, and doesn't affect balance assessment.
+
 # WeightIt 0.13.1
 
-* For ordinal multicategory treatments, setting `link = "br.logit"` now uses `brglm2::bracl()` to fit a bias-reduced ordinal regression model.
+* For ordinal multi-category treatments, setting `link = "br.logit"` now uses `brglm2::bracl()` to fit a bias-reduced ordinal regression model.
 
 * Added the vignette "Installing Supporting Packages" to explain how to install the various packages that might be needed for `WeightIt` to use certain methods, including when the package is not on CRAN. See the vignette at `vignette("installing-packages")`.
 

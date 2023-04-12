@@ -1,4 +1,4 @@
-weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stabilize = FALSE, focal = NULL,
+weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", stabilize = FALSE, focal = NULL,
                      by = NULL, s.weights = NULL, ps = NULL, moments = NULL, int = FALSE, subclass = NULL,
                      missing = NULL, verbose = FALSE, include.obj = FALSE, ...) {
 
@@ -6,10 +6,9 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   A <- list(...)
 
-
   #Checks
-  if (is_null(formula) || is_null(class(formula)) || !is.formula(formula, 2)) {
-    stop("'formula' must be a formula relating treatment to covariates.", call. = FALSE)
+  if (is_null(formula) || !rlang::is_formula(formula, lhs = TRUE)) {
+    .err("`formula` must be a formula relating treatment to covariates")
   }
 
   #Process treat and covs from formula and data
@@ -19,16 +18,20 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   treat <- t.c[["treat"]]
   # treat.name <- t.c[["treat.name"]]
 
-  if (is_null(covs)) stop("No covariates were specified.", call. = FALSE)
-  if (is_null(treat)) stop("No treatment variable was specified.", call. = FALSE)
+  if (is_null(covs)) {
+    .err("no covariates were specified")
+  }
+  if (is_null(treat)) {
+    .err("no treatment variable was specified")
+  }
   if (length(treat) != nrow(covs)) {
-    stop("The treatment and covariates must have the same number of units.", call. = FALSE)
+    .err("the treatment and covariates must have the same number of units")
   }
 
   n <- length(treat)
 
   if (anyNA(treat)) {
-    stop("No missing values are allowed in the treatment variable.", call. = FALSE)
+    .err("no missing values are allowed in the treatment variable")
   }
 
   #Get treat type
@@ -38,7 +41,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
   #Process ps
   ps <- process.ps(ps, data, treat)
   if (is_not_null(ps)) {
-    method <- "ps"
+    method <- "glm"
   }
 
   ##Process method
@@ -77,7 +80,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   ##Process by
   if (is_not_null(A[["exact"]])) {
-    message("'by' has replaced 'exact' in the weightit() syntax, but 'exact' will always work.")
+    .msg("`by` has replaced `exact` in the `weightit()` syntax, but `exact` will always work")
     by <- A[["exact"]]
     by.arg <- "exact"
   }
@@ -137,7 +140,7 @@ weightit <- function(formula, data = NULL, method = "ps", estimand = "ATE", stab
 
   class(out) <- "weightit"
 
-  return(out)
+  out
   ####----
 }
 
@@ -250,7 +253,7 @@ summary.weightit <- function(object, top = 5, ignore.s.weights = FALSE, ...) {
     }
   }
   else if (treat.type == "ordinal") {
-    stop("Sneaky, sneaky! Ordinal coming soon :)", call. = FALSE)
+    .err("Sneaky, sneaky! Ordinal coming one day :)", tidy = FALSE)
   }
 
   out$effective.sample.size <- nn
@@ -274,7 +277,9 @@ print.summary.weightit <- function(x, ...) {
                             matrix(do.call("c", lapply(x$weight.top, function(x) c(names(x), rep("", top - length(x)), round(x, 4), rep("", top - length(x))))),
                                    byrow = TRUE, nrow = 2*length(x$weight.top))),
                  rep("", 1 + top))
-  cat("\n- " %+% italic("Units with", top, "most extreme weights by group") %+% ":\n")
+  cat("\n- " %+% italic(sprintf("Units with the %s most extreme weights%s",
+                        top, ngettext(length(x$weight.top), "",
+                                      " by group"))) %+% ":\n")
   print.data.frame(df, row.names = FALSE)
   cat("\n- " %+% italic("Weight statistics") %+% ":\n\n")
   print.data.frame(round_df_char(setNames(as.data.frame(cbind(x$coef.of.var,

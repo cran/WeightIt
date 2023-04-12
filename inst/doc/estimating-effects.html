@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Noah Greifer" />
+
+<meta name="date" content="2023-04-12" />
+
+<title>Estimating Effects After Weighting</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+<style type="text/css">
+
+div.csl-bib-body { }
+div.csl-entry {
+clear: both;
+}
+.hanging div.csl-entry {
+margin-left:2em;
+text-indent:-2em;
+}
+div.csl-left-margin {
+min-width:2em;
+float:left;
+}
+div.csl-right-inline {
+margin-left:2em;
+padding-left:1em;
+}
+div.csl-indent {
+margin-left: 2em;
+}
+</style>
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Estimating Effects After Weighting</h1>
+<h4 class="author">Noah Greifer</h4>
+<h4 class="date">2023-04-12</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction" id="toc-introduction">Introduction</a>
+<ul>
+<li><a href="#identifying-the-estimand" id="toc-identifying-the-estimand">Identifying the estimand</a></li>
+<li><a href="#g-computation" id="toc-g-computation">G-computation</a></li>
+<li><a href="#modeling-the-outcome" id="toc-modeling-the-outcome">Modeling the Outcome</a></li>
+<li><a href="#estimating-standard-errors-and-confidence-intervals" id="toc-estimating-standard-errors-and-confidence-intervals">Estimating
+Standard Errors and Confidence Intervals</a></li>
+</ul></li>
+<li><a href="#estimating-treatment-effects-and-standard-errors-after-weighting" id="toc-estimating-treatment-effects-and-standard-errors-after-weighting">Estimating
+Treatment Effects and Standard Errors After Weighting</a>
+<ul>
+<li><a href="#the-standard-case-using-robust-ses" id="toc-the-standard-case-using-robust-ses">The Standard Case using
+Robust SEs</a></li>
+<li><a href="#adjustments-to-the-standard-case" id="toc-adjustments-to-the-standard-case">Adjustments to the Standard
+Case</a></li>
+<li><a href="#using-bootstrapping-to-estimate-confidence-intervals" id="toc-using-bootstrapping-to-estimate-confidence-intervals">Using
+Bootstrapping to Estimate Confidence Intervals</a></li>
+<li><a href="#longitudinal-treatments" id="toc-longitudinal-treatments">Longitudinal Treatments</a></li>
+</ul></li>
+<li><a href="#reporting-results" id="toc-reporting-results">Reporting
+Results</a></li>
+<li><a href="#references" id="toc-references">References</a></li>
+<li><a href="#code-to-generate-data-used-in-examples" id="toc-code-to-generate-data-used-in-examples">Code to Generate Data
+used in Examples</a></li>
+</ul>
+</div>
+
+<style>
+pre {
+overflow-x: auto;
+}
+pre code {
+word-wrap: normal;
+white-space: pre;
+}
+</style>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>After assessing balance and deciding on a weighting specification, it
+comes time to estimate the effect of the treatment in the weighted
+sample. How the effect is estimated and interpreted depends on the
+desired estimand and the type of model used (if any). In addition to
+estimating effects, estimating the uncertainty of the effects is
+critical in communicating them and assessing whether the observed effect
+is compatible with there being no effect in the population. This guide
+explains how to estimate effects after weighting for point and
+longitudinal treatments and with various outcome types.</p>
+<p>This guide is structured as follows: first, information on the
+concepts related to effect and standard error (SE) estimation is
+presented below. Then, instructions for how to estimate effects and SEs
+are described for the standard case (weighting for the ATE with a
+continuous outcome) and some other common circumstances. Finally,
+recommendations for reporting results and tips to avoid making common
+mistakes are presented.</p>
+<p>(Note: much of this vignette is copied from
+<code>vignette(&quot;estimating-effects&quot;, package = &quot;MatchIt&quot;)</code> and
+adapt to the context of weighting.)</p>
+<div id="identifying-the-estimand" class="section level3">
+<h3>Identifying the estimand</h3>
+<p>Before an effect is estimated, the estimand must be specified and
+clarified. Although some aspects of the estimand depend not only on how
+the effect is estimated after weighting but also on the weighting method
+itself, other aspects must be considered at the time of effect
+estimation and interpretation. Here, we consider three aspects of the
+estimand: the population the effect is meant to generalize to (the
+target population), the effect measure, and whether the effect is
+marginal or conditional.</p>
+<p><strong>The target population.</strong> Different weighting methods
+allow you to estimate effects that can generalize to different target
+populations. The most common estimand in weighting is the average
+treatment effect in the population (ATE), which is the average effect of
+treatment for the population from which the sample is a random sample.
+Other common estimands include the average treatment effect in the
+treated (ATT), the average treatment effect in the control (ATC), and
+the average treatment effect in the overlap (ATO). These are defined and
+explained in <span class="citation">Greifer and Stuart (<a href="#ref-greiferChoosingEstimandWhen2021" role="doc-biblioref">2021</a>)</span>. The estimand for weighting is
+controlled by the <code>estimand</code> argument in the call to
+<code>weightit()</code>. Other allowable estimands for some weighting
+methods include the average treatment effect in the matched sample (ATM)
+and the average treatment effect in the optimal subset (ATOS). These are
+treated just like the ATO and will not be differentiated further.</p>
+<p><strong>Marginal and conditional effects.</strong> A marginal effect
+is a comparison between the expected potential outcome under treatment
+and the expected potential outcome under control. This is the same
+quantity estimated in randomized trials without blocking or covariate
+adjustment and is particularly useful for quantifying the overall effect
+of a policy or population-wide intervention. A conditional effect is the
+comparison between the expected potential outcomes in the treatment
+groups within strata. This is useful for identifying the effect of a
+treatment for an individual patient or a subset of the population.</p>
+<p><strong>Effect measures.</strong> The outcome types we consider here
+are continuous, with the effect measured by the mean difference; binary,
+with the effect measured by the risk difference (RD), risk ratio (RR),
+or odds ratio (OR); and time-to-event (i.e., survival), with the effect
+measured by the hazard ratio (HR). The RR, OR, and HR are
+<em>noncollapsible</em> effect measures, which means the marginal effect
+on that scale is not a (possibly) weighted average of the conditional
+effects within strata, even if the stratum-specific effects are of the
+same magnitude. For these effect measures, it is critical to distinguish
+between marginal and conditional effects because different statistical
+methods target different types of effects. The mean difference and RD
+are <em>collapsible</em> effect measures, so the same methods can be
+used to estimate marginal and conditional effects.</p>
+<p>Our primary focus will be on marginal effects, which are appropriate
+for all effect measures, easily interpretable, and require few modeling
+assumptions. The “Common Mistakes” section includes examples of commonly
+used methods that estimate conditional rather than marginal effects and
+should not be used when marginal effects are desired.</p>
+</div>
+<div id="g-computation" class="section level3">
+<h3>G-computation</h3>
+<p>To estimate marginal effects, we use a method known as g-computation
+<span class="citation">(<a href="#ref-snowdenImplementationGComputationSimulated2011" role="doc-biblioref">Snowden, Rose, and Mortimer 2011</a>)</span> or
+regression estimation <span class="citation">(<a href="#ref-schaferAverageCausalEffects2008" role="doc-biblioref">Schafer
+and Kang 2008</a>)</span>. This involves first specifying a model for
+the outcome as a function of the treatment and covariates. Then, for
+each unit, we compute their predicted values of the outcome setting
+their treatment status to treated, and then again for control, leaving
+us with two predicted outcome values for each unit, which are estimates
+of the potential outcomes under each treatment level. We compute the
+mean of each of the estimated potential outcomes across the entire
+sample, which leaves us with two average estimated potential outcomes.
+Finally, the contrast of these average estimated potential outcomes
+(e.g., their difference or ratio, depending on the effect measure
+desired) is the estimate of the treatment effect.</p>
+<p>When doing g-computation after weighting, a few additional
+considerations are required. First, the outcome model should be fit
+incorporating the estimated weights (e.g., using weighted least squares
+or weighted maximum liklihood estimation). Second, when we take the
+average of the estimated potential outcomes under each treatment level,
+this must be a weighted average that incorporates the estimated weights.
+Third, if we want to target the ATT or ATC, we only estimate potential
+outcomes for the treated or control group, respectively (though we still
+generate predicted values under both treatment and control).</p>
+<p>G-computation as a framework for estimating effects after weighting
+has a number of advantages over other approaches. It works the same
+regardless of the form of the outcome model or type of outcome (e.g.,
+whether a linear model is used for a continuous outcome or a logistic
+model is used for a binary outcome); the only difference might be how
+the average expected potential outcomes are contrasted in the final
+step. In simple cases, the estimated effect is numerically identical to
+effects estimated using other methods; for example, if no covariates are
+included in the outcome model, the g-computation estimate is equal to
+the difference in means from a t-test or coefficient of the treatment in
+a linear model for the outcome. There are analytic and bootstrap
+approximations to the SEs of the g-computation estimate. The analytic
+approximation is computed using the delta method, a technique for
+compute the SE of a quantity derived from the regression model
+parameters, such as the g-computation estimate.</p>
+<p>For the reasons above, we use g-computation when possible for all
+effect estimates, even if there are simpler methods that would yield the
+same estimates. Using a single workflow (with some slight modifications
+depending on the context; see below) facilitates implementing best
+practices regardless of what choices a user makes.</p>
+<p>There are other methods to incorporate the outcome model into
+estimation of the treatment effect, the best studied of which is
+augmented inverse probability weighting (AIPW), which also involves a
+g-computation step. We only describe g-computation here because of its
+conceptual simplicity, ease of implementation, and connection with best
+practices for estimating effects after weighting.</p>
+</div>
+<div id="modeling-the-outcome" class="section level3">
+<h3>Modeling the Outcome</h3>
+<p>The goal of the outcome model is to generate good predictions for use
+in the g-computation procedure described above. The type and form of the
+outcome model should depend on the outcome type. For continuous
+outcomes, one can use a linear model regressing the outcome on the
+treatment; for binary outcomes, one can use a generalized linear model
+with, e.g., a logistic link; for time-to-event outcomes, one can use a
+Cox proportional hazards model.</p>
+<p>An additional decision to make is whether (and how) to include
+covariates in the outcome model. One may ask, why use weighting at all
+if you are going to model the outcome with covariates anyway? Weighting
+reduces the dependence of the effect estimate on correct specification
+of the outcome model; this is the central thesis of <span class="citation">Ho et al. (<a href="#ref-hoMatchingNonparametricPreprocessing2007" role="doc-biblioref">2007</a>)</span> (though applied to matching in
+their case). Including covariates in the outcome model after weighting
+has several functions: it can increase precision in the effect estimate,
+reduce the bias due to residual imbalance, and make the effect estimate
+“doubly robust”, which means it is consistent if either the weighting
+reduces sufficient imbalance in the covariates or if the outcome model
+is correct. For these reasons, we recommend covariate adjustment after
+weighting when possible. There is some evidence that covariate
+adjustment is most helpful for covariates with standardized mean
+differences greater than .1 <span class="citation">(<a href="#ref-nguyenDoubleadjustmentPropensityScore2017" role="doc-biblioref">Nguyen et al. 2017</a>)</span>, so these covariates
+and covariates thought to be highly predictive of the outcome should be
+prioritized in treatment effect models if not all can be included due to
+sample size constraints.</p>
+<p>Although there are many possible ways to include covariates (e.g.,
+not just main effects but interactions, smoothing terms like splines, or
+other nonlinear transformations), it is important not to engage in
+specification search (i.e., trying many outcomes models in search of the
+“best” one). Doing so can invalidate results and yield a conclusion that
+fails to replicate. For this reason, we recommend only including the
+same terms included in the weighting model unless there is a strong
+<em>a priori</em> and justifiable reason to model the outcome
+differently.</p>
+<p>It is important not to interpret the coefficients and tests of
+covariates in the outcome model. These are not causal effects and their
+estimates may be severely confounded. Only the treatment effect estimate
+can be interpreted as causal assuming the relevant assumptions about
+unconfoundedness are met. Inappropriately interpreting the coefficients
+of covariates in the outcome model is known as the Table 2 fallacy <span class="citation">(<a href="#ref-westreichTableFallacyPresenting2013" role="doc-biblioref">Westreich and Greenland 2013</a>)</span>. To avoid
+this, we only display the results of the g-computation procedure and do
+not examine or interpret the outcome models themselves.</p>
+</div>
+<div id="estimating-standard-errors-and-confidence-intervals" class="section level3">
+<h3>Estimating Standard Errors and Confidence Intervals</h3>
+<p>Uncertainty estimation (i.e., of SEs, confidence intervals, and
+p-values) may consider the variety of sources of uncertainty present in
+the analysis, including (but not limited to!) estimation of the
+propensity score (if used) and estimation of the treatment effect (i.e.,
+because of sampling error). For some methods, methods for analytically
+computing the correct asymptotic SE have been described. These often
+require custom coding or are limited to specific weighting methods and
+estimands<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>. Instead, we consider two approximations to
+the analytic SE: robust SEs and the bootstrap, described below.</p>
+<div id="robust-and-cluster-robust-standard-errors" class="section level4">
+<h4>Robust and Cluster-Robust Standard Errors</h4>
+<p><strong>Robust standard errors.</strong> Also known as sandwich SEs
+(due to the form of the formula for computing them),
+heteroscedasticity-consistent SEs, or Huber-White SEs, robust SEs are an
+adjustment to the usual maximum likelihood or ordinary least squares SEs
+that are robust to violations of some of the assumptions required for
+usual SEs to be valid <span class="citation">(<a href="#ref-mackinnonHeteroskedasticityconsistentCovarianceMatrix1985" role="doc-biblioref">MacKinnon and White 1985</a>)</span>. Robust SEs
+have been shown to be conservative (i.e., yield overly large SEs and
+wide confidence intervals) for estimating the ATE after some forms of
+weighting <span class="citation">(<a href="#ref-robinsMarginalStructuralModels2000" role="doc-biblioref">Robins, Hernán, and Brumback 2000</a>)</span>,
+though they can be either conservative or not for other weighting
+methods and estimands, such as for the ATT <span class="citation">(<a href="#ref-reifeisVarianceTreatmentEffect2020" role="doc-biblioref">Reifeis and Hudgens 2020</a>)</span> or for entropy
+balancing <span class="citation">(<a href="#ref-chanGloballyEfficientNonparametric2016" role="doc-biblioref">Chan, Yam, and Zhang 2016</a>)</span>. Robust SEs
+treated the estimated weights as if they were fixed and known, ignoring
+uncertainty in their estimation. Although they are quick and simple to
+estimate using functionality in the <code>sandwich</code> and
+<code>survey</code> packages, they should be used with caution, and the
+bootstrap (described below) should be preferred in most cases.</p>
+</div>
+<div id="bootstrapping" class="section level4">
+<h4>Bootstrapping</h4>
+<p>Some problems with robust SEs include that they fail to take into
+account the estimation fo the weights and are only an approximation when
+used to compute derived quantities from nonlinear models, which is often
+true when using g-computation to estimate effects. One solution to these
+problems is bootstrapping, which is a technique used to simulate the
+sampling distribution of an estimator by repeatedly drawing samples with
+replacement and estimating the effect in each bootstrap sample <span class="citation">(<a href="#ref-efronBootstrapMethodsStandard1986" role="doc-biblioref">Efron and Tibshirani 1986</a>)</span>. From the
+bootstrap distribution, SEs and confidence intervals can be computed in
+several ways, including using the standard deviation of the bootstrap
+estimates as the SE estimate or using the 2.5 and 97.5 percentiles as
+95% confidence interval bounds. Bootstrapping tends to be most useful
+when no analytic estimator of a SE is possible or has been derived yet.
+Bootstrapping has been found to be effective at estimating SEs and
+confidence after weighting, often performing better even than the
+analytic asymptotic formula when it is available <span class="citation">(<a href="#ref-austin2022" role="doc-biblioref">Austin
+2022</a>)</span>.</p>
+<p>Typically, bootstrapping involves performing the entire estimation
+process in each bootstrap sample, including estimation both of the
+weights and the effect. With bootstrapping, more bootstrap replications
+are always better but can take time and increase the chances that at
+least one error will occur within the bootstrap analysis (e.g., a
+bootstrap sample with zero treated units or zero units with an event).
+In general, numbers of replications upwards of 999 are recommended, with
+values one less than a multiple of 100 preferred to avoid interpolation
+when using the percentiles as confidence interval limits <span class="citation">(<a href="#ref-mackinnonBootstrapMethodsEconometrics2006" role="doc-biblioref">MacKinnon 2006</a>)</span>. There are several
+methods of computing bootstrap confidence intervals, but the
+bias-corrected accelerated (BCa) bootstrap confidence interval often
+performs well and is easy to implement, simply by setting
+<code>type = &quot;bca&quot;</code> in the call to <code>boot::boot.ci()</code>
+after running <code>boot::boot()</code><a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a>.</p>
+</div>
+</div>
+</div>
+<div id="estimating-treatment-effects-and-standard-errors-after-weighting" class="section level2">
+<h2>Estimating Treatment Effects and Standard Errors After
+Weighting</h2>
+<p>Below, we describe effect estimation after weighting. The focus here
+is not on evaluating the methods but simply on demonstrating them. In
+all cases, the correct propensity score model is used. We will present
+both the faster and simpler method that uses robust SEs and the more
+complicated but accurate method using bootstrapping.</p>
+<p>We’ll be using a simulated toy dataset <code>d</code> with several
+outcome types. Code to generate the dataset is at the end of this
+document. Below we display the first six rows of <code>d</code>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(d)</span></code></pre></div>
+<pre><code>##   A      X1      X2      X3       X4 X5      X6      X7      X8       X9      Y_C Y_B     Y_S
+## 1 0  0.1725 -1.4283 -0.4103 -2.36059  1 -1.1199  0.6398 -0.4840 -0.59385  0.07104   0  278.46
+## 2 0 -1.0959  0.8463  0.2456 -0.12333  1 -2.2687 -1.4491 -0.5514 -0.31439  0.15619   0  330.63
+## 3 0  0.1768  0.7905 -0.8436  0.82366  1 -0.2221  0.2971 -0.6966 -0.69516 -0.85180   1  369.94
+## 4 0 -0.4595  0.1726  1.9542 -0.62661  1 -0.4019 -0.8294 -0.5384  0.20729 -2.35184   0   91.06
+## 5 1  0.3563 -1.8121  0.8135 -0.67189  1 -0.8297  1.7297 -0.6439 -0.02648  0.68058   0  182.73
+## 6 0 -2.4313 -1.7984 -1.2940  0.04609  1 -1.2419 -1.1252 -1.8659 -0.56513 -5.62260   0 2563.73</code></pre>
+<p><code>A</code> is the treatment variable, <code>X1</code> through
+<code>X9</code> are covariates, <code>Y_C</code> is a continuous
+outcome, <code>Y_B</code> is a binary outcome, and <code>Y_S</code> is a
+survival outcome.</p>
+<p>We will need to the following packages to perform the analyses:</p>
+<ul>
+<li><code>marginaleffects</code> provides the
+<code>avg_comparisons()</code> function for performing g-computation and
+estimating the SEs and confidence intervals of the average estimate
+potential outcomes and treatment effects</li>
+<li><code>sandwich</code> is used internally by
+<code>marginaleffects</code> to compute robust and cluster-robust
+SEs</li>
+<li><code>survival</code> provides <code>coxph()</code> to estimate the
+coefficients in a Cox-proportional hazards model for the marginal hazard
+ratio, which we will use for survival outcomes</li>
+<li><code>boot</code> provides <code>boot()</code> and
+<code>boot.ci()</code> for performing bootstrapping and computing
+bootstrap confidence intervals</li>
+</ul>
+<p>Of course, we also need <code>WeightIt</code> to perform the
+weighting.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;WeightIt&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span></code></pre></div>
+<p>All effect estimates will be computed using
+<code>marginaleffects::avg_comparions()</code>, even when its use may be
+superfluous (e.g., for comparing the weighted difference in means). As
+previously mentioned, this is because it is useful to have a single
+workflow that works no matter the situation, perhaps with very slight
+modifications to accommodate different contexts. Using
+<code>avg_comparisons()</code> has several advantages, even when the
+alternatives are simple: it only provides the effect estimate, and not
+other coefficients; it automatically incorporates robust SEs if
+requested; and it always produces average marginal effects for the
+correct population if requested.</p>
+<p>Other packages may be of use but are not used here. There are
+alternatives to the <code>marginaleffects</code> package for computing
+average marginal effects, including <code>margins</code> and
+<code>stdReg</code>. The <code>survey</code> package can be used to
+estimate robust SEs incorporating weights and provides functions for
+survey-weighted generalized linear models and Cox-proportional hazards
+models. Much of the code here can be adapted to be used with
+<code>survey</code>, and we will demonstrate that as well.</p>
+<div id="the-standard-case-using-robust-ses" class="section level3">
+<h3>The Standard Case using Robust SEs</h3>
+<p>For most weighting methods, estimating the effect after weighting is
+straightforward and involves fitting a model for the outcome that
+incorporates the estimated weights, then estimating the treatment effect
+using g-computation (i.e., using
+<code>marginaleffects::avg_comparisons()</code>) with a robust SE to
+account for pair membership. This procedure is the same for continuous
+and binary outcomes with and without covariates.</p>
+<p>There are a few adjustments that need to be made for certain
+scenarios, which we describe in the section “Adjustments to the Standard
+Case”. These adjustments include for the following cases: when weighting
+for the ATT or ATC, for estimating effects with binary outcomes, and for
+estimating effects with survival outcomes. Estimation for all estimands
+other than the ATT and ATC proceeds as it does for the ATE. You must
+read the Standard Case to understand the basic procedure before reading
+about these special scenarios.</p>
+<p>Here, we demonstrate the faster analytic approach to estimating
+confidence intervals; for the bootstrap approach, see the section “Using
+Bootstrapping to Estimate Confidence Intervals” below.</p>
+<p>First, we will perform propensity score weighting for the ATE.
+Remember, all weighting methods use this exact procedure or a slight
+variation, so this section is critical even if you are using a different
+weighting method.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">#PS weighting for the ATE with a logistic regression PS</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>W <span class="ot">&lt;-</span> <span class="fu">weightit</span>(A <span class="sc">~</span> X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9, <span class="at">data =</span> d,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>              <span class="at">method =</span> <span class="st">&quot;glm&quot;</span>, <span class="at">estimand =</span> <span class="st">&quot;ATE&quot;</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>W</span></code></pre></div>
+<pre><code>## A weightit object
+##  - method: &quot;glm&quot; (propensity score weighting with GLM)
+##  - number of obs.: 2000
+##  - sampling weights: none
+##  - treatment: 2-category
+##  - estimand: ATE
+##  - covariates: X1, X2, X3, X4, X5, X6, X7, X8, X9</code></pre>
+<p>Typically one would assess balance and ensure that this weighting
+specification works, but we will skip that step here to focus on effect
+estimation. See <code>vignette(&quot;WeightIt&quot;)</code> and
+<code>vignette(&quot;cobalt&quot;, package = &quot;cobalt&quot;)</code> for more information
+on this necessary step.</p>
+<p>First, we fit a model for the outcome given the treatment and
+(optionally) the covariates. It’s usually a good idea to include
+treatment-covariate interactions, which we do below, but this is not
+always necessary, especially when excellent balance has been
+achieved.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Bring weights into the dataset</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>d<span class="sc">$</span>weights <span class="ot">&lt;-</span> W<span class="sc">$</span>weights</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">#Linear model with covariates</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y_C <span class="sc">~</span> A <span class="sc">*</span> (X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                        X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9),</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>           <span class="at">data =</span> d, <span class="at">weights =</span> weights)</span></code></pre></div>
+<p>Next, we use <code>marginaleffects::avg_comparisons()</code> to
+estimate the ATE.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit,</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">variables =</span> <span class="st">&quot;A&quot;</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>                <span class="at">vcov =</span> <span class="st">&quot;HC3&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>                <span class="at">wts =</span> <span class="st">&quot;weights&quot;</span>)</span></code></pre></div>
+<pre><code>## 
+##  Term Contrast Estimate Std. Error    z Pr(&gt;|z|) 2.5 % 97.5 %
+##     A    1 - 0        2       0.62 3.23  0.00124 0.787   3.22
+## 
+## Columns: term, contrast, estimate, std.error, statistic, p.value, conf.low, conf.high</code></pre>
+<p>Let’s break down the call to <code>avg_comparisons()</code>: to the
+first argument, we supply the model fit, <code>fit</code>; to the
+<code>variables</code> argument, the name of the treatment
+(<code>&quot;A&quot;</code>); to the <code>vcov</code> argument, the name of the
+robust SE we want to request (in this case, HC3, which perform well
+relative to other robust SEs); and to the <code>wts</code> argument, the
+names of the variable in <code>d</code> containing the matching weights
+(<code>&quot;weights&quot;</code>) to ensure they are included in the analysis.
+Some of these arguments differ depending on the specifics of the outcome
+type; see the sections below for information.</p>
+<p>If, in addition to the effect estimate, we want the average estimated
+potential outcomes, we can use
+<code>marginaleffects::avg_predictions()</code>, which we demonstrate
+below. Note the interpretation of the resulting estimates as the
+expected potential outcomes is only valid if all covariates present in
+the outcome model (if any) are interacted with the treatment.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">avg_predictions</span>(fit,</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">variables =</span> <span class="st">&quot;A&quot;</span>,</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>                <span class="at">vcov =</span> <span class="st">&quot;HC3&quot;</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>                <span class="at">wts =</span> <span class="st">&quot;weights&quot;</span>)</span></code></pre></div>
+<pre><code>## 
+##  A Estimate Std. Error     z Pr(&gt;|z|) 2.5 % 97.5 %
+##  0     1.34      0.128 10.46   &lt;0.001  1.09   1.59
+##  1     3.31      0.433  7.64   &lt;0.001  2.46   4.15
+## 
+## Columns: A, estimate, std.error, statistic, p.value, conf.low, conf.high</code></pre>
+<p>We can see that the difference in potential outcome means is equal to
+the average treatment effect computed previously<a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a>. All of the arguments
+to <code>avg_predictions()</code> are the same as those to
+<code>avg_comparisons()</code>.</p>
+</div>
+<div id="adjustments-to-the-standard-case" class="section level3">
+<h3>Adjustments to the Standard Case</h3>
+<p>This section explains how the procedure might differ if any of the
+following special circumstances occur.</p>
+<div id="weighting-for-the-att-or-atc" class="section level4">
+<h4>Weighting for the ATT or ATC</h4>
+<p>When weighting for the ATT, everything is identical to the Standard
+Case except that in the calls to <code>avg_comparisons()</code> and
+<code>avg_predictions()</code>, the <code>newdata</code> argument must
+additionally be supplied to <code>avg_comparisons()</code> and
+<code>avg_predictions()</code> as</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>newdata <span class="ot">=</span> <span class="fu">subset</span>(d, A <span class="sc">==</span> <span class="dv">1</span>)</span></code></pre></div>
+<p>This requests that g-computation be done only for the treated units.
+For the ATC, replace <code>1</code> with <code>0</code>.</p>
+</div>
+<div id="binary-outcomes" class="section level4">
+<h4>Binary outcomes</h4>
+<p>Estimating effects on binary outcomes is essentially the same as for
+continuous outcomes. The main difference is that there are several
+measures of the effect one can consider, which include the odds ratio
+(OR), risk ratio/relative risk (RR), and risk difference (RD), and the
+syntax to <code>avg_comparisons()</code> depends on which one is
+desired. The outcome model should be one appropriate for binary outcomes
+(e.g., logistic regression) but is unrelated to the desired effect
+measure because we can compute any of the above effect measures using
+<code>avg_comparisons()</code> after the logistic regression.</p>
+<p>To fit a logistic regression model, change <code>lm()</code> to
+<code>glm()</code> and set <code>family = quasibinomial</code><a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a>. To
+compute the marginal RD, we can use exactly the same syntax as in the
+Standard Case; nothing needs to change<a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a>.</p>
+<p>To compute the marginal RR, we need to add
+<code>comparison = &quot;lnratioavg&quot;</code> to
+<code>avg_comparisons()</code>; this computes the marginal log RR. To
+get the marginal RR, we need to add <code>transform = &quot;exp&quot;</code> to
+<code>avg_comparisons()</code>, which exponentiates the marginal log RR
+and its confidence interval. The code below computes the effects and
+displays the statistics of interest:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Logistic regression model with covariates</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">glm</span>(Y_B <span class="sc">~</span> A <span class="sc">*</span> (X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>                        X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9),</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>           <span class="at">data =</span> d, <span class="at">weights =</span> weights,</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>           <span class="at">family =</span> quasibinomial)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co">#Compute effects; RR and confidence interval</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>                <span class="at">variables =</span> <span class="st">&quot;A&quot;</span>,</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>                <span class="at">vcov =</span> <span class="st">&quot;HC3&quot;</span>,</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>                <span class="at">wts =</span> <span class="st">&quot;weights&quot;</span>,</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>                <span class="at">comparison =</span> <span class="st">&quot;lnratioavg&quot;</span>,</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">transform =</span> <span class="st">&quot;exp&quot;</span>)</span></code></pre></div>
+<pre><code>## 
+##  Term              Contrast Estimate Pr(&gt;|z|) 2.5 % 97.5 %
+##     A ln(mean(1) / mean(0))     1.47  0.00348  1.14    1.9
+## 
+## Columns: term, contrast, estimate, p.value, conf.low, conf.high, predicted, predicted_hi, predicted_lo</code></pre>
+<p>The output displays the marginal RR, its Z-value, the p-value for the
+Z-test of the log RR against 0, and its confidence interval. (Note that
+even though the <code>Contrast</code> label still suggests the log RR,
+the RR is actually displayed.) To view the log RR and its standard
+error, omit the <code>transform</code> argument.</p>
+<p>For the marginal OR, the only thing that needs to change is that
+<code>comparison</code> should be set to <code>&quot;lnoravg&quot;</code>.</p>
+</div>
+<div id="survival-outcomes" class="section level4">
+<h4>Survival outcomes</h4>
+<p>There are several measures of effect size for survival outcomes, some
+of which are described by <span class="citation">Mao et al. (<a href="#ref-mao2018" role="doc-biblioref">2018</a>)</span>. When using
+the Cox proportional hazards model, the quantity of interest is the
+hazard ratio (HR) between the treated and control groups. As with the
+OR, the HR is non-collapsible, which means the estimated HR will only be
+a valid estimate of the marginal HR when no other covariates are
+included in the model. Other effect measures, such as the difference in
+mean survival times or probability of survival after a given time, can
+be treated just like continuous and binary outcomes as previously
+described.</p>
+<p>For the HR, we cannot compute average marginal effects and must use
+the coefficient on treatment in a Cox model fit without covariates. This
+means that we cannot use the procedures from the Standard Case. Here we
+describe estimating the marginal HR using <code>coxph()</code> from the
+<code>survival</code> package. (See
+<code>help(&quot;coxph&quot;, package = &quot;survival&quot;)</code> for more information on
+this model.) Robust SEs for HRs were studied by <span class="citation">Austin (<a href="#ref-austin2016" role="doc-biblioref">2016</a>)</span> and were found to be conservative;
+they are requested automatically when weights are supplied to
+<code>coxph()</code>. Other formulas have been developed for estimating
+standard errors more accurately <span class="citation">Hajage et al. (<a href="#ref-hajage2018" role="doc-biblioref">2018</a>)</span>, though
+<span class="citation">Austin (<a href="#ref-austin2016" role="doc-biblioref">2016</a>)</span> also found the bootstrap to be
+adequate.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;survival&quot;</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co">#Cox Regression for marginal HR</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="fu">coxph</span>(<span class="fu">Surv</span>(Y_S) <span class="sc">~</span> A, <span class="at">data =</span> d, <span class="at">weights =</span> weights)</span></code></pre></div>
+<pre><code>## Call:
+## coxph(formula = Surv(Y_S) ~ A, data = d, weights = weights)
+## 
+##   coef exp(coef) se(coef) robust se z     p
+## A 0.43      1.53     0.03      0.07 6 5e-09
+## 
+## Likelihood ratio test=184  on 1 df, p=&lt;2e-16
+## n= 2000, number of events= 2000</code></pre>
+<p>The <code>coef</code> column contains the log HR, and
+<code>exp(coef)</code> contains the HR. Remember to always use the
+<code>robust se</code> for the SE of the log HR. The displayed z-test
+p-value results from using the robust SE.</p>
+</div>
+<div id="multi-category-treatments" class="section level4">
+<h4>Multi-category treatments</h4>
+<p>Multi-category treatments work essentially the same way as binary
+treatments. The main practical differences are in choosing the estimand
+and estimating the weights. The ATE and ATO are straightforward. The ATT
+requires choosing one group to be the treated or “focal” group. Effects
+are the estimated for members of that group. The contrast in the focal
+group between the expected potential outcomes under a non-focal
+treatment and the expected potential outcomes for the focal (actual)
+treatment can be interpreted similarly to how ATTs are interpreted for
+binary treatments. The contrasts in the focal group between expected
+potential outcomes under a pair of non-focal treatments can be
+interpreted as the contrast between the ATTs of the non-focal
+treatments. Weights may be estimated differently for multi-category
+treatments from binary treatments; see the individual methods pages for
+how they differ.</p>
+<p>Below, we’ll estimate the ATTs of a constructed multi-category
+treatment for a focal level. Our new treatment <code>Am</code> is
+constructed as follows:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>d<span class="sc">$</span>Am <span class="ot">&lt;-</span> <span class="fu">factor</span>(<span class="fu">ifelse</span>(d<span class="sc">$</span>A <span class="sc">==</span> <span class="dv">1</span>, <span class="st">&quot;T&quot;</span>, <span class="fu">sample</span>(<span class="fu">c</span>(<span class="st">&quot;C1&quot;</span>, <span class="st">&quot;C2&quot;</span>), <span class="fu">nrow</span>(d), <span class="cn">TRUE</span>)))</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(d<span class="sc">$</span>Am)</span></code></pre></div>
+<pre><code>## 
+##  C1  C2   T 
+## 769 790 441</code></pre>
+<p>We have a focal treatment group, <code>&quot;T&quot;</code>, and two control
+groups <code>&quot;C1&quot;</code> and <code>&quot;C2&quot;</code>. We expect the ATTs for
+the two control groups to be the same since we assigned them randomly
+from within the original control group.</p>
+<p>First, we estimate our weights using entropy balancing, identifying
+the focal group using <code>focal</code>:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>W <span class="ot">&lt;-</span> <span class="fu">weightit</span>(Am <span class="sc">~</span> X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>                X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9, <span class="at">data =</span> d,</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>              <span class="at">method =</span> <span class="st">&quot;ebal&quot;</span>, <span class="at">estimand =</span> <span class="st">&quot;ATT&quot;</span>,</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>              <span class="at">focal =</span> <span class="st">&quot;T&quot;</span>)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>W</span></code></pre></div>
+<pre><code>## A weightit object
+##  - method: &quot;ebal&quot; (entropy balancing)
+##  - number of obs.: 2000
+##  - sampling weights: none
+##  - treatment: 3-category (C1, C2, T)
+##  - estimand: ATT (focal: T)
+##  - covariates: X1, X2, X3, X4, X5, X6, X7, X8, X9</code></pre>
+<p>Typically one would assess the performance of the weights (balance
+and effective sample size) but we will skip that for now. Next, we fit
+the outcome model and perform g-computation. We use
+<code>avg_predictions()</code> first to compute the expected potential
+outcome under each treatment for the focal group, and the use
+<code>hypotheses()</code> to test all pairwise comparisons.</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Bring weights into the dataset</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>d<span class="sc">$</span>weights <span class="ot">&lt;-</span> W<span class="sc">$</span>weights</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co">#Fit the outcome model</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">lm</span>(Y_C <span class="sc">~</span> Am <span class="sc">*</span> (X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>                        X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9),</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>          <span class="at">data =</span> d, <span class="at">weights =</span> weights)</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="co">#G-computation</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">avg_predictions</span>(fit,</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>                     <span class="at">variables =</span> <span class="st">&quot;Am&quot;</span>,</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>                     <span class="at">vcov =</span> <span class="st">&quot;HC3&quot;</span>,</span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>                     <span class="at">newdata =</span> <span class="fu">subset</span>(boot_data, A <span class="sc">==</span> <span class="dv">1</span>),</span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>                     <span class="at">wts =</span> <span class="st">&quot;weights&quot;</span>)</span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>p</span></code></pre></div>
+<pre><code>## 
+##  Am Estimate Std. Error     z Pr(&gt;|z|) 2.5 % 97.5 %
+##  C1     1.26      0.252  5.01   &lt;0.001 0.768   1.75
+##  C2     1.16      0.260  4.46   &lt;0.001 0.651   1.67
+##  T      3.52      0.322 10.91   &lt;0.001 2.884   4.15
+## 
+## Columns: Am, estimate, std.error, statistic, p.value, conf.low, conf.high</code></pre>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">hypotheses</span>(p, <span class="st">&quot;revpairwise&quot;</span>)</span></code></pre></div>
+<pre><code>## 
+##     Term Estimate Std. Error      z Pr(&gt;|z|)  2.5 % 97.5 %
+##  C2 - C1    -0.10      0.342 -0.293    0.769 -0.771   0.57
+##  T - C1      2.25      0.388  5.815   &lt;0.001  1.495   3.02
+##  T - C2      2.36      0.382  6.166   &lt;0.001  1.607   3.10
+## 
+## Columns: term, estimate, std.error, statistic, p.value, conf.low, conf.high</code></pre>
+<p>We find significant ATTs between the focal treatment and control
+levels (<code>T - C1</code> and <code>T - C2</code>), but the difference
+between control levels (<code>C2 - C1</code>), which can be interpreted
+as the difference between these ATTs, is nonsignificant, as expected.
+Remember, for the ATT, bootstrapping usually provides more valid
+inference than the robust SEs used here.</p>
+</div>
+<div id="continuous-treatments" class="section level4">
+<h4>Continuous treatments</h4>
+<p>Coming soon!</p>
+</div>
+<div id="using-the-survey-package" class="section level4">
+<h4>Using the <code>survey</code> package</h4>
+<p>The <code>survey</code> package has often been recommended for use in
+estimating treatment effects after propensity score weighting. When
+combined with <code>marginaleffects</code> functions, it yields
+identical estimates and similar standard errors to the methods described
+above that use <code>lm()</code> or <code>glm()</code> and manually
+request a robust SE. The main benefits of using <code>survey</code> are
+that you don’t need to request robust SEs in the call to
+<code>avg_comparisons()</code> and you can incorporate other survey
+design information, e.g., if your study comes from a complex survey.</p>
+<p>Below is how you would adjust the standard case to use
+<code>survey</code> instead:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;survey&quot;</span>)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co">#Declare a survey design using the estimated weights</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>des <span class="ot">&lt;-</span> <span class="fu">svydesign</span>(<span class="sc">~</span><span class="dv">1</span>, <span class="at">weights =</span> <span class="sc">~</span>weights, <span class="at">data =</span> d)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="co">#Fit the outcome model</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">svyglm</span>(Y_C <span class="sc">~</span> A <span class="sc">*</span> (X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>                           X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9),</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>              <span class="at">design =</span> des)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a><span class="co">#G-computation for the difference in means</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit,</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">variables =</span> <span class="st">&quot;A&quot;</span>,</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>                <span class="at">wts =</span> <span class="st">&quot;(weights)&quot;</span>)</span></code></pre></div>
+<pre><code>## 
+##  Term Contrast Estimate Std. Error    z Pr(&gt;|z|) 2.5 % 97.5 %
+##     A    1 - 0     1.96      0.311 6.31   &lt;0.001  1.35   2.57
+## 
+## Columns: term, contrast, estimate, std.error, statistic, p.value, conf.low, conf.high</code></pre>
+<p>Note that we need to supply <code>&quot;(weights)&quot;</code> to the
+<code>wts</code> argument for them to be correctly incorporated. You
+might notice that the standard errors computed using <code>survey</code>
+are different from those using <code>lm()</code> or <code>glm()</code>
+and HC3 robust SEs; to get similar SEs using <code>lm()</code> or
+<code>glm()</code>, set <code>vcov = &quot;HC0&quot;</code> in the call to
+<code>avg_comparisons()</code>. This approach is not recommended since
+HC3 standard errors tend to perform better, which is one reason to avoid
+using <code>survey</code>. In many cases, though, the results will be
+similar.</p>
+</div>
+</div>
+<div id="using-bootstrapping-to-estimate-confidence-intervals" class="section level3">
+<h3>Using Bootstrapping to Estimate Confidence Intervals</h3>
+<p>The bootstrap is an alternative to the delta method for estimating
+confidence intervals for estimated effects. See the section
+Bootstrapping above for details. Here, we’ll demonstrate the standard
+bootstrap, which involves resampling units and estimating the weights
+and treatment effect within each bootstrap sample. For both, we will use
+functionality in the <code>boot</code> package. It is critical to set a
+seed using <code>set.seed()</code> prior to performing the bootstrap in
+order for results to be replicable.</p>
+<p>For the standard bootstrap, we need a function that takes in the
+original dataset and a vector of sampled unit indices and returns the
+estimated quantity of interest. This function should estimate the
+weights in the bootstrap sample, fit the outcome model, and estimate the
+treatment effect using g-computation. We’ll consider the marginal RR ATT
+of <code>A</code> on the binary outcome <code>Y_B</code>.</p>
+<p>The first step is to write the estimation function, we call
+<code>boot_fun</code>. This function returns the marginal RR. In it, we
+estimate the weights and the effect and return the estimate of
+interest.</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>boot_fun <span class="ot">&lt;-</span> <span class="cf">function</span>(data, i) {</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  boot_data <span class="ot">&lt;-</span> data[i,]</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">#PS weighting for the ATE</span></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  W <span class="ot">&lt;-</span> <span class="fu">weightit</span>(A <span class="sc">~</span> X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>                 X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9,</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">data =</span> boot_data,</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>               <span class="at">method =</span> <span class="st">&quot;glm&quot;</span>, <span class="at">estimand =</span> <span class="st">&quot;ATT&quot;</span>)</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#Bring weights into the dataset</span></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>  boot_data<span class="sc">$</span>weights <span class="ot">&lt;-</span> W<span class="sc">$</span>weights</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#Fit outcome model</span></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>  fit <span class="ot">&lt;-</span> <span class="fu">glm</span>(Y_B <span class="sc">~</span> A <span class="sc">*</span> (X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>                 X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9),</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>             <span class="at">data =</span> boot_data, <span class="at">weights =</span> weights,</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>             <span class="at">family =</span> quasibinomial)</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#G-computation</span></span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>  comp <span class="ot">&lt;-</span> <span class="fu">avg_comparisons</span>(fit,</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>                          <span class="at">variables =</span> <span class="st">&quot;A&quot;</span>,</span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>                          <span class="at">vcov =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>                          <span class="at">newdata =</span> <span class="fu">subset</span>(boot_data, A <span class="sc">==</span> <span class="dv">1</span>),</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>                          <span class="at">wts =</span> <span class="st">&quot;weights&quot;</span>,</span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>                          <span class="at">comparison =</span> <span class="st">&quot;lnratioavg&quot;</span>,</span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>                          <span class="at">transform =</span> <span class="st">&quot;exp&quot;</span>)</span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-28"><a href="#cb27-28" aria-hidden="true" tabindex="-1"></a>  comp<span class="sc">$</span>estimate</span>
+<span id="cb27-29"><a href="#cb27-29" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>Next, we call <code>boot::boot()</code> with this function and the
+original dataset supplied to perform the bootstrapping. We’ll request
+199 bootstrap replications here, but in practice you should use many
+more, upwards of 999. More is always better. Using more also allows you
+to use the bias-corrected and accelerated (BCa) bootstrap confidence
+intervals (which you can request by setting <code>type = &quot;bca&quot;</code> in
+the call to <code>boot.ci()</code>), which are known to be the most
+accurate. See <code>?boot.ci</code> for details. Here, we’ll just use a
+percentile confidence interval.</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;boot&quot;</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">54321</span>)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>boot_out <span class="ot">&lt;-</span> <span class="fu">boot</span>(d, boot_fun, <span class="at">R =</span> <span class="dv">199</span>)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>boot_out</span></code></pre></div>
+<pre><code>## 
+## ORDINARY NONPARAMETRIC BOOTSTRAP
+## 
+## 
+## Call:
+## boot(data = d, statistic = boot_fun, R = 199)
+## 
+## 
+## Bootstrap Statistics :
+##     original    bias    std. error
+## t1*    1.522 0.0004574       0.119</code></pre>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">boot.ci</span>(boot_out, <span class="at">type =</span> <span class="st">&quot;perc&quot;</span>)</span></code></pre></div>
+<pre><code>## BOOTSTRAP CONFIDENCE INTERVAL CALCULATIONS
+## Based on 199 bootstrap replicates
+## 
+## CALL : 
+## boot.ci(boot.out = boot_out, type = &quot;perc&quot;)
+## 
+## Intervals : 
+## Level     Percentile     
+## 95%   ( 1.305,  1.800 )  
+## Calculations and Intervals on Original Scale
+## Some percentile intervals may be unstable</code></pre>
+<p>We find a RR of 1.522 with a confidence interval of (1.305, 1.8). If
+we had wanted a risk difference, we could have adjusted the arguments to
+<code>avg_comparisons()</code> (i.e., by removing the
+<code>comparison</code> and <code>transform</code> arguments).</p>
+<p>To estimate the bootstrap confidence for the HR, we can do the same
+as above except our <code>boot_fun</code> will look like the
+following:</p>
+<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>boot_fun <span class="ot">&lt;-</span> <span class="cf">function</span>(data, i) {</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  boot_data <span class="ot">&lt;-</span> data[i,]</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">#PS weighting for the ATE</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  W <span class="ot">&lt;-</span> <span class="fu">weightit</span>(A <span class="sc">~</span> X1 <span class="sc">+</span> X2 <span class="sc">+</span> X3 <span class="sc">+</span> X4 <span class="sc">+</span> X5 <span class="sc">+</span> </span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>                 X6 <span class="sc">+</span> X7 <span class="sc">+</span> X8 <span class="sc">+</span> X9,</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">data =</span> boot_data,</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>               <span class="at">method =</span> <span class="st">&quot;glm&quot;</span>, <span class="at">estimand =</span> <span class="st">&quot;ATT&quot;</span>)</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>  <span class="co">#Bring weights into the dataset</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>  boot_data<span class="sc">$</span>weights <span class="ot">&lt;-</span> W<span class="sc">$</span>weights</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>  <span class="co">#Fit outcome model</span></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>  fit <span class="ot">&lt;-</span> <span class="fu">coxph</span>(<span class="fu">Surv</span>(Y_S) <span class="sc">~</span> A, <span class="at">data =</span> boot_data,</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a>               <span class="at">weights =</span> weights)</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>  <span class="co">#Return the coefficient on treatment</span></span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coef</span>(fit)[<span class="st">&quot;A&quot;</span>]</span>
+<span id="cb32-19"><a href="#cb32-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>(Remember that you will need to load in the <code>survival</code>
+package before doing so.)</p>
+</div>
+<div id="longitudinal-treatments" class="section level3">
+<h3>Longitudinal Treatments</h3>
+<p>Coming soon! For now see the example at
+<code>vignette(&quot;WeightIt&quot;)</code>.</p>
+</div>
+</div>
+<div id="reporting-results" class="section level2">
+<h2>Reporting Results</h2>
+<p>It is important to be as thorough and complete as possible when
+describing the methods of estimating the treatment effect and the
+results of the analysis. This improves transparency and replicability of
+the analysis. Results should at least include the following:</p>
+<ul>
+<li>a description of the outcome model used (e.g., logistic regression,
+a linear model with treatment-covariate interactions and covariates, a
+Cox proportional hazards model with the propensity score weights
+applied)</li>
+<li>the way the effect was estimated (e.g., using g-computation or as
+the coefficient in the outcome model)</li>
+<li>the way SEs and confidence intervals were estimated (e.g., using
+robust SEs, using the BCa bootstrap with 4999 bootstrap replications and
+the entire process of weighting and effect estimation included in each
+replication)</li>
+<li>R packages and functions used in estimating the effect and its SE
+(e.g., <code>glm()</code> in base R, <code>avg_comparisons()</code> in
+<code>marginaleffects</code>, <code>boot()</code> and
+<code>boot.ci()</code> in <code>boot</code>)</li>
+<li>The effect and its SE and confidence interval</li>
+</ul>
+<p>All this is in addition to information about the weighting method,
+estimand, propensity score estimation procedure (if used), balance
+assessment, etc.</p>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-austin2016" class="csl-entry">
+Austin, Peter C. 2016. <span>“Variance Estimation When Using Inverse
+Probability of Treatment Weighting (IPTW) with Survival
+Analysis.”</span> <em>Statistics in Medicine</em> 35 (30): 5642–55. <a href="https://doi.org/10.1002/sim.7084">https://doi.org/10.1002/sim.7084</a>.
+</div>
+<div id="ref-austin2022" class="csl-entry">
+———. 2022. <span>“Bootstrap Vs Asymptotic Variance Estimation When Using
+Propensity Score Weighting with Continuous and Binary Outcomes.”</span>
+<em>Statistics in Medicine</em> 41 (22): 4426–43. <a href="https://doi.org/10.1002/sim.9519">https://doi.org/10.1002/sim.9519</a>.
+</div>
+<div id="ref-chanGloballyEfficientNonparametric2016" class="csl-entry">
+Chan, Kwun Chuen Gary, Sheung Chi Phillip Yam, and Zheng Zhang. 2016.
+<span>“Globally Efficient Non-Parametric Inference of Average Treatment
+Effects by Empirical Balancing Calibration Weighting.”</span>
+<em>Journal of the Royal Statistical Society: Series B (Statistical
+Methodology)</em> 78 (3): 673–700. <a href="https://doi.org/10.1111/rssb.12129">https://doi.org/10.1111/rssb.12129</a>.
+</div>
+<div id="ref-efronBootstrapMethodsStandard1986" class="csl-entry">
+Efron, B., and R. Tibshirani. 1986. <span>“Bootstrap Methods for
+Standard Errors, Confidence Intervals, and Other Measures of Statistical
+Accuracy.”</span> <em>Statistical Science</em> 1 (1): 54–75. <a href="https://www.jstor.org/stable/2245500">https://www.jstor.org/stable/2245500</a>.
+</div>
+<div id="ref-greiferChoosingEstimandWhen2021" class="csl-entry">
+Greifer, Noah, and Elizabeth A. Stuart. 2021. <span>“Choosing the
+Estimand When Matching or Weighting in Observational Studies.”</span>
+<em>arXiv:2106.10577 [Stat]</em>, June. <a href="https://arxiv.org/abs/2106.10577">https://arxiv.org/abs/2106.10577</a>.
+</div>
+<div id="ref-hajage2018" class="csl-entry">
+Hajage, David, Guillaume Chauvet, Lisa Belin, Alexandre Lafourcade,
+Florence Tubach, and Yann De Rycke. 2018. <span>“Closed-Form Variance
+Estimator for Weighted Propensity Score Estimators with Survival
+Outcome.”</span> <em>Biometrical Journal</em> 60 (6): 1151–63. <a href="https://doi.org/10.1002/bimj.201700330">https://doi.org/10.1002/bimj.201700330</a>.
+</div>
+<div id="ref-hoMatchingNonparametricPreprocessing2007" class="csl-entry">
+Ho, Daniel E., Kosuke Imai, Gary King, and Elizabeth A. Stuart. 2007.
+<span>“Matching as Nonparametric Preprocessing for Reducing Model
+Dependence in Parametric Causal Inference.”</span> <em>Political
+Analysis</em> 15 (3): 199–236. <a href="https://doi.org/10.1093/pan/mpl013">https://doi.org/10.1093/pan/mpl013</a>.
+</div>
+<div id="ref-mackinnonBootstrapMethodsEconometrics2006" class="csl-entry">
+MacKinnon, James G. 2006. <span>“Bootstrap Methods in
+Econometrics.”</span> <em>Economic Record</em> 82 (s1): S2–18. <a href="https://doi.org/10.1111/j.1475-4932.2006.00328.x">https://doi.org/10.1111/j.1475-4932.2006.00328.x</a>.
+</div>
+<div id="ref-mackinnonHeteroskedasticityconsistentCovarianceMatrix1985" class="csl-entry">
+MacKinnon, James G, and Halbert White. 1985. <span>“Some
+Heteroskedasticity-Consistent Covariance Matrix Estimators with Improved
+Finite Sample Properties.”</span> <em>Journal of Econometrics</em> 29
+(3): 305–25. <a href="https://doi.org/10.1016/0304-4076(85)90158-7">https://doi.org/10.1016/0304-4076(85)90158-7</a>.
+</div>
+<div id="ref-mao2018" class="csl-entry">
+Mao, Huzhang, Liang Li, Wei Yang, and Yu Shen. 2018. <span>“On the
+Propensity Score Weighting Analysis with Survival Outcome: Estimands,
+Estimation, and Inference.”</span> <em>Statistics in Medicine</em> 37
+(26): 3745–63. <a href="https://doi.org/10.1002/sim.7839">https://doi.org/10.1002/sim.7839</a>.
+</div>
+<div id="ref-nguyenDoubleadjustmentPropensityScore2017" class="csl-entry">
+Nguyen, Tri-Long, Gary S. Collins, Jessica Spence, Jean-Pierre Daurès,
+P. J. Devereaux, Paul Landais, and Yannick Le Manach. 2017.
+<span>“Double-Adjustment in Propensity Score Matching Analysis: Choosing
+a Threshold for Considering Residual Imbalance.”</span> <em>BMC Medical
+Research Methodology</em> 17: 78. <a href="https://doi.org/10.1186/s12874-017-0338-0">https://doi.org/10.1186/s12874-017-0338-0</a>.
+</div>
+<div id="ref-reifeisVarianceTreatmentEffect2020" class="csl-entry">
+Reifeis, Sarah A., and Michael G. Hudgens. 2020. <span>“On Variance of
+the Treatment Effect in the Treated Using Inverse Probability
+Weighting.”</span> <em>arXiv:2011.11874 [Stat]</em>, November. <a href="https://arxiv.org/abs/2011.11874">https://arxiv.org/abs/2011.11874</a>.
+</div>
+<div id="ref-robinsMarginalStructuralModels2000" class="csl-entry">
+Robins, James M., Miguel Ángel Hernán, and Babette Brumback. 2000.
+<span>“Marginal Structural Models and Causal Inference in
+Epidemiology.”</span> <em>Epidemiology</em> 11 (5): 550–60. <a href="https://doi.org/10.1097/00001648-200009000-00011">https://doi.org/10.1097/00001648-200009000-00011</a>.
+</div>
+<div id="ref-schaferAverageCausalEffects2008" class="csl-entry">
+Schafer, Joseph L., and Joseph Kang. 2008. <span>“Average Causal Effects
+from Nonrandomized Studies: A Practical Guide and Simulated
+Example.”</span> <em>Psychological Methods</em> 13 (4): 279–313. <a href="https://doi.org/10.1037/a0014268">https://doi.org/10.1037/a0014268</a>.
+</div>
+<div id="ref-snowdenImplementationGComputationSimulated2011" class="csl-entry">
+Snowden, Jonathan M., Sherri Rose, and Kathleen M. Mortimer. 2011.
+<span>“Implementation of G-Computation on a Simulated Data Set:
+Demonstration of a Causal Inference Technique.”</span> <em>American
+Journal of Epidemiology</em> 173 (7): 731–38. <a href="https://doi.org/10.1093/aje/kwq472">https://doi.org/10.1093/aje/kwq472</a>.
+</div>
+<div id="ref-westreichTableFallacyPresenting2013" class="csl-entry">
+Westreich, Daniel, and Sander Greenland. 2013. <span>“The Table 2
+Fallacy: Presenting and Interpreting Confounder and Modifier
+Coefficients.”</span> <em>American Journal of Epidemiology</em> 177 (4):
+292–98. <a href="https://doi.org/10.1093/aje/kws412">https://doi.org/10.1093/aje/kws412</a>.
+</div>
+</div>
+</div>
+<div id="code-to-generate-data-used-in-examples" class="section level2">
+<h2>Code to Generate Data used in Examples</h2>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Generating data similar to Austin (2009) for demonstrating treatment effect estimation</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>gen_X <span class="ot">&lt;-</span> <span class="cf">function</span>(n) {</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(<span class="dv">9</span> <span class="sc">*</span> n), <span class="at">nrow =</span> n, <span class="at">ncol =</span> <span class="dv">9</span>)</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  X[,<span class="dv">5</span>] <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(X[,<span class="dv">5</span>] <span class="sc">&lt;</span> .<span class="dv">5</span>)</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  X</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a><span class="co">#~20% treated</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>gen_A <span class="ot">&lt;-</span> <span class="cf">function</span>(X) {</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>  LP_A <span class="ot">&lt;-</span> <span class="sc">-</span> <span class="fl">1.2</span> <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">1</span>] <span class="sc">-</span> <span class="fu">log</span>(<span class="fl">1.5</span>)<span class="sc">*</span>X[,<span class="dv">2</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">4</span>] <span class="sc">-</span> <span class="fu">log</span>(<span class="fl">2.4</span>)<span class="sc">*</span>X[,<span class="dv">5</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">7</span>] <span class="sc">-</span> <span class="fu">log</span>(<span class="fl">1.5</span>)<span class="sc">*</span>X[,<span class="dv">8</span>]</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>  P_A <span class="ot">&lt;-</span> <span class="fu">plogis</span>(LP_A)</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rbinom</span>(<span class="fu">nrow</span>(X), <span class="dv">1</span>, P_A)</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Continuous outcome</span></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a>gen_Y_C <span class="ot">&lt;-</span> <span class="cf">function</span>(A, X) {</span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>  <span class="dv">2</span><span class="sc">*</span>A <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>X[,<span class="dv">1</span>] <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>X[,<span class="dv">2</span>] <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>X[,<span class="dv">3</span>] <span class="sc">+</span> <span class="dv">1</span><span class="sc">*</span>X[,<span class="dv">4</span>] <span class="sc">+</span> <span class="dv">2</span><span class="sc">*</span>X[,<span class="dv">5</span>] <span class="sc">+</span> <span class="dv">1</span><span class="sc">*</span>X[,<span class="dv">6</span>] <span class="sc">+</span> <span class="fu">rnorm</span>(<span class="fu">length</span>(A), <span class="dv">0</span>, <span class="dv">5</span>)</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a><span class="co">#Conditional:</span></span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a><span class="co">#  MD: 2</span></span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a><span class="co">#Marginal:</span></span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a><span class="co">#  MD: 2</span></span>
+<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-24"><a href="#cb33-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Binary outcome</span></span>
+<span id="cb33-25"><a href="#cb33-25" aria-hidden="true" tabindex="-1"></a>gen_Y_B <span class="ot">&lt;-</span> <span class="cf">function</span>(A, X) {</span>
+<span id="cb33-26"><a href="#cb33-26" aria-hidden="true" tabindex="-1"></a>  LP_B <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">2</span> <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">2.4</span>)<span class="sc">*</span>A <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">1</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">2</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">3</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">1.5</span>)<span class="sc">*</span>X[,<span class="dv">4</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">2.4</span>)<span class="sc">*</span>X[,<span class="dv">5</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">1.5</span>)<span class="sc">*</span>X[,<span class="dv">6</span>]</span>
+<span id="cb33-27"><a href="#cb33-27" aria-hidden="true" tabindex="-1"></a>  P_B <span class="ot">&lt;-</span> <span class="fu">plogis</span>(LP_B)</span>
+<span id="cb33-28"><a href="#cb33-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rbinom</span>(<span class="fu">length</span>(A), <span class="dv">1</span>, P_B)</span>
+<span id="cb33-29"><a href="#cb33-29" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb33-30"><a href="#cb33-30" aria-hidden="true" tabindex="-1"></a><span class="co">#Conditional:</span></span>
+<span id="cb33-31"><a href="#cb33-31" aria-hidden="true" tabindex="-1"></a><span class="co">#  OR:   2.4</span></span>
+<span id="cb33-32"><a href="#cb33-32" aria-hidden="true" tabindex="-1"></a><span class="co">#  logOR: .875</span></span>
+<span id="cb33-33"><a href="#cb33-33" aria-hidden="true" tabindex="-1"></a><span class="co">#Marginal:</span></span>
+<span id="cb33-34"><a href="#cb33-34" aria-hidden="true" tabindex="-1"></a><span class="co">#  RD:    .144</span></span>
+<span id="cb33-35"><a href="#cb33-35" aria-hidden="true" tabindex="-1"></a><span class="co">#  RR:   1.54</span></span>
+<span id="cb33-36"><a href="#cb33-36" aria-hidden="true" tabindex="-1"></a><span class="co">#  logRR: .433</span></span>
+<span id="cb33-37"><a href="#cb33-37" aria-hidden="true" tabindex="-1"></a><span class="co">#  OR:   1.92</span></span>
+<span id="cb33-38"><a href="#cb33-38" aria-hidden="true" tabindex="-1"></a><span class="co">#  logOR  .655</span></span>
+<span id="cb33-39"><a href="#cb33-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-40"><a href="#cb33-40" aria-hidden="true" tabindex="-1"></a><span class="co"># Survival outcome</span></span>
+<span id="cb33-41"><a href="#cb33-41" aria-hidden="true" tabindex="-1"></a>gen_Y_S <span class="ot">&lt;-</span> <span class="cf">function</span>(A, X) {</span>
+<span id="cb33-42"><a href="#cb33-42" aria-hidden="true" tabindex="-1"></a>  LP_S <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">2</span> <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">2.4</span>)<span class="sc">*</span>A <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">1</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">2</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="dv">2</span>)<span class="sc">*</span>X[,<span class="dv">3</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">1.5</span>)<span class="sc">*</span>X[,<span class="dv">4</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">2.4</span>)<span class="sc">*</span>X[,<span class="dv">5</span>] <span class="sc">+</span> <span class="fu">log</span>(<span class="fl">1.5</span>)<span class="sc">*</span>X[,<span class="dv">6</span>]</span>
+<span id="cb33-43"><a href="#cb33-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sqrt</span>(<span class="sc">-</span><span class="fu">log</span>(<span class="fu">runif</span>(<span class="fu">length</span>(A)))<span class="sc">*</span><span class="fl">2e4</span><span class="sc">*</span><span class="fu">exp</span>(<span class="sc">-</span>LP_S))</span>
+<span id="cb33-44"><a href="#cb33-44" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb33-45"><a href="#cb33-45" aria-hidden="true" tabindex="-1"></a><span class="co">#Conditional:</span></span>
+<span id="cb33-46"><a href="#cb33-46" aria-hidden="true" tabindex="-1"></a><span class="co">#  HR:   2.4</span></span>
+<span id="cb33-47"><a href="#cb33-47" aria-hidden="true" tabindex="-1"></a><span class="co">#  logHR: .875</span></span>
+<span id="cb33-48"><a href="#cb33-48" aria-hidden="true" tabindex="-1"></a><span class="co">#Marginal:</span></span>
+<span id="cb33-49"><a href="#cb33-49" aria-hidden="true" tabindex="-1"></a><span class="co">#  HR:   1.57</span></span>
+<span id="cb33-50"><a href="#cb33-50" aria-hidden="true" tabindex="-1"></a><span class="co">#  logHR: .452</span></span>
+<span id="cb33-51"><a href="#cb33-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-52"><a href="#cb33-52" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">19599</span>)</span>
+<span id="cb33-53"><a href="#cb33-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-54"><a href="#cb33-54" aria-hidden="true" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">2000</span></span>
+<span id="cb33-55"><a href="#cb33-55" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">gen_X</span>(n)</span>
+<span id="cb33-56"><a href="#cb33-56" aria-hidden="true" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">gen_A</span>(X)</span>
+<span id="cb33-57"><a href="#cb33-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-58"><a href="#cb33-58" aria-hidden="true" tabindex="-1"></a>Y_C <span class="ot">&lt;-</span> <span class="fu">gen_Y_C</span>(A, X)</span>
+<span id="cb33-59"><a href="#cb33-59" aria-hidden="true" tabindex="-1"></a>Y_B <span class="ot">&lt;-</span> <span class="fu">gen_Y_B</span>(A, X)</span>
+<span id="cb33-60"><a href="#cb33-60" aria-hidden="true" tabindex="-1"></a>Y_S <span class="ot">&lt;-</span> <span class="fu">gen_Y_S</span>(A, X)</span>
+<span id="cb33-61"><a href="#cb33-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-62"><a href="#cb33-62" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(A, X, Y_C, Y_B, Y_S)</span></code></pre></div>
+</div>
+<div class="footnotes footnotes-end-of-document">
+<hr />
+<ol>
+<li id="fn1"><p>These can be computed with M-estimation using the
+<code>geex</code> package or automatically using the
+<code>PSweight</code> package.<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+<li id="fn2"><p>Sometimes, an error will occur with this method, which
+usually means more bootstrap replications are required. The number of
+replicates must be greater than the original sample size.<a href="#fnref2" class="footnote-back">↩︎</a></p></li>
+<li id="fn3"><p>To verify that they are equal, supply the output of
+<code>avg_predictions()</code> to <code>hypotheses()</code>, e.g.,
+<code>avg_predictions(…) |&gt; hypotheses(&quot;revpairwise&quot;)</code>; this
+explicitly compares the average potential outcomes and should yield
+identical estimates to the <code>avg_comparisons()</code> call.<a href="#fnref3" class="footnote-back">↩︎</a></p></li>
+<li id="fn4"><p>We use <code>quasibinomial()</code> instead of
+<code>binomial()</code> simply to avoid a spurious warning; the results
+will be identical regardless.<a href="#fnref4" class="footnote-back">↩︎</a></p></li>
+<li id="fn5"><p>Note that for low or high average expected risks
+computed with <code>predictions()</code>, the confidence intervals may
+go below 0 or above 1; this is because an approximation is used. To
+avoid this problem, bootstrapping or simulation-based inference can be
+used instead.<a href="#fnref5" class="footnote-back">↩︎</a></p></li>
+</ol>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
