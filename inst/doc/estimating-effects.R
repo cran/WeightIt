@@ -7,6 +7,7 @@ me_ok <- requireNamespace("marginaleffects", quietly = TRUE) &&
 su_ok <- requireNamespace("survival", quietly = TRUE)
 boot_ok <- requireNamespace("boot", quietly = TRUE)
 
+## ---- include = FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #Generating data similar to Austin (2009) for demonstrating treatment effect estimation
 gen_X <- function(n) {
   X <- matrix(rnorm(9 * n), nrow = n, ncol = 9)
@@ -14,11 +15,18 @@ gen_X <- function(n) {
   X
 }
 
+gen_Ac <- function(X) {
+  LP_A <- -1.2 + log(2)*X[,1] - log(1.5)*X[,2] + log(2)*X[,4] - log(2.4)*X[,5] + log(2)*X[,7] - log(1.5)*X[,8]
+  LP_A + rlogis(nrow(X))
+}
+
 #~20% treated
-gen_A <- function(X) {
-  LP_A <- - 1.2 + log(2)*X[,1] - log(1.5)*X[,2] + log(2)*X[,4] - log(2.4)*X[,5] + log(2)*X[,7] - log(1.5)*X[,8]
-  P_A <- plogis(LP_A)
-  rbinom(nrow(X), 1, P_A)
+gen_A <- function(Ac) {
+  1 * (Ac > 0)
+}
+
+gen_Am <- function(A) {
+  factor(ifelse(A == 1, "T", sample(c("C1", "C2"), length(A), TRUE)))
 }
 
 # Continuous outcome
@@ -62,21 +70,24 @@ set.seed(19599)
 
 n <- 2000
 X <- gen_X(n)
-A <- gen_A(X)
+Ac <- gen_Ac(X)
+A <- gen_A(Ac)
+Am <- gen_Am(A)
 
 Y_C <- gen_Y_C(A, X)
 Y_B <- gen_Y_B(A, X)
 Y_S <- gen_Y_S(A, X)
 
-d <- data.frame(A, X, Y_C, Y_B, Y_S)
+d <- data.frame(A, Am, Ac, X, Y_C, Y_B, Y_S)
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 head(d)
 
-## ----message=FALSE,warning=FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------
-library("WeightIt")
+## ----message=FALSE,warning=FALSE, include=FALSE, eval=!me_ok------------------------------------------------------------------------------------------------------------------------------------------
+#  library("WeightIt")
 
 ## ----message=FALSE,warning=FALSE, eval=me_ok----------------------------------------------------------------------------------------------------------------------------------------------------------
+library("WeightIt")
 library("marginaleffects")
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -128,9 +139,23 @@ library("survival")
 #Cox Regression for marginal HR
 coxph(Surv(Y_S) ~ A, data = d, weights = weights)
 
-## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-d$Am <- factor(ifelse(d$A == 1, "T", sample(c("C1", "C2"), nrow(d), TRUE)))
+## ---- eval = requireNamespace("survey", quietly = TRUE), message=F------------------------------------------------------------------------------------------------------------------------------------
+library("survey")
 
+#Declare a survey design using the estimated weights
+des <- svydesign(~1, weights = ~weights, data = d)
+
+#Fit the outcome model
+fit <- svyglm(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 + 
+                           X6 + X7 + X8 + X9),
+              design = des)
+
+#G-computation for the difference in means
+avg_comparisons(fit,
+                variables = "A",
+                wts = "(weights)")
+
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 table(d$Am)
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -159,21 +184,61 @@ p
 
 hypotheses(p, "revpairwise")
 
-## ---- eval = requireNamespace("survey", quietly = TRUE), message=F------------------------------------------------------------------------------------------------------------------------------------
-library("survey")
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+W <- weightit(Ac ~ X1 + X2 + X3 + X4 + X5 + 
+                X6 + X7 + X8 + X9, data = d,
+              method = "energy")
+W
 
-#Declare a survey design using the estimated weights
-des <- svydesign(~1, weights = ~weights, data = d)
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#Bring weights into the dataset
+d$weights <- W$weights
 
 #Fit the outcome model
-fit <- svyglm(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 + 
-                           X6 + X7 + X8 + X9),
-              design = des)
+fit <- lm(Y_C ~ splines::ns(Ac, df = 4) *
+            (X1 + X2 + X3 + X4 + X5 + 
+               X6 + X7 + X8 + X9),
+          data = d, weights = weights)
 
-#G-computation for the difference in means
-avg_comparisons(fit,
-                variables = "A",
-                wts = "(weights)")
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#Represenative values of Ac:
+values <- with(d, seq(quantile(Ac, .1),
+                      quantile(Ac, .9),
+                      length.out = 51))
+
+#G-computation
+p <- avg_predictions(fit,
+                     variables = list(Ac = values),
+                     vcov = "HC3",
+                     wts = "weights")
+
+## ---- fig.height=3.5, fig.width=7---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+library("ggplot2")
+ggplot(p, aes(x = Ac)) +
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
+              alpha = .3) +
+  labs(x = "Ac", y = "E[Y|A]") +
+  theme_bw()
+
+## ---- fig.height=3.5, fig.width=7---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Estimate the pointwise derivatives at representative
+# values of Ac
+s <- avg_slopes(fit,
+                variables = "Ac",
+                newdata = datagridcf(Ac = values),
+                by = "Ac",
+                vcov = "HC3",
+                wts = "weights")
+
+# Plot the AMEF
+ggplot(s, aes(x = Ac)) +
+  geom_line(aes(y = estimate)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high),
+              alpha = .3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Ac", y = "dE[Y|A]/dA") +
+  theme_bw()
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 boot_fun <- function(data, i) {
@@ -249,11 +314,18 @@ boot_fun <- function(data, i) {
 #    X
 #  }
 #  
+#  gen_Ac <- function(X) {
+#    LP_A <- -1.2 + log(2)*X[,1] - log(1.5)*X[,2] + log(2)*X[,4] - log(2.4)*X[,5] + log(2)*X[,7] - log(1.5)*X[,8]
+#    LP_A + rlogis(nrow(X))
+#  }
+#  
 #  #~20% treated
-#  gen_A <- function(X) {
-#    LP_A <- - 1.2 + log(2)*X[,1] - log(1.5)*X[,2] + log(2)*X[,4] - log(2.4)*X[,5] + log(2)*X[,7] - log(1.5)*X[,8]
-#    P_A <- plogis(LP_A)
-#    rbinom(nrow(X), 1, P_A)
+#  gen_A <- function(Ac) {
+#    1 * (Ac > 0)
+#  }
+#  
+#  gen_Am <- function(A) {
+#    factor(ifelse(A == 1, "T", sample(c("C1", "C2"), length(A), TRUE)))
 #  }
 #  
 #  # Continuous outcome
@@ -297,11 +369,13 @@ boot_fun <- function(data, i) {
 #  
 #  n <- 2000
 #  X <- gen_X(n)
-#  A <- gen_A(X)
+#  Ac <- gen_Ac(X)
+#  A <- gen_A(Ac)
+#  Am <- gen_Am(A)
 #  
 #  Y_C <- gen_Y_C(A, X)
 #  Y_B <- gen_Y_B(A, X)
 #  Y_S <- gen_Y_S(A, X)
 #  
-#  d <- data.frame(A, X, Y_C, Y_B, Y_S)
+#  d <- data.frame(A, Am, Ac, X, Y_C, Y_B, Y_S)
 

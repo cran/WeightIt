@@ -165,7 +165,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal, stabil
 
     if (bin.treat) {
 
-      t.lev <- get.treated.level(treat_sub)
+      t.lev <- get_treated_level(treat_sub)
       c.lev <- setdiff(levels(treat_sub), t.lev)
 
       ps <- make_df(levels(treat_sub), nrow = length(treat_sub))
@@ -332,7 +332,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal, stabil
           rlang::check_installed("mclogit")
 
           if (is_not_null(A$random)) {
-            random <- get.covs.and.treat.from.formula(A$random, data = .data)$reported.covs[subset,,drop = FALSE]
+            random <- get_covs_and_treat_from_formula(A$random, data = .data)$reported.covs[subset,,drop = FALSE]
             data <- cbind(data.frame(random), data.frame(treat = treat_sub, .s.weights = s.weights, covs))
             covnames <- names(data)[-c(seq_col(random), ncol(random) + (1:2))]
             tname <- names(data)[ncol(random) + 1]
@@ -453,7 +453,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal, stabil
     bin.treat <- is_binary(treat_sub)
 
     if (bin.treat) {
-      t.lev <- get.treated.level(treat)
+      t.lev <- get_treated_level(treat)
       c.lev <- setdiff(levels(treat_sub), t.lev)
 
       if (is_(ps, c("matrix", "data.frame"))) {
@@ -784,7 +784,7 @@ weightit2optweight.msm <- function(covs.list, treat.list, s.weights, subset, mis
   if (is_not_null(treat.list)) {
     treat.list <- lapply(treat.list, function(t) {
       treat <- t[subset]
-      if (get.treat.type(t) != "continuous") treat <- factor(treat)
+      if (get_treat_type(t) != "continuous") treat <- factor(treat)
       return(treat)
     })
   }
@@ -822,8 +822,8 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
   treat <- treat[subset]
   s.weights <- s.weights[subset]
 
-  if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
-  treat.type <- get.treat.type(treat)
+  if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+  treat.type <- get_treat_type(treat)
 
   for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
 
@@ -845,7 +845,7 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
     A[["criterion"]] <- A[["criterion"]][1]
   }
 
-  available.criteria <- available.stats(treat.type)
+  available.criteria <- cobalt::available.stats(treat.type)
 
   if (is.character(A[["criterion"]]) &&
       startsWith(A[["criterion"]], "es.")) {
@@ -894,7 +894,7 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
 
   if (treat.type == "binary")  {
     available.distributions <- c("bernoulli", "adaboost")
-    t.lev <- get.treated.level(treat)
+    t.lev <- get_treated_level(treat)
     treat <- binarize(treat, one = focal)
   }
   else {
@@ -911,7 +911,7 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
     }
     else n.grid <- round(A[["n.grid"]])
 
-    init <- bal.init(
+    init <- cobalt::bal.init(
       if (!anyNA(covs)) covs
       else if (missing == "surr") add_missing_indicators(covs)
       else replace_na_with(covs),
@@ -957,7 +957,7 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
       w <- get.w.from.ps(ps, treat = treat, estimand = estimand, focal = focal, stabilize = stabilize, subclass = subclass)
       if (trim.at != 0) w <- suppressMessages(apply(w, 2, trim, at = trim.at, treat = treat))
 
-      iter.grid.balance <- apply(w, 2, bal.compute, x = init)
+      iter.grid.balance <- apply(w, 2, cobalt::bal.compute, x = init)
 
       if (n.grid == n.trees) {
         best.tree.index <- which.min(iter.grid.balance)
@@ -981,7 +981,7 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset, stabil
         w <- get.w.from.ps(ps, treat = treat, estimand = estimand, focal = focal, stabilize = stabilize, subclass = subclass)
         if (trim.at != 0) w <- suppressMessages(apply(w, 2, trim, at = trim.at, treat = treat))
 
-        iter.grid.balance.fine <- apply(w, 2, bal.compute, x = init)
+        iter.grid.balance.fine <- apply(w, 2, cobalt::bal.compute, x = init)
 
         best.tree.index <- which.min(iter.grid.balance.fine)
         best.loss <- iter.grid.balance.fine[best.tree.index]
@@ -1098,7 +1098,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, estimand, focal, subset, s
     A[["criterion"]] <- A[["criterion"]][1]
   }
 
-  available.criteria <- available.stats("continuous")
+  available.criteria <- cobalt::available.stats("continuous")
 
   cv <- 0
 
@@ -1144,7 +1144,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, estimand, focal, subset, s
     }
     else n.grid <- round(A[["n.grid"]])
 
-    init <- bal.init(
+    init <- cobalt::bal.init(
       if (!anyNA(covs)) covs
       else if (missing == "surr") add_missing_indicators(covs)
       else replace_na_with(covs),
@@ -1245,7 +1245,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, estimand, focal, subset, s
                             densfun = densfun, use.kernel = use.kernel, densControl = A)
       if (trim.at != 0) w <- suppressMessages(apply(w, 2, trim, at = trim.at, treat = treat))
 
-      iter.grid.balance <- apply(w, 2, bal.compute, x = init)
+      iter.grid.balance <- apply(w, 2, cobalt::bal.compute, x = init)
 
       if (n.grid == n.trees) {
         best.tree.index <- which.min(iter.grid.balance)
@@ -1270,7 +1270,7 @@ weightit2gbm.cont <- function(covs, treat, s.weights, estimand, focal, subset, s
                               densfun = densfun, use.kernel = use.kernel, densControl = A)
         if (trim.at != 0) w <- suppressMessages(apply(w, 2, trim, at = trim.at, treat = treat))
 
-        iter.grid.balance.fine <- apply(w, 2, bal.compute, x = init)
+        iter.grid.balance.fine <- apply(w, 2, cobalt::bal.compute, x = init)
 
         best.tree.index <- which.min(iter.grid.balance.fine)
         best.loss <- iter.grid.balance.fine[best.tree.index]
@@ -1373,8 +1373,8 @@ weightit2cbps <- function(covs, treat, s.weights, estimand, focal, subset, stabi
   treat <- factor(treat[subset])
   s.weights <- s.weights[subset]
 
-  if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
-  treat.type <- get.treat.type(treat)
+  if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+  treat.type <- get_treat_type(treat)
 
   if (missing == "ind") {
     covs <- add_missing_indicators(covs)
@@ -1496,7 +1496,7 @@ weightit2cbps <- function(covs, treat, s.weights, estimand, focal, subset, stabi
     p.score <- NULL
   }
   else if (is_not_null(dim(ps)) && length(dim(ps)) == 2) {
-    p.score <- ps[[get.treated.level(treat)]]
+    p.score <- ps[[get_treated_level(treat)]]
   }
   else p.score <- ps
 
@@ -1851,8 +1851,8 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
   treat <- factor(treat[subset])
   s.weights <- s.weights[subset]
 
-  if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
-  treat.type <- get.treat.type(treat)
+  if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+  treat.type <- get_treat_type(treat)
 
   if (missing == "ind") {
     covs <- add_missing_indicators(covs)
@@ -1893,7 +1893,7 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
       A[["criterion"]] <- A[["criterion"]][1]
     }
 
-    available.criteria <- available.stats(treat.type)
+    available.criteria <- cobalt::available.stats(treat.type)
 
     if (is.character(A[["criterion"]]) &&
         startsWith(A[["criterion"]], "es.")) {
@@ -1907,9 +1907,13 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
     criterion <- A[["criterion"]]
     criterion <- match_arg(criterion, available.criteria)
 
-    init <- bal.init(covs, treat = treat, stat = criterion,
-                     estimand = estimand, s.weights = s.weights,
-                     focal = focal, ...)
+    init <- cobalt::bal.init(covs,
+                             treat = treat,
+                             stat = criterion,
+                             estimand = estimand,
+                             s.weights = s.weights,
+                             focal = focal,
+                             ...)
 
     sneaky <- 0
     attr(sneaky, "vals") <- list(init = init, estimand = estimand)
@@ -1960,7 +1964,7 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal, stab
   #Computing weights
   w <- get_w_from_ps(ps = ps, treat = treat, estimand, focal, stabilize = stabilize, subclass = subclass)
 
-  p.score <- if (treat.type == "binary") ps[[get.treated.level(treat)]] else NULL
+  p.score <- if (treat.type == "binary") ps[[get_treated_level(treat)]] else NULL
 
   list(w = w, ps = p.score, info = info, fit.obj = fit.list)
 }
@@ -2059,13 +2063,16 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
       A[["criterion"]] <- A[["criterion"]][1]
     }
 
-    available.criteria <- available.stats("continuous")
+    available.criteria <- cobalt::available.stats("continuous")
 
     criterion <- A[["criterion"]]
     criterion <- match_arg(criterion, available.criteria)
 
-    init <- bal.init(covs, treat = treat, stat = criterion,
-                     s.weights = s.weights, ...)
+    init <- cobalt::bal.init(covs,
+                             treat = treat,
+                             stat = criterion,
+                             s.weights = s.weights,
+                             ...)
 
     sneaky <- 0
     attr(sneaky, "vals") <- list(init = init,
@@ -2134,8 +2141,8 @@ weightit2bart <- function(covs, treat, s.weights, subset, estimand, focal, stabi
     .err("sampling weights cannot be used with `method = \"bart\"`")
   }
 
-  if (!has.treat.type(treat)) treat <- assign.treat.type(treat)
-  treat.type <- get.treat.type(treat)
+  if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+  treat.type <- get_treat_type(treat)
 
   if (missing == "ind") {
     covs <- add_missing_indicators(covs)
@@ -2188,7 +2195,7 @@ weightit2bart <- function(covs, treat, s.weights, subset, estimand, focal, stabi
   #Computing weights
   w <- get_w_from_ps(ps = ps, treat = treat, estimand, focal, stabilize = stabilize, subclass = subclass)
 
-  p.score <- if (treat.type == "binary") ps[[get.treated.level(treat)]] else NULL
+  p.score <- if (treat.type == "binary") ps[[get_treated_level(treat)]] else NULL
 
   list(w = w, ps = p.score, info = info, fit.obj = fit.list)
 }
