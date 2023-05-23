@@ -31,7 +31,9 @@ gen_Am <- function(A) {
 
 # Continuous outcome
 gen_Y_C <- function(A, X) {
-  2*A + 2*X[,1] + 2*X[,2] + 2*X[,3] + 1*X[,4] + 2*X[,5] + 1*X[,6] + rnorm(length(A), 0, 5)
+  2*A + 2*X[,1] + 2*X[,2] + 2*X[,3] + 1*X[,4] + 2*X[,5] + 1*X[,6] + 
+    .5*A*X[,1] + .5*A*X[,2] - .25*A*X[,3] + A*(X[,5] - .5) +
+    rnorm(length(A), 0, 5)
 }
 #Conditional:
 #  MD: 2
@@ -178,7 +180,7 @@ fit <- lm(Y_C ~ Am * (X1 + X2 + X3 + X4 + X5 +
 p <- avg_predictions(fit,
                      variables = "Am",
                      vcov = "HC3",
-                     newdata = subset(boot_data, A == 1),
+                     newdata = subset(d, Am == "T"),
                      wts = "weights")
 p
 
@@ -244,7 +246,7 @@ ggplot(s, aes(x = Ac)) +
 boot_fun <- function(data, i) {
   boot_data <- data[i,]
   
-  #PS weighting for the ATE
+  #PS weighting for the ATT
   W <- weightit(A ~ X1 + X2 + X3 + X4 + X5 + 
                  X6 + X7 + X8 + X9,
                data = boot_data,
