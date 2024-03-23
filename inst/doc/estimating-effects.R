@@ -1,13 +1,11 @@
-## ---- include = FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, eval=T)
 options(width = 200, digits= 4)
 
-me_ok <- requireNamespace("marginaleffects", quietly = TRUE) &&
-  requireNamespace("sandwich", quietly = TRUE)
+me_ok <- requireNamespace("marginaleffects", quietly = TRUE)
 su_ok <- requireNamespace("survival", quietly = TRUE)
-boot_ok <- requireNamespace("boot", quietly = TRUE)
 
-## ---- include = FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #Generating data similar to Austin (2009) for demonstrating treatment effect estimation
 gen_X <- function(n) {
   X <- matrix(rnorm(9 * n), nrow = n, ncol = 9)
@@ -100,62 +98,73 @@ W <- weightit(A ~ X1 + X2 + X3 + X4 + X5 +
 W
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#Bring weights into the dataset
-d$weights <- W$weights
-
 #Linear model with covariates
-fit <- lm(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 + 
+fit <- lm_weightit(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 + 
                         X6 + X7 + X8 + X9),
-           data = d, weights = weights)
+                    data = d, weightit = W)
 
-## ---- eval=me_ok--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-avg_comparisons(fit,
-                variables = "A",
-                vcov = "HC3",
-                wts = "weights")
+## ----eval=me_ok---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+avg_comparisons(fit, variables = "A")
 
-## ---- eval=me_ok--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-avg_predictions(fit,
-                variables = "A",
-                vcov = "HC3",
-                wts = "weights")
+## ----eval=me_ok---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+avg_predictions(fit, variables = "A")
 
-## ---- eval=me_ok--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----eval=me_ok---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #Logistic regression model with covariates
-fit <- glm(Y_B ~ A * (X1 + X2 + X3 + X4 + X5 + 
+fit <- glm_weightit(Y_B ~ A * (X1 + X2 + X3 + X4 + X5 + 
                         X6 + X7 + X8 + X9),
-           data = d, weights = weights,
-           family = quasibinomial)
+                    data = d, weightit = W,
+                    family = binomial)
 
 #Compute effects; RR and confidence interval
 avg_comparisons(fit,
                 variables = "A",
-                vcov = "HC3",
-                wts = "weights",
                 comparison = "lnratioavg",
                 transform = "exp")
 
-## ---- eval=su_ok, message=F---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----eval=su_ok, message=F----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library("survival")
 
 #Cox Regression for marginal HR
-coxph(Surv(Y_S) ~ A, data = d, weights = weights)
+coxph(Surv(Y_S) ~ A, data = d, weights = W$weights)
 
-## ---- eval = requireNamespace("survey", quietly = TRUE), message=F------------------------------------------------------------------------------------------------------------------------------------
-library("survey")
+## ----eval= FALSE--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#  #Estimate the balancing weights, with sampling weights called "sw"
+#  W <- weightit(A ~ X1 + X2 + X3 + X4 + X5 +
+#                  X6 + X7 + X8 + X9, data = d,
+#                method = "glm", estimand = "ATE",
+#                s.weights = "sw")
+#  
+#  #Fit the outcome model, with clustering variable "clu"
+#  fit <- glm_weightit(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 +
+#                             X6 + X7 + X8 + X9),
+#                      data = d, weightit = W,
+#                      cluster = ~clu)
+#  
+#  #Compute the ATE, include sampling weights in the estimation
+#  avg_comparisons(fit,
+#                  variables = "A",
+#                  wts = W$s.weights)
 
-#Declare a survey design using the estimated weights
-des <- svydesign(~1, weights = ~weights, data = d)
-
-#Fit the outcome model
-fit <- svyglm(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 + 
-                           X6 + X7 + X8 + X9),
-              design = des)
-
-#G-computation for the difference in means
-avg_comparisons(fit,
-                variables = "A",
-                wts = "(weights)")
+## ----eval= FALSE--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#  library(survey)
+#  
+#  #Multiply sampling weights and estimated weights
+#  d$weights <- W$weights * d$sw
+#  
+#  #Declare a survey design using the combined weights with
+#  #appropriate clustering
+#  des <- svydesign(~clu, weights = ~weights, data = d)
+#  
+#  #Fit the outcome model
+#  fit <- svyglm(Y_C ~ A * (X1 + X2 + X3 + X4 + X5 +
+#                             X6 + X7 + X8 + X9),
+#                design = des)
+#  
+#  #G-computation for the difference in means, including sampling weights
+#  avg_comparisons(fit,
+#                  variables = "A",
+#                  wts = d$sw)
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 table(d$Am)
@@ -167,21 +176,16 @@ W <- weightit(Am ~ X1 + X2 + X3 + X4 + X5 +
               focal = "T")
 W
 
-## ---- eval=me_ok--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#Bring weights into the dataset
-d$weights <- W$weights
-
+## ----eval=me_ok---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #Fit the outcome model
-fit <- lm(Y_C ~ Am * (X1 + X2 + X3 + X4 + X5 + 
-                        X6 + X7 + X8 + X9),
-          data = d, weights = weights)
+fit <- lm_weightit(Y_C ~ Am * (X1 + X2 + X3 + X4 + X5 + 
+                                 X6 + X7 + X8 + X9),
+                   data = d, weightit = W)
 
 #G-computation
 p <- avg_predictions(fit,
                      variables = "Am",
-                     vcov = "HC3",
-                     newdata = subset(d, Am == "T"),
-                     wts = "weights")
+                     newdata = subset(d, Am == "T"))
 p
 
 hypotheses(p, "revpairwise")
@@ -189,32 +193,28 @@ hypotheses(p, "revpairwise")
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 W <- weightit(Ac ~ X1 + X2 + X3 + X4 + X5 + 
                 X6 + X7 + X8 + X9, data = d,
-              method = "energy")
+              moments = 2, int = TRUE,
+              method = "ebal")
 W
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#Bring weights into the dataset
-d$weights <- W$weights
-
 #Fit the outcome model
-fit <- lm(Y_C ~ splines::ns(Ac, df = 4) *
-            (X1 + X2 + X3 + X4 + X5 + 
-               X6 + X7 + X8 + X9),
-          data = d, weights = weights)
+fit <- lm_weightit(Y_C ~ splines::ns(Ac, df = 4) *
+                     (X1 + X2 + X3 + X4 + X5 + 
+                        X6 + X7 + X8 + X9),
+                   data = d, weightit = W)
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #Represenative values of Ac:
 values <- with(d, seq(quantile(Ac, .1),
                       quantile(Ac, .9),
-                      length.out = 51))
+                      length.out = 31))
 
 #G-computation
 p <- avg_predictions(fit,
-                     variables = list(Ac = values),
-                     vcov = "HC3",
-                     wts = "weights")
+                     variables = list(Ac = values))
 
-## ---- fig.height=3.5, fig.width=7---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----fig.height=3.5, fig.width=7----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library("ggplot2")
 ggplot(p, aes(x = Ac)) +
   geom_line(aes(y = estimate)) +
@@ -223,15 +223,14 @@ ggplot(p, aes(x = Ac)) +
   labs(x = "Ac", y = "E[Y|A]") +
   theme_bw()
 
-## ---- fig.height=3.5, fig.width=7---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----fig.height=3.5, fig.width=7----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Estimate the pointwise derivatives at representative
 # values of Ac
 s <- avg_slopes(fit,
                 variables = "Ac",
-                newdata = datagridcf(Ac = values),
-                by = "Ac",
-                vcov = "HC3",
-                wts = "weights")
+                newdata = datagrid(Ac = values,
+                                   grid_type = "counterfactual"),
+                by = "Ac")
 
 # Plot the AMEF
 ggplot(s, aes(x = Ac)) +
@@ -243,72 +242,30 @@ ggplot(s, aes(x = Ac)) +
   theme_bw()
 
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-boot_fun <- function(data, i) {
-  boot_data <- data[i,]
-  
-  #PS weighting for the ATT
-  W <- weightit(A ~ X1 + X2 + X3 + X4 + X5 + 
-                 X6 + X7 + X8 + X9,
-               data = boot_data,
-               method = "glm", estimand = "ATT")
-  
-  #Bring weights into the dataset
-  boot_data$weights <- W$weights
-  
-  #Fit outcome model
-  fit <- glm(Y_B ~ A * (X1 + X2 + X3 + X4 + X5 + 
-                 X6 + X7 + X8 + X9),
-             data = boot_data, weights = weights,
-             family = quasibinomial)
-  
-  #G-computation
-  comp <- avg_comparisons(fit,
-                          variables = "A",
-                          vcov = FALSE,
-                          newdata = subset(boot_data, A == 1),
-                          wts = "weights",
-                          comparison = "lnratioavg",
-                          transform = "exp")
-  
-  comp$estimate
-}
+data("msmdata")
 
-## ---- eval = boot_ok, message=F, warning=F------------------------------------------------------------------------------------------------------------------------------------------------------------
-library("boot")
-set.seed(54321)
-boot_out <- boot(d, boot_fun, R = 199)
+Wmsm <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
+                             A_2 ~ X1_1 + X2_1 +
+                               A_1 + X1_0 + X2_0,
+                             A_3 ~ X1_2 + X2_2 +
+                               A_2 + X1_1 + X2_1 +
+                               A_1 + X1_0 + X2_0),
+                        data = msmdata, method = "glm",
+                        stabilize = TRUE)
 
-boot_out
-boot.ci(boot_out, type = "perc")
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+fit <- glm_weightit(Y_B ~ A_1 * A_2 * A_3 * (X1_0 + X2_0),
+                    data = msmdata, weightit = Wmsm,
+                    family = binomial)
 
-## ---- include = FALSE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-b <- {
-  if (boot_ok) boot.ci(boot_out, type = "perc")
-  else list(t0 = 1.522, percent = c(0, 0, 0, 1.305, 1.800))
-}
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+(p <- avg_predictions(fit,
+                      variables = c("A_1", "A_2", "A_3")))
 
-## ---- eval=su_ok--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-boot_fun <- function(data, i) {
-  boot_data <- data[i,]
-  
-  #PS weighting for the ATE
-  W <- weightit(A ~ X1 + X2 + X3 + X4 + X5 + 
-                 X6 + X7 + X8 + X9,
-               data = boot_data,
-               method = "glm", estimand = "ATT")
-  
-  #Bring weights into the dataset
-  boot_data$weights <- W$weights
-  
-  #Fit outcome model
-  fit <- coxph(Surv(Y_S) ~ A, data = boot_data,
-               weights = weights)
-  
-  #Return the coefficient on treatment
-  coef(fit)["A"]
-}
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+hypotheses(p, "reference")
 
-## ---- eval = FALSE------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## ----eval = FALSE-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #  #Generating data similar to Austin (2009) for demonstrating treatment effect estimation
 #  gen_X <- function(n) {
 #    X <- matrix(rnorm(9 * n), nrow = n, ncol = 9)

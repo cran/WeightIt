@@ -1,6 +1,38 @@
 WeightIt News and Updates
 ======
 
+# WeightIt 1.0.0
+
+* Added a new function, `glm_weightit()` (along with wrapper `lm_weightit()`) and associated methods for fitting generalized linear models in the weighted sample, with the option of accounting for estimation of the weights in computing standard errors via M-estimation or two forms of bootstrapping. `glm_weightit()` also supports multinomial logistic regression in addition to all models supported by `glm()`. Cluster-robust standard errors are supported, and output is compatible with any functions that accept `glm()` objects. Not all weighting methods support M-estimation, but for those that do, a new component is added to the `weightit` output object. Currently, GLM propensity scores, entropy balancing, just-identified CBPS, and inverse probability tilting (described below) support M-estimation-based standard errors with `glm_weightit()`.
+
+* Added inverse probability tilting (IPT) as described by Graham, Pinto, and Egel (2012), which can be requested by setting `method = "ipt"`. Thus is similar to entropy balancing and CBPS in that it enforces exact balance and yields a propensity score, but has some theoretical advantages to both methods. IPT does not rely on any other packages and runs very quickly.
+
+* Estimating covariate balancing propensity score weights (i.e., `method = "cbps"`) no longer depends on the `CBPS` package. The default is now the just-identified versions of the method; the over-identified version can be requested by setting `over = TRUE`. The ATT for multi-category treatments is now supported, as are arbitrary numbers of treatment groups (`CBPS` only natively support up to 4 groups and only the ATE for multi-category treatments). For binary treatments, generalized linear models other than logistic regression are now supported (e.g., probit or Poisson regression).
+
+* New function `calibrate()` to apply Platt scaling to calibrate propensity scores as recommended by [Gutman et al. (2022)](http://arxiv.org/abs/2211.01221).
+
+* A new argument `quantile` can be supplied to `weightit()` with all the methods that accept `moments` and `int` (`"ebal"`, `"cbps"`, `"ipt"`, `"npcbps"`, `"optweight"`, and `"energy"`). This allows one to request balance on the quantiles of the covariates, which can add some robustness as demonstrated by [Beręsewicz (2023)](https://arxiv.org/abs/2310.11969).
+
+* `as.weightit()` now has a method for `weightit.fit` objects, which now have additional components included in the output.
+
+* `trim()` now has a `drop` argument; setting to `TRUE` sets the weights of all trimmed units to 0 (effectively dropping them).
+
+* When using `weightit()` with a continuous treatment and a `method` that estimates the generalized propensity score (e.g., `"glm"`, `"gbm"`, `"super"`), sampling weights are now be incorporated into the density when `use.kernel = FALSE` (the default) when supplied to `s.weights`. Previously they were ignored in calculating the density, but have always been and remain used in the modeling the treatment (when allowed).
+
+* Fixed a bug when `criterion` was not specified when using `method = "gbm"`.
+
+* Fixed a bug when `ps` was supplied for continuous treatments. Thanks to @taylordunn. (#53)
+
+* Warning messages now display immediately rather than at the end of evaluation.
+
+* The vignettes have been changed to use a slightly different estimator for weighted g-computation. The estimated weights are no longer to be included in the call to `avg_comparisons()`, etc.; that is, they are only used to fit the outcome model. This makes the estimators more consistent with other software, including `teffects ipwra` in Stata, and most of the literature on weighted g-computation. Note this will not effect any estimates for the ATT or ATC and will only yield at most minor changes for the ATE. For other estimands (e.g., ATO), the weights are still to be included.
+
+* The word "multinomial" to describe treatments with more than two categories has been replaced with "multi-category" in all documentation and messages.
+
+* Transferred all help files to Roxygen and reorganized package scripts.
+
+* Reorganization of some functions.
+
 # WeightIt 0.14.2
 
 * Fixed a bug when using `estimand = "ATC"` with multi-category treatments. (#47)
@@ -297,7 +329,7 @@ WeightIt News and Updates
 
 * Fixed bug when using objects not in the data set in `weightit()`. Behavior has changed to include transformed covariates entered in formula in `weightit()` output.
 
-* Fixed bug resulting from potentially colinearity when using `ebal` or `ebcw`.
+* Fixed bug resulting from potential colinearity when using `ebal` or `ebcw`.
 
 * Added a vignette.
 

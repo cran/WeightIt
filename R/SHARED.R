@@ -196,10 +196,6 @@ strsplits <- function(x, splits, fixed = TRUE, ...) {
   for (split in splits) x <- unlist(strsplit(x, split, fixed = TRUE, ...))
   return(x[x != ""]) # Remove empty values
 }
-c.factor <- function(..., recursive = TRUE) {
-  #c() for factors
-  unlist(list(...), recursive = recursive)
-}
 can_str2num <- function(x) {
   if (is.numeric(x) || is.logical(x)) return(TRUE)
   nas <- is.na(x)
@@ -208,7 +204,7 @@ can_str2num <- function(x) {
 }
 str2num <- function(x) {
   nas <- is.na(x)
-  if (!is_(x, c("numeric", "logical"))) x <- as.character(x)
+  if (!is.numeric(x) && !is.logical(x)) x <- as.character(x)
   suppressWarnings(x_num <- as.numeric(x))
   is.na(x_num[nas]) <- TRUE
   x_num
@@ -271,6 +267,9 @@ check_if_int <- function(x) {
   else if (is.numeric(x)) check_if_zero(x - round(x))
   else rep(FALSE, length(x))
 }
+squish <- function(p, tol = 1e-6) {
+  pmax(pmin(p, 1 - tol), tol)
+}
 
 #Statistics
 binarize <- function(variable, zero = NULL, one = NULL) {
@@ -310,9 +309,7 @@ binarize <- function(variable, zero = NULL, one = NULL) {
     else stop("The argument to 'zero' is not the name of a level of variable.", call. = FALSE)
   }
 }
-ESS <- function(w) {
-  sum(w)^2/sum(w^2)
-}
+## ESS
 center <- function(x, at = NULL, na.rm = TRUE) {
   if (is.data.frame(x)) {
     x <- as.matrix.data.frame(x)
@@ -474,6 +471,46 @@ mean_fast <- function(x, nas.possible = FALSE) {
 bw.nrd <- function(x) {
   #R's bw.nrd doesn't always work, but bw.nrd0 does
   bw.nrd0(x)*1.06/.9
+}
+w.quantile <- function(x, probs = seq(0, 1, 0.25), w = NULL, na.rm = FALSE, ...) {
+
+  n <- length(x)
+  if (n == 0 || (!isTRUE(na.rm) && anyNA(x))) {
+    return(rep(NA_real_, length(probs)))
+  }
+
+  if (!is.null(w)) {
+    if (all(w == 0)) {
+      return(rep(0, length(probs)))
+    }
+  }
+
+  if (isTRUE(na.rm)) {
+    indices <- !is.na(x)
+    x <- x[indices]
+    if (!is.null(w))
+      w <- w[indices]
+  }
+
+  order <- order(x)
+  x <- x[order]
+  w <- w[order]
+
+  rw <- {
+    if (is.null(w)) (1:n)/n
+    else cumsum(w)/sum(w)
+  }
+
+  q <- vapply(probs, function(p) {
+    if (p == 0) return(x[1])
+    if (p == 1) return(x[n])
+    select <- min(which(rw > p))
+    if (rw[select] == p)
+      mean(x[c(select, select + 1)])
+    else x[select]
+  }, x[1])
+
+  unname(q)
 }
 
 #Formulas
@@ -652,12 +689,12 @@ get_covs_and_treat_from_formula <- function(f, data = NULL, terms = FALSE, sep =
   }
 
   if (is_null(rhs.term.labels)) {
-    new.form <- as.formula("~ 1")
+    new.form <- as.formula("~ 0")
     tt.covs <- terms(new.form)
-    covs <- data.frame(Intercept = rep(1, if (is_null(treat)) 1 else length(treat)))
-    if (is_not_null(treat.name) && treat.name == "Intercept") {
-      names(covs) <- "Intercept_"
-    }
+    covs <- data.frame(Intercept = rep(1, if (is_null(treat)) 1 else length(treat)))[,-1, drop = FALSE]
+    # if (is_not_null(treat.name) && treat.name == "Intercept") {
+    #   names(covs) <- "Intercept_"
+    # }
   }
   else {
     new.form.char <- paste("~", paste(vapply(names(rhs.term.labels.list), function(x) {
@@ -671,8 +708,7 @@ get_covs_and_treat_from_formula <- function(f, data = NULL, terms = FALSE, sep =
     } , character(1L)), collapse = " + "))
 
     new.form <- as.formula(new.form.char)
-    tt.covs <- terms(new.form)
-    attr(tt.covs, "intercept") <- 0
+    tt.covs <- terms(update(new.form,  ~ . - 1))
 
     #Get model.frame, report error
     mf.covs <- quote(stats::model.frame(tt.covs, data,
@@ -682,7 +718,9 @@ get_covs_and_treat_from_formula <- function(f, data = NULL, terms = FALSE, sep =
     tryCatch({covs <- eval(mf.covs)},
              error = function(e) {stop(conditionMessage(e), call. = FALSE)})
 
-    if (is_not_null(treat.name) && treat.name %in% names(covs)) stop("The variable on the left side of the formula appears on the right side too.", call. = FALSE)
+    if (is_not_null(treat.name) && treat.name %in% names(covs)) {
+      .err("the variable on the left side of the formula appears on the right side too")
+    }
   }
 
   if (eval.model.matrx) {
@@ -703,7 +741,7 @@ get_covs_and_treat_from_formula <- function(f, data = NULL, terms = FALSE, sep =
     #Get full model matrix with interactions too
     covs.matrix <- model.matrix(tt.covs, data = covs,
                                 contrasts.arg = lapply(Filter(is.factor, covs),
-                                                       contrasts, contrasts=FALSE))
+                                                       contrasts, contrasts = FALSE))
 
     if (s) {
       for (i in names(covs)[vapply(covs, is.factor, logical(1L))]) {
@@ -717,10 +755,10 @@ get_covs_and_treat_from_formula <- function(f, data = NULL, terms = FALSE, sep =
 
   if (!terms) attr(covs, "terms") <- NULL
 
-  return(list(reported.covs = covs,
-              model.covs = covs.matrix,
-              treat = treat,
-              treat.name = treat.name))
+  list(reported.covs = covs,
+       model.covs = covs.matrix,
+       treat = treat,
+       treat.name = treat.name)
 }
 assign_treat_type <- function(treat, use.multi = FALSE) {
   #Returns treat with treat.type attribute
@@ -800,22 +838,22 @@ process.bin.vars <- function(bin.vars, mat) {
 }
 process.s.weights <- function(s.weights, data = NULL) {
   #Process s.weights
-  if (is_not_null(s.weights)) {
-    if (!(is.character(s.weights) && length(s.weights) == 1) && !is.numeric(s.weights)) {
-      stop("The argument to 's.weights' must be a vector or data frame of sampling weights or the (quoted) names of the variable in 'data' that contains sampling weights.", call. = FALSE)
-    }
-    if (is.character(s.weights) && length(s.weights)==1) {
-      if (is_null(data)) {
-        stop("'s.weights' was specified as a string but there was no argument to 'data'.", call. = FALSE)
-      }
-      else if (s.weights %in% names(data)) {
-        s.weights <- data[[s.weights]]
-      }
-      else stop("The name supplied to 's.weights' is not the name of a variable in 'data'.", call. = FALSE)
-    }
+  if (is_null(s.weights)) return(NULL)
+
+  if (is.numeric(s.weights)) return(s.weights)
+
+  if (!is.character(s.weights) || length(s.weights) != 1) {
+    .err("the argument to `s.weights` must be a vector or data frame of sampling weights or the (quoted) names of the variable in `data` that contains sampling weights")
   }
-  else s.weights <- NULL
-  return(s.weights)
+
+  if (is_null(data)) {
+    .err("`s.weights` was specified as a string but there was no argument to `data`")
+  }
+  if (!s.weights %in% names(data)) {
+    .err("the name supplied to `s.weights` is not the name of a variable in `data`")
+  }
+
+  data[[s.weights]]
 }
 
 #Uniqueness
@@ -892,7 +930,7 @@ make_list <- function(n) {
   if (length(n) == 1L && is.numeric(n)) {
     vector("list", as.integer(n))
   }
-  else if (is_(n, "atomic")) {
+  else if (length(n) > 0L && is.atomic(n)) {
     setNames(vector("list", length(n)), as.character(n))
   }
   else stop("'n' must be an integer(ish) scalar or an atomic variable.")
