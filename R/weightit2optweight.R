@@ -84,17 +84,17 @@
 #' @references
 #' ## Binary treatments
 #'
-#' Wang, Y., & Zubizarreta, J. R. (2020). Minimal dispersion approximately balancing weights: Asymptotic properties and practical considerations. Biometrika, 107(1), 93–105. \doi{10.1093/biomet/asz050}
+#' Wang, Y., & Zubizarreta, J. R. (2020). Minimal dispersion approximately balancing weights: Asymptotic properties and practical considerations. *Biometrika*, 107(1), 93–105. \doi{10.1093/biomet/asz050}
 #'
-#' Zubizarreta, J. R. (2015). Stable Weights that Balance Covariates for Estimation With Incomplete Outcome Data. Journal of the American Statistical Association, 110(511), 910–922. \doi{10.1080/01621459.2015.1023805}
+#' Zubizarreta, J. R. (2015). Stable Weights that Balance Covariates for Estimation With Incomplete Outcome Data. *Journal of the American Statistical Association*, 110(511), 910–922. \doi{10.1080/01621459.2015.1023805}
 #'
 #' ## Multi-Category Treatments
 #'
-#' de los Angeles Resa, M., & Zubizarreta, J. R. (2020). Direct and stable weight adjustment in non-experimental studies with multivalued treatments: Analysis of the effect of an earthquake on post-traumatic stress. Journal of the Royal Statistical Society: Series A (Statistics in Society), n/a(n/a). \doi{10.1111/rssa.12561}
+#' de los Angeles Resa, M., & Zubizarreta, J. R. (2020). Direct and stable weight adjustment in non-experimental studies with multivalued treatments: Analysis of the effect of an earthquake on post-traumatic stress. *Journal of the Royal Statistical Society: Series A (Statistics in Society)*, n/a(n/a). \doi{10.1111/rssa.12561}
 #'
 #' ## Continuous treatments
 #'
-#' Greifer, N. (2020). Estimating Balancing Weights for Continuous Treatments Using Constrained Optimization. \doi{10.17615/DYSS-B342}
+#' Greifer, N. (2020). *Estimating Balancing Weights for Continuous Treatments Using Constrained Optimization*. \doi{10.17615/DYSS-B342}
 #'
 #' @examplesIf all(sapply(c("optweight", "osqp"), requireNamespace, quietly = TRUE))
 #' data("lalonde", package = "cobalt")
@@ -123,7 +123,8 @@
 #' cobalt::bal.tab(W3)
 NULL
 
-weightit2optweight <- function(covs, treat, s.weights, subset, estimand, focal, missing, moments, int, verbose, ...) {
+weightit2optweight <- function(covs, treat, s.weights, subset, estimand, focal, missing,
+                               moments, int, verbose, ...) {
   A <- list(...)
 
   rlang::check_installed("optweight")
@@ -132,12 +133,12 @@ weightit2optweight <- function(covs, treat, s.weights, subset, estimand, focal, 
   treat <- factor(treat[subset])
   s.weights <- s.weights[subset]
 
-  covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int))
+  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
 
-  covs <- cbind(covs, quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
                                  focal = focal, treat = treat))
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (missing == "ind") {
     covs <- add_missing_indicators(covs)
@@ -181,8 +182,8 @@ weightit2optweight.cont <- function(covs, treat, s.weights, subset, missing, mom
   treat <- treat[subset]
   s.weights <- s.weights[subset]
 
-  covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int))
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (missing == "ind") {
     covs <- add_missing_indicators(covs)
@@ -196,7 +197,10 @@ weightit2optweight.cont <- function(covs, treat, s.weights, subset, missing, mom
   }
   A[names(A) %in% names(formals(weightit2optweight.cont))] <- NULL
 
-  if ("tols" %in% names(A)) A[["tols"]] <- optweight::check.tols(new.formula, new.data, A[["tols"]], stop = TRUE)
+  if ("tols" %in% names(A)) {
+    A[["tols"]] <- optweight::check.tols(new.formula, new.data, A[["tols"]], stop = TRUE)
+  }
+
   if ("targets" %in% names(A)) {
     .wrn("`targets` cannot be used through WeightIt and will be ignored")
     A[["targets"]] <- NULL
@@ -220,8 +224,8 @@ weightitMSM2optweight <- function(covs.list, treat.list, s.weights, subset, miss
   if (is_not_null(covs.list)) {
     covs.list <- lapply(covs.list, function(c) {
       covs <- c[subset, , drop = FALSE]
-      covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int))
-      for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+      for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
       if (missing == "ind") {
         covs <- add_missing_indicators(covs)

@@ -134,7 +134,7 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
 
   data.list <- list(data, obj2[["covs"]], obj[["covs"]])
   combined.data <- do.call("data.frame", clear_null(data.list))
-  processed.moderator <- process.by(moderator, data = clear_null(combined.data),
+  processed.moderator <- .process_by(moderator, data = clear_null(combined.data),
                                     treat = obj[["treat"]], treat.name = NULL,
                                     by.arg = "moderator")
   moderator.factor <- attr(processed.moderator, "by.factor")
@@ -483,7 +483,7 @@ print.weightit.sbps <- function(x, ...) {
   trim <- attr(x[["weights"]], "trim")
 
   cat("A weightit.sbps object\n")
-  if (is_not_null(x[["method"]])) cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", method.to.phrase(x[["method"]]), ")\n"))
+  if (is_not_null(x[["method"]])) cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", .method_to_phrase(x[["method"]]), ")\n"))
   cat(paste0(" - number of obs.: ", length(x[["weights"]]), "\n"))
   cat(paste0(" - sampling weights: ", if (is_null(x[["s.weights"]]) || all_the_same(x[["s.weights"]])) "none" else "present", "\n"))
   cat(paste0(" - treatment: ", ifelse(treat.type == "continuous", "continuous", paste0(nunique(x[["treat"]]), "-category", ifelse(treat.type == "multinomial", paste0(" (", paste(levels(x[["treat"]]), collapse = ", "), ")"), ""))), "\n"))

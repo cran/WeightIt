@@ -40,12 +40,12 @@
 #'
 #' ## M-estimation
 #'
-#' For binary treatments, M-estimation is supported when `missing` is not `"saem"` and `link` does not start with `"br."`. For multi-category treatments, M-estimation is supported when `missing` is not `"saem"` and `multi-method` is `"weightit"` (the default for non-ordered treatments) or `"glm"`. For continuous treatments, M-estimation is not supported. See [glm_weightit()] and `vignette("estimating-effects")` for details. For longitudinal treatments, M-estimation is supported whenever the underlying methods are.
+#' For binary treatments, M-estimation is supported when `link` does not start with `"br."` and is neither `"flic"` nor `"flac"` (see below). For multi-category treatments, M-estimation is supported when `multi.method` is `"weightit"` (the default for non-ordered treatments) or `"glm"`. For continuous treatments, M-estimation is supported when `use.kernel` is not `TRUE`. The conditional treatment variance and unconditional treatment mean and variance are included as parameters to estimate, as these all go into calculation of the weights. For all treatment type, M-estimation is not supported when `missing = "saem"`. See [glm_weightit()] and `vignette("estimating-effects")` for details. For longitudinal treatments, M-estimation is supported whenever the underlying methods are.
 #'
 #' @section Additional Arguments:
 #' For binary treatments, the following additional argument can be specified:
 #' \describe{
-#'   \item{`link`}{the link used in the generalized linear model for the propensity scores. `link` can be any of those allowed by [binomial()]. A `br.` prefix can be added (e.g., `"br.logit"`); this changes the fitting method to the bias-corrected generalized linear models implemented in the \CRANpkg{brglm2} package.}
+#'   \item{`link`}{the link used in the generalized linear model for the propensity scores. `link` can be any of those allowed by [binomial()]. A `br.` prefix can be added (e.g., `"br.logit"`); this changes the fitting method to the bias-corrected generalized linear models implemented in the \CRANpkg{brglm2} package. `link` can also be either `"flic"` or `"flac"` to fit the corresponding Firth corrected logistic regression models implemented in the \CRANpkg{logistf} package.}
 #' }
 #'
 #' For multi-category treatments, the following additional arguments can be specified:
@@ -74,7 +74,7 @@
 #'
 #' @section Additional Outputs:
 #' \describe{
-#'   \item{`obj`}{When `include.obj = TRUE`, the (generalized) propensity score model fit. For binary treatments, the output of the call to [glm()]. For multi-category treatments, the output of the call to the fitting function (or a list thereof if `multi.method = "glm"`. For continuous treatments, the output of the call to `glm()` for the predicted values in the denominator density.
+#'   \item{`obj`}{When `include.obj = TRUE`, the (generalized) propensity score model fit. For binary treatments, the output of the call to [glm()] or the requested fitting function. For multi-category treatments, the output of the call to the fitting function (or a list thereof if `multi.method = "glm"`). For continuous treatments, the output of the call to `glm()` for the predicted values in the denominator density.
 #'   }
 #' }
 #'
@@ -88,61 +88,65 @@
 #'
 #' - `estimand = "ATO"`
 #'
-#' Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via propensity score weighting. Journal of the American Statistical Association, 113(521), 390–400. \doi{10.1080/01621459.2016.1260466}
+#' Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via propensity score weighting. *Journal of the American Statistical Association*, 113(521), 390–400. \doi{10.1080/01621459.2016.1260466}
 #'
 #' - `estimand = "ATM"`
 #'
-#' Li, L., & Greene, T. (2013). A Weighting Analogue to Pair Matching in Propensity Score Analysis. The International Journal of Biostatistics, 9(2). \doi{10.1515/ijb-2012-0030}
+#' Li, L., & Greene, T. (2013). A Weighting Analogue to Pair Matching in Propensity Score Analysis. *The International Journal of Biostatistics*, 9(2). \doi{10.1515/ijb-2012-0030}
 #'
 #' - `estimand = "ATOS"`
 #'
-#' Crump, R. K., Hotz, V. J., Imbens, G. W., & Mitnik, O. A. (2009). Dealing with limited overlap in estimation of average treatment effects. Biometrika, 96(1), 187–199. \doi{10.1093/biomet/asn055}
+#' Crump, R. K., Hotz, V. J., Imbens, G. W., & Mitnik, O. A. (2009). Dealing with limited overlap in estimation of average treatment effects. *Biometrika*, 96(1), 187–199. \doi{10.1093/biomet/asn055}
 #'
 #' - Other estimands
 #'
-#' Austin, P. C. (2011). An Introduction to Propensity Score Methods for Reducing the Effects of Confounding in Observational Studies. Multivariate Behavioral Research, 46(3), 399–424. \doi{10.1080/00273171.2011.568786}
+#' Austin, P. C. (2011). An Introduction to Propensity Score Methods for Reducing the Effects of Confounding in Observational Studies. *Multivariate Behavioral Research*, 46(3), 399–424. \doi{10.1080/00273171.2011.568786}
 #'
 #' - Marginal mean weighting through stratification
 #'
-#' Hong, G. (2010). Marginal mean weighting through stratification: Adjustment for selection bias in multilevel data. Journal of Educational and Behavioral Statistics, 35(5), 499–531. \doi{10.3102/1076998609359785}
+#' Hong, G. (2010). Marginal mean weighting through stratification: Adjustment for selection bias in multilevel data. *Journal of Educational and Behavioral Statistics*, 35(5), 499–531. \doi{10.3102/1076998609359785}
 #'
 #' - Bias-reduced logistic regression
 #'
 #' See references for the \pkg{brglm2} \pkgfun2{brglm2}{brglm2}{package}.
 #'
+#' - Firth corrected logistic regression
+#'
+#' Puhr, R., Heinze, G., Nold, M., Lusa, L., & Geroldinger, A. (2017). Firth’s logistic regression with rare events: Accurate effect estimates and predictions? *Statistics in Medicine*, 36(14), 2302–2317. \doi{10.1002/sim.7273}
+#'
 #' - SAEM logistic regression for missing data
 #'
-#' Jiang, W., Josse, J., & Lavielle, M. (2019). Logistic regression with missing covariates — Parameter estimation, model selection and prediction within a joint-modeling framework. Computational Statistics & Data Analysis, 106907. \doi{10.1016/j.csda.2019.106907}
+#' Jiang, W., Josse, J., & Lavielle, M. (2019). Logistic regression with missing covariates — Parameter estimation, model selection and prediction within a joint-modeling framework. *Computational Statistics & Data Analysis*, 106907. \doi{10.1016/j.csda.2019.106907}
 #'
 #' ## Multi-Category Treatments
 #'
 #' - `estimand = "ATO"`
 #'
-#' Li, F., & Li, F. (2019). Propensity score weighting for causal inference with multiple treatments. The Annals of Applied Statistics, 13(4), 2389–2415. \doi{10.1214/19-AOAS1282}
+#' Li, F., & Li, F. (2019). Propensity score weighting for causal inference with multiple treatments. *The Annals of Applied Statistics*, 13(4), 2389–2415. \doi{10.1214/19-AOAS1282}
 #'
 #' - `estimand = "ATM"`
 #'
-#' Yoshida, K., Hernández-Díaz, S., Solomon, D. H., Jackson, J. W., Gagne, J. J., Glynn, R. J., & Franklin, J. M. (2017). Matching weights to simultaneously compare three treatment groups: Comparison to three-way matching. Epidemiology (Cambridge, Mass.), 28(3), 387–395. \doi{10.1097/EDE.0000000000000627}
+#' Yoshida, K., Hernández-Díaz, S., Solomon, D. H., Jackson, J. W., Gagne, J. J., Glynn, R. J., & Franklin, J. M. (2017). Matching weights to simultaneously compare three treatment groups: Comparison to three-way matching. *Epidemiology* (Cambridge, Mass.), 28(3), 387–395. \doi{10.1097/EDE.0000000000000627}
 #'
 #' - Other estimands
 #'
-#' McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand, R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for Multiple Treatments Using Generalized Boosted Models. Statistics in Medicine, 32(19), 3388–3414. \doi{10.1002/sim.5753}
+#' McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand, R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for Multiple Treatments Using Generalized Boosted Models. *Statistics in Medicine*, 32(19), 3388–3414. \doi{10.1002/sim.5753}
 #'
 #' - Marginal mean weighting through stratification
 #'
-#' Hong, G. (2012). Marginal mean weighting through stratification: A generalized method for evaluating multivalued and multiple treatments with nonexperimental data. Psychological Methods, 17(1), 44–60. \doi{10.1037/a0024918}
+#' Hong, G. (2012). Marginal mean weighting through stratification: A generalized method for evaluating multivalued and multiple treatments with nonexperimental data. *Psychological Methods*, 17(1), 44–60. \doi{10.1037/a0024918}
 #'
 #' ## Continuous treatments
 #'
-#' Robins, J. M., Hernán, M. Á., & Brumback, B. (2000). Marginal Structural Models and Causal Inference in Epidemiology. Epidemiology, 11(5), 550–560.
+#' Robins, J. M., Hernán, M. Á., & Brumback, B. (2000). Marginal Structural Models and Causal Inference in Epidemiology. *Epidemiology*, 11(5), 550–560.
 #'
 #' - Using non-normal conditional densities
 #'
-#' Naimi, A. I., Moodie, E. E. M., Auger, N., & Kaufman, J. S. (2014). Constructing Inverse Probability Weights for Continuous Exposures: A Comparison of Methods. Epidemiology, 25(2), 292–299. \doi{10.1097/EDE.0000000000000053}
+#' Naimi, A. I., Moodie, E. E. M., Auger, N., & Kaufman, J. S. (2014). Constructing Inverse Probability Weights for Continuous Exposures: A Comparison of Methods. *Epidemiology*, 25(2), 292–299. \doi{10.1097/EDE.0000000000000053}
 #'
 #' - SAEM linear regression for missing data
 #'
-#' Jiang, W., Josse, J., & Lavielle, M. (2019). Logistic regression with missing covariates — Parameter estimation, model selection and prediction within a joint-modeling framework. Computational Statistics & Data Analysis, 106907. \doi{10.1016/j.csda.2019.106907}
+#' Jiang, W., Josse, J., & Lavielle, M. (2019). Logistic regression with missing covariates — Parameter estimation, model selection and prediction within a joint-modeling framework. *Computational Statistics & Data Analysis*, 106907. \doi{10.1016/j.csda.2019.106907}
 #'
 #' @examples
 #' library("cobalt")
@@ -185,7 +189,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (ncol(covs) > 1) {
     if (missing == "saem") {
@@ -203,10 +207,13 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
   #Process link
   acceptable.links <- {
     if (missing == "saem") "logit"
-    else expand.grid_string(c("", "br."), c("logit", "probit", "cloglog", "identity", "log", "cauchit"))
+    else c(expand.grid_string(c("", "br."), c("logit", "probit", "cloglog", "identity", "log", "cauchit")),
+           "flic", "flac")
   }
 
-  if (is_null(A[["link"]])) A$link <- acceptable.links[1]
+  if (is_null(A[["link"]])) {
+    A[["link"]] <- acceptable.links[1]
+  }
   else {
     which.link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
     if (is.na(which.link)) {
@@ -219,7 +226,8 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
   }
 
   use.br <- startsWith(A[["link"]], "br.")
-  if (use.br) A$link <- substr(A$link, 4, nchar(A$link))
+  if (use.br) A[["link"]] <- substr(A[["link"]], 4, nchar(A[["link"]]))
+  use.logistf <- A[["link"]] %in% c("flic", "flac")
 
   if (missing == "saem") {
     rlang::check_installed("misaem")
@@ -236,11 +244,46 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
       }, verbose = verbose)
     },
     warning = function(w) {
-      if (conditionMessage(w) != "one argument not used by format '%i '") .wrn("(from misaem) ", w, tidy = FALSE)
+      w <- conditionMessage(w)
+      if (w != "one argument not used by format '%i '") .wrn("(from misaem) ", w, tidy = FALSE)
       invokeRestart("muffleWarning")
     })
 
     p.score <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
+  }
+  else if (use.logistf) {
+    rlang::check_installed("logistf")
+    fit_fun <- switch(A[["link"]],
+                      "flic" = logistf::flic,
+                      "flac" = logistf::flac)
+
+    ctrl_fun <- logistf::logistf.control
+    control <- do.call(ctrl_fun, c(A[["control"]],
+                                   A[setdiff(names(formals(ctrl_fun))[pmatch(names(A), names(formals(ctrl_fun)), 0)],
+                                             names(A[["control"]]))]))
+
+    modctrl_fun <- logistf::logistf.mod.control
+    modcontrol <- do.call(modctrl_fun, c(A[["modcontrol"]],
+                                   A[setdiff(names(formals(modctrl_fun))[pmatch(names(A), names(formals(modctrl_fun)), 0)],
+                                             names(A[["modcontrol"]]))]))
+
+    withCallingHandlers({verbosely({
+      data <- data.frame(treat, covs)
+      formula <- if (ncol(covs) > 0) formula(data) else treat ~ 1
+
+      fit <- do.call(fit_fun, list(formula, data = data,
+                                   weights = s.weights,
+                                   control = control,
+                                   modcontrol = modcontrol,
+                                   pl = FALSE), quote = TRUE)
+    }, verbose = verbose)},
+    warning = function(w) {
+      w <- conditionMessage(w)
+      if (w != "non-integer #successes in a binomial glm!") .wrn("(from `glm()`) ", w, tidy = FALSE)
+      invokeRestart("muffleWarning")
+    })
+
+    p.score <- fit$predict
   }
   else {
     if (use.br) {
@@ -284,6 +327,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
       else {
         data <- data.frame(treat, covs)
         formula <- if (ncol(covs) > 0) formula(data) else treat ~ 1
+
         fit <- do.call(stats::glm, list(formula, data = data,
                                         weights = s.weights,
                                         mustart = mustart,
@@ -294,11 +338,16 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
       }
     }, verbose = verbose)},
     warning = function(w) {
-      if (conditionMessage(w) != "non-integer #successes in a binomial glm!") .wrn("(from `glm()`) ", w, tidy = FALSE)
+      w <- conditionMessage(w)
+      if (w != "non-integer #successes in a binomial glm!") .wrn("(from `glm()`) ", w, tidy = FALSE)
       invokeRestart("muffleWarning")
     })
 
     p.score <- fit$fitted.values
+
+    if (any(p.score <= 1e-14) || any(p.score >= 1 - 1e-14)) {
+      .wrn('propensity scores numerically equal to 0 or 1 were estimated, indicating perfect separation and infinite parameter estimates. These may yield problems with inference. Consider trying a different `link`. See `help("method_glm", package = "WeightIt")` for details')
+    }
   }
 
   fit[["call"]] <- NULL
@@ -310,7 +359,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
                                    stabilize = stabilize, subclass = subclass)
 
   Mparts <- NULL
-  if (missing != "saem" && !use.br) {
+  if (missing != "saem" && !use.br && !use.logistf) {
     Mparts <- list(
       psi_treat = function(Btreat, A, Xtreat, SW) {
         lin_pred <- drop(Xtreat %*% Btreat)
@@ -320,8 +369,8 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
       wfun = function(Btreat, Xtreat, A) {
         lin_pred <- drop(Xtreat %*% Btreat)
         ps <- family$linkinv(lin_pred)
-        w <- .get_w_from_ps_internal_bin(ps = ps, treat = A, estimand,
-                                     stabilize = stabilize, subclass = subclass)
+        .get_w_from_ps_internal_bin(ps = ps, treat = A, estimand,
+                                    stabilize = stabilize, subclass = subclass)
       },
       Xtreat = cbind(`(Intercept)` = 1, covs),
       A = treat,
@@ -349,7 +398,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (ncol(covs) > 1) {
     if (missing == "saem") {
@@ -362,7 +411,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   }
 
   if (is_not_null(A$use.mlogit)) {
-    .err("`use.mlogit` is no longer accepted and will be ignored; use `multi.method` instead. See `help(\"method_glm\")` for details")
+    .wrn("`use.mlogit` is no longer accepted and will be ignored; use `multi.method` instead. See `help(\"method_glm\")` for details")
     A$use.mlogit <- NULL
   }
   if (is_not_null(A$use.mclogit)) {
@@ -404,13 +453,13 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   # Process link
   link <- NULL
   if (is_null(multi.method)) {
-    if (is_null(A$link) || identical(A$link, "logit")) {
+    if (is_null(A[["link"]]) || identical(A[["link"]], "logit")) {
       multi.method <- "weightit"
     }
-    else if (identical(A$link, "bayes.probit")) {
+    else if (identical(A[["link"]], "bayes.probit")) {
       multi.method <- "mnp"
     }
-    else if (identical(A$link, "br.logit")) {
+    else if (identical(A[["link"]], "br.logit")) {
       multi.method <- "brmultinom"
     }
     else {
@@ -419,7 +468,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   }
   else if (multi.method == "polr") {
     acceptable.links <- c("logit", "probit", "loglog", "cloglog", "cauchit", "br.logit")
-    if (is_null(A$link)) {
+    if (is_null(A[["link"]])) {
       link <- acceptable.links[1]
     }
     else {
@@ -434,19 +483,19 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
     }
   }
   else if (multi.method == "saem") {
-    if (is_not_null(A$link) && !identical(A$link, "logit")) {
+    if (is_not_null(A[["link"]]) && !identical(A[["link"]], "logit")) {
       .wrn("`link` is ignored when `missing = \"saem\"`")
     }
   }
   else if (multi.method %in% c("weightit", "mclogit", "mnp", "brmultinom")) {
-    if (is_not_null(A$link) && !identical(A$link, "logit")) {
+    if (is_not_null(A[["link"]]) && !identical(A[["link"]], "logit")) {
       .wrn(sprintf("`link` is ignored when `multi.method` is \"%s\"",
                    multi.method))
     }
   }
   else if (multi.method == "glm") {
     acceptable.links <- c("logit", "probit", "cloglog", "identity", "log", "cauchit")
-    if (is_null(A$link)) {
+    if (is_null(A[["link"]])) {
       link <- acceptable.links[1]
     }
     else {
@@ -462,11 +511,11 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   if (multi.method == "weightit") {
     verbosely({
       fit.obj <- do.call(".mlogit_weightit.fit",
-                     c(list(x = cbind(1, covs),
-                            y = treat,
-                            weights = s.weights,
-                            hess = FALSE)),
-                     quote = TRUE)
+                         c(list(x = cbind(1, covs),
+                                y = treat,
+                                weights = s.weights,
+                                hess = FALSE)),
+                         quote = TRUE)
     }, verbose = verbose)
 
     ps <- fit.obj$fitted.values
@@ -543,7 +592,8 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
         }, verbose = verbose)
       },
       warning = function(w) {
-        if (conditionMessage(w) != "one argument not used by format '%i '") .wrn("(from misaem) ", w, tidy = FALSE)
+        w <- conditionMessage(w)
+        if (w != "one argument not used by format '%i '") .wrn("(from misaem) ", w, tidy = FALSE)
         invokeRestart("muffleWarning")
       })
 
@@ -588,20 +638,20 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                                              names(A[["control"]]))]))
     tryCatch({verbosely({
       fit.obj <- do.call(mclogit::mblogit,
-                     list(form,
-                          data = data,
-                          weights = quote(.s.weights),
-                          random = A[["random"]],
-                          method = A[["mclogit.method"]],
-                          estimator = if_null_then(A[["estimator"]], eval(formals(mclogit::mclogit)[["estimator"]])),
-                          dispersion = if_null_then(A[["dispersion"]], eval(formals(mclogit::mclogit)[["dispersion"]])),
-                          groups = A[["groups"]],
-                          control = control))
+                         list(form,
+                              data = data,
+                              weights = quote(.s.weights),
+                              random = A[["random"]],
+                              method = A[["mclogit.method"]],
+                              estimator = if_null_then(A[["estimator"]], eval(formals(mclogit::mclogit)[["estimator"]])),
+                              dispersion = if_null_then(A[["dispersion"]], eval(formals(mclogit::mclogit)[["dispersion"]])),
+                              groups = A[["groups"]],
+                              control = control))
 
     }, verbose = verbose)},
     error = function(e) {
       .err(sprintf("there was a problem fitting the multinomial %s regression with `mblogit()`.\n       Try a different `multi.method`.\nError message: (from `mclogit::mblogit()`) %s",
-                   A$link, conditionMessage(e)), tidy = FALSE)
+                   A[["link"]], conditionMessage(e)), tidy = FALSE)
     }
     )
 
@@ -618,9 +668,9 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                                              names(A[["control"]]))]))
     tryCatch({verbosely({
       fit.obj <- do.call(brglm2::brmultinom,
-                     list(formula, data,
-                          weights = s.weights,
-                          control = control), quote = TRUE)
+                         list(formula, data,
+                              weights = s.weights,
+                              control = control), quote = TRUE)
     }, verbose = verbose)},
     error = function(e) {
       .err(sprintf("There was a problem with the bias-reduced multinomial logit regression. Try a different `multi.method`.\n       Error message: (from brglm2) %s", conditionMessage(e)), tidy = FALSE)
@@ -706,7 +756,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       },
       Xtreat = cbind(`(Intercept)` = 1, covs),
       A = treat,
-      btreat = unlist(lapply(fit.list, `[[`, "coefficients"))
+      btreat = unlist(grab(fit.list, "coefficients"))
     )
   }
 
@@ -717,8 +767,6 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
 weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing, verbose, ...) {
   A <- list(...)
 
-  fit.obj <- NULL
-
   covs <- covs[subset, , drop = FALSE]
   treat <- treat[subset]
   s.weights <- s.weights[subset]
@@ -727,7 +775,7 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (ncol(covs) > 1) {
     if (missing == "saem") {
@@ -743,16 +791,19 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
     covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
   }
 
-  data <- data.frame(treat, covs)
-  formula <- formula(data)
+  s.weights <- s.weights / mean_fast(s.weights)
 
   #Process density params
-  densfun <- get_dens_fun(use.kernel = isTRUE(A[["use.kernel"]]), bw = A[["bw"]],
+  densfun <- .get_dens_fun(use.kernel = isTRUE(A[["use.kernel"]]), bw = A[["bw"]],
                           adjust = A[["adjust"]], kernel = A[["kernel"]],
-                          n = A[["n"]], treat = treat, density = A[["density"]])
+                          n = A[["n"]], treat = treat, density = A[["density"]],
+                          weights = s.weights)
 
   #Stabilization - get dens.num
-  dens.num <- densfun(treat - mean(treat), s.weights)
+  un_p <- mean_fast(s.weights * treat)
+  un_s2 <- mean_fast(s.weights * (treat - un_p)^2)
+
+  dens.num <- densfun((treat - un_p) / sqrt(un_s2))
 
   #Estimate GPS
   if (is_null(A[["link"]])) A[["link"]] <- "identity"
@@ -768,11 +819,15 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
                    word_list(acceptable.links, quotes = TRUE, is.are = TRUE)))
     }
 
+    data <- data.frame(treat, covs)
+    formula <- formula(data)
+
     withCallingHandlers({verbosely({
       fit <- misaem::miss.lm(formula, data, control = as.list(A[["control"]]))
     }, verbose = verbose)},
     warning = function(w) {
-      if (conditionMessage(w) != "one argument not used by format '%i '") {
+      w <- conditionMessage(w)
+      if (w != "one argument not used by format '%i '") {
         .wrn("(from `misaem::miss.lm()`) ", w, tidy = FALSE)
       }
       invokeRestart("muffleWarning")
@@ -780,36 +835,48 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
 
     if (is_null(A[["saem.method"]])) A[["saem.method"]] <- "map"
 
-    gp.score <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
+    p <- drop(predict(fit, newdata = covs, method = A[["saem.method"]]))
   }
   else {
     acceptable.links <- c("identity", "log", "inverse")
 
-    which.link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
-    if (is.na(which.link)) {
+    link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
+    if (is.na(link)) {
       .err(sprintf("only %s allowed as the link for continuous treatments",
                    word_list(acceptable.links, quotes = TRUE, is.are = TRUE)))
     }
 
-    family <- gaussian(link = which.link)
+    family <- gaussian(link = link)
 
     verbosely({
-      fit <- do.call("glm", c(list(formula, data = data,
-                                   weights = s.weights,
-                                   family = family,
-                                   control = as.list(A$control))),
-                     quote = TRUE)
+      if (isTRUE(A[["quick"]])) {
+        fit <- do.call(stats::glm.fit, list(y = treat,
+                                            x = cbind(`(Intercept)` = 1, covs),
+                                            weights = s.weights,
+                                            family = family,
+                                            control = as.list(A$control)), quote = TRUE)
+      }
+      else {
+        data <- data.frame(treat, covs)
+        formula <- if (ncol(covs) > 0) formula(data) else treat ~ 1
+
+        fit <- do.call(stats::glm, list(formula, data = data,
+                                        weights = s.weights,
+                                        family = family,
+                                        control = as.list(A$control)),
+                       quote = TRUE)
+      }
     }, verbose = verbose)
 
-    gp.score <- fit$fitted.values
+    p <- fit$fitted.values
   }
 
-  fit.obj <- fit
+  s2 <- mean_fast(s.weights * (treat - p)^2)
 
   #Get weights
-  dens.denom <- densfun(treat - gp.score, s.weights)
+  dens.denom <- densfun((treat - p) / sqrt(s2))
 
-  w <- dens.num/dens.denom
+  w <- dens.num / dens.denom
 
   if (isTRUE(A[["plot"]])) {
     d.n <- attr(dens.num, "density")
@@ -818,7 +885,42 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
   }
 
   Mparts <- NULL
+  if (missing != "saem" && !isTRUE(A[["use.kernel"]])) {
+    Mparts <- list(
+      psi_treat = function(Btreat, A, Xtreat, SW) {
+        un_s2 <- exp(Btreat[1])
+        un_p <- Btreat[2]
 
-  list(w = w, fit.obj = fit.obj,
+        s2 <- exp(Btreat[3])
+        lin_pred <- drop(Xtreat %*% Btreat[-(1:3)])
+        p <- family$linkinv(lin_pred)
+
+        SW <- SW / mean_fast(SW)
+
+        cbind(SW * (A - un_p)^2 - un_s2, #unconditional variance
+              SW * (A - un_p), #unconditional mean
+              SW * (A - p)^2 - s2, #conditional variance
+              Xtreat * (SW * family$mu.eta(lin_pred) * (A - p) / family$variance(p))) #conditional mean
+      },
+      wfun = function(Btreat, Xtreat, A) {
+        un_s2 <- exp(Btreat[1])
+        un_p <- Btreat[2]
+        dens.num <- densfun((A - un_p)/sqrt(un_s2))
+
+        s2 <- exp(Btreat[3])
+        lin_pred <- drop(Xtreat %*% Btreat[-(1:3)])
+        p <- family$linkinv(lin_pred)
+        dens.denom <- densfun((A - p) / sqrt(s2))
+
+        dens.num / dens.denom
+      },
+      Xtreat = cbind(`(Intercept)` = 1, covs),
+      A = treat,
+      btreat = c("log(s^2)" = log(un_s2), "E[A]" = un_p, "log(s_r^2)" = log(s2),
+                 fit$coefficients)
+    )
+  }
+
+  list(w = w, fit.obj = fit,
        Mparts = Mparts)
 }

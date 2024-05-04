@@ -71,13 +71,13 @@
 #' \pkgfun{CBPS}{npCBPS} for the fitting function
 #'
 #' @references
-#' Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing propensity score for a continuous treatment: Application to the efficacy of political advertisements. The Annals of Applied Statistics, 12(1), 156–177. \doi{10.1214/17-AOAS1101}
+#' Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing propensity score for a continuous treatment: Application to the efficacy of political advertisements. *The Annals of Applied Statistics*, 12(1), 156–177. \doi{10.1214/17-AOAS1101}
 #'
 #' @examplesIf requireNamespace("CBPS", quietly = TRUE)
 #' # Examples take a long time to run
 #' library("cobalt")
 #' data("lalonde", package = "cobalt")
-#' \dontrun{
+#' \donttest{
 #'   #Balancing covariates between treatment groups (binary)
 #'   (W1 <- weightit(treat ~ age + educ + married +
 #'                     nodegree + re74, data = lalonde,
@@ -110,11 +110,11 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int))
+  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
 
-  covs <- cbind(covs, quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights))
+  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights))
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
@@ -155,9 +155,9 @@ weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, moment
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
-  covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int))
+  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
 
   colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]

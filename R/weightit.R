@@ -23,10 +23,7 @@
 #' individual pages for each method for more information on which estimands are
 #' allowed with each method and what literature to read to interpret these
 #' estimands.
-#' @param stabilize `logical`; whether or not to stabilize the weights.
-#' For the methods that involve estimating propensity scores, this involves
-#' multiplying each unit's weight by the proportion of units in their treatment
-#' group. Default is `FALSE`.
+#' @param stabilize whether or not and how to stabilize the weights. If `TRUE`, each unit's weight will be multiplied by a standardization factor, which is the inverse of the unconditional probability (or density) of each unit's observed treatment value. If a formula, a generalized linear model will be fit with the included predictors, and the inverse of the corresponding weight will be used as the standardization factor. Can only be used with continuous treatments or when `estimand = "ATE"`. Default is `FALSE` for no standardization. See also the `num.formula` argument at [weightitMSM()]
 #' @param focal when multi-category treatments are used and ATT weights are
 #' requested, which group to consider the "treated" or focal group. This group
 #' will not be weighted, and the other groups will be weighted to be more like
@@ -34,8 +31,7 @@
 #' `"ATT"`.
 #' @param by a string containing the name of the variable in `data` for
 #' which weighting is to be done within categories or a one-sided formula with
-#' the stratifying variable on the right-hand side. For example, if `by = "gender"` or `by = ~gender`, a separate propensity score model or optimization will occur within each level of the variable `"gender"`. (The argument used to be
-#' called `exact`, which will still work but with a message.) Only one
+#' the stratifying variable on the right-hand side. For example, if `by = "gender"` or `by = ~gender`, a separate propensity score model or optimization will occur within each level of the variable `"gender"`. Only one
 #' `by` variable is allowed; to stratify by multiply variables
 #' simultaneously, create a new variable that is a full cross of those
 #' variables using [interaction()].
@@ -118,16 +114,14 @@
 #' | [`"glm"`][method_glm] | Propensity score weighting using generalized linear models |
 #' | :---- | :---- |
 #' | [`"gbm"`][method_gbm] | Propensity score weighting using generalized boosted modeling |
-#' | [`"cbps"`][method_cbps]|Covariate Balancing Propensity Score weighting |
-#' | [`"npcbps"`][method_npcbps]|Non-parametric Covariate Balancing Propensity Score weighting |
+#' | [`"cbps"`][method_cbps]| Covariate Balancing Propensity Score weighting |
+#' | [`"npcbps"`][method_npcbps]| Non-parametric Covariate Balancing Propensity Score weighting |
 #' | [`"ebal"`][method_ebal] | Entropy balancing |
 #' | [`"ipt"`][method_ipt] | Inverse probability tilting |
-# \item [`"ebcw"`][method_ebcw] - Empirical balancing calibration weighting |
 #' | [`"optweight"`][method_optweight] | Optimization-based weighting |
 #' | [`"super"`][method_super] | Propensity score weighting using SuperLearner |
 #' | [`"bart"`][method_bart] | Propensity score weighting using Bayesian additive regression trees (BART) |
 #' | [`"energy"`][method_energy] | Energy balancing |
-#'
 #'
 #' `method` can also be supplied as a user-defined function; see
 #' [`method_user`] for instructions and examples.
@@ -161,7 +155,7 @@
 #'                 method = "glm", estimand = "ATT"))
 #' summary(W1)
 #' bal.tab(W1)
-#' @examplesIf requireNamespace("osqp", quietly = TRUE)
+#'
 #' #Balancing covariates with respect to race (multi-category)
 #' (W2 <- weightit(race ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
@@ -169,11 +163,10 @@
 #' summary(W2)
 #' bal.tab(W2)
 #'
-#' @examplesIf requireNamespace("CBPS", quietly = TRUE)
 #' #Balancing covariates with respect to re75 (continuous)
 #' (W3 <- weightit(re75 ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
-#'                 method = "cbps", over = FALSE))
+#'                 method = "cbps"))
 #' summary(W3)
 #' bal.tab(W3)
 
@@ -198,9 +191,6 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
   treat <- t.c[["treat"]]
   # treat.name <- t.c[["treat.name"]]
 
-  if (is_null(covs)) {
-    # .err("no covariates were specified")
-  }
   if (is_null(treat)) {
     .err("no treatment variable was specified")
   }
@@ -218,34 +208,33 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
   treat <- assign_treat_type(treat)
   treat.type <- get_treat_type(treat)
 
-  chk::chk_flag(stabilize)
   chk::chk_flag(verbose)
   chk::chk_flag(include.obj)
   chk::chk_flag(keep.mparts)
 
   #Process ps
-  ps <- process.ps(ps, data, treat)
+  ps <- .process_ps(ps, data, treat)
   if (is_not_null(ps) && !identical(method, "glm") && !is.function(method)) {
     .wrn("`ps` is supplied, so `method` will be ignored")
     method <- "glm"
   }
 
   ##Process method
-  check.acceptable.method(method, msm = FALSE, force = FALSE)
+  .check_acceptable_method(method, msm = FALSE, force = FALSE)
 
   if (is.character(method)) {
-    method <- method.to.proper.method(method)
+    method <- .method_to_proper_method(method)
     attr(method, "name") <- method
   }
   else if (is.function(method)) {
     method.name <- deparse1(substitute(method))
-    check.user.method(method)
+    .check_user_method(method)
     attr(method, "name") <- method.name
   }
 
   #Process estimand and focal
-  estimand <- process.estimand(estimand, method, treat.type)
-  f.e.r <- process.focal.and.estimand(focal, estimand, treat)
+  estimand <- .process_estimand(estimand, method, treat.type)
+  f.e.r <- .process_focal_and_estimand(focal, estimand, treat)
   focal <- f.e.r[["focal"]]
   # estimand <- f.e.r[["estimand"]]
   estimand <- f.e.r[["reported.estimand"]]
@@ -254,16 +243,36 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
   #Process missing
   missing <- {
     if (!anyNA(reported.covs)) ""
-    else process.missing(missing, method, treat.type)
+    else .process_missing(missing, method, treat.type)
   }
 
   #Check subclass
-  if (is_not_null(subclass)) check.subclass(method, treat.type)
+  if (is_not_null(subclass)) .check_subclass(method, treat.type)
 
   #Process s.weights
   s.weights <- process.s.weights(s.weights, data)
 
   if (is_null(s.weights)) s.weights <- rep(1, n)
+
+  #Process stabilize
+  if (isFALSE(stabilize)) {
+    stabilize <- NULL
+  }
+  else if (isTRUE(stabilize)) {
+    stabilize <- as.formula("~ 1")
+  }
+
+  if (is_not_null(stabilize)) {
+    if (treat.type != "continious" && estimand != "ATE") {
+      .err("`stabilize` can only be supplied when `estimand = \"ATE\"`")
+    }
+
+    if (!rlang::is_formula(stabilize)) {
+      .err("`stabilize` must be `TRUE`, `FALSE`, or a formula with the stabilization factors on the right hand side")
+    }
+
+    stabilize <- update(formula, update(stabilize, NULL ~ .))
+  }
 
   ##Process by
   if (is_not_null(A[["exact"]])) {
@@ -273,11 +282,11 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
   }
   else by.arg <- "by"
 
-  # processed.by <- process.by(by.name, data = data, treat = treat)
-  processed.by <- process.by(by, data = data, treat = treat, by.arg = by.arg)
+  # processed.by <- .process_by(by.name, data = data, treat = treat)
+  processed.by <- .process_by(by, data = data, treat = treat, by.arg = by.arg)
 
   #Process moments and int
-  moments.int <- process.moments.int(moments, int, method)
+  moments.int <- .process_moments_int(moments, int, method)
 
   call <- match.call()
   # args <- list(...)
@@ -291,7 +300,7 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
   A[["by.factor"]] <- attr(processed.by, "by.factor")
   A[["estimand"]] <- estimand
   A[["focal"]] <- focal
-  A[["stabilize"]] <- stabilize
+  A[["stabilize"]] <- FALSE
   A[["method"]] <- method
   A[["moments"]] <- moments.int[["moments"]]
   A[["int"]] <- moments.int[["int"]]
@@ -306,7 +315,23 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
 
   obj <- do.call("weightit.fit", A)
 
-  check_estimated_weights(obj$weights, treat, treat.type, s.weights)
+  if (is_not_null(stabilize)) {
+    stab.t.c <- get_covs_and_treat_from_formula(stabilize, data)
+
+    A[["treat"]] <- stab.t.c[["treat"]]
+    A[["covs"]] <- stab.t.c[["model.covs"]]
+    A[["method"]] <- "glm"
+    A[["moments"]] <- NULL
+    A[["int"]] <- NULL
+    A[[".formula"]] <- stabilize
+    A[[".covs"]] <- stab.t.c[["reported.covs"]]
+
+    sw_obj <- do.call("weightit.fit", A)
+
+    obj$weights <- obj$weights / sw_obj[["weights"]]
+  }
+
+  .check_estimated_weights(obj$weights, treat, treat.type, s.weights)
 
   ## Assemble output object----
   out <- list(weights = obj$weights,
@@ -321,20 +346,26 @@ weightit <- function(formula, data = NULL, method = "glm", estimand = "ATE", sta
               by = processed.by,
               call = call,
               formula = formula,
+              stabilize = stabilize,
               env = parent.frame(),
               info = obj$info,
               obj = obj$fit.obj)
 
   out <- clear_null(out)
 
-  if (keep.mparts) {
-    attr(out, "Mparts") <- attr(obj, "Mparts")
+  if (keep.mparts && is_not_null(attr(obj, "Mparts"))) {
+    if (is_null(stabilize)) {
+      attr(out, "Mparts") <- attr(obj, "Mparts")
+    }
+    else {
+      attr(sw_obj, "Mparts")$wfun <- Invert(attr(sw_obj, "Mparts")$wfun)
+      attr(out, "Mparts.list") <- list(attr(obj, "Mparts"), attr(sw_obj, "Mparts"))
+    }
   }
 
   class(out) <- "weightit"
 
   out
-  ####----
 }
 
 #' @exportS3Method print weightit
@@ -343,15 +374,38 @@ print.weightit <- function(x, ...) {
   trim <- attr(x[["weights"]], "trim")
 
   cat("A " %+% italic("weightit") %+% " object\n")
-  if (is_not_null(x[["method"]])) cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", method.to.phrase(x[["method"]]), ")\n"))
-  cat(paste0(" - number of obs.: ", length(x[["weights"]]), "\n"))
-  cat(paste0(" - sampling weights: ", if (is_null(x[["s.weights"]]) || all_the_same(x[["s.weights"]])) "none" else "present", "\n"))
-  cat(paste0(" - treatment: ", ifelse(treat.type == "continuous", "continuous", paste0(nunique(x[["treat"]]), "-category", ifelse(treat.type == "multinomial", paste0(" (", paste(levels(x[["treat"]]), collapse = ", "), ")"), ""))), "\n"))
-  if (is_not_null(x[["estimand"]])) cat(paste0(" - estimand: ", x[["estimand"]], ifelse(is_not_null(x[["focal"]]), paste0(" (focal: ", x[["focal"]], ")"), ""), "\n"))
-  if (is_not_null(x[["covs"]])) cat(paste0(" - covariates: ", ifelse(length(names(x[["covs"]])) > 60, "too many to name", paste(names(x[["covs"]]), collapse = ", ")), "\n"))
-  if (is_not_null(x[["by"]])) {
-    cat(paste0(" - by: ", paste(names(x[["by"]]), collapse = ", "), "\n"))
+
+  if (is_not_null(x[["method"]])) {
+    cat(sprintf(" - method: %s (%s)\n",
+                add_quotes(attr(x[["method"]], "name")),
+                .method_to_phrase(x[["method"]])))
   }
+
+  cat(sprintf(" - number of obs.: %s\n",
+              length(x[["weights"]])))
+
+  cat(sprintf(" - sampling weights: %s\n",
+              if (is_null(x[["s.weights"]]) || all_the_same(x[["s.weights"]])) "none" else "present"))
+
+  cat(sprintf(" - treatment: %s\n",
+              if (treat.type == "continuous") "continuous"
+              else paste0(nunique(x[["treat"]]), "-category",
+                          if (treat.type == "multinomial") paste0(" (", paste(levels(x[["treat"]]), collapse = ", "), ")")
+                          else "")))
+
+  if (is_not_null(x[["estimand"]])) {
+    cat(paste0(" - estimand: ", x[["estimand"]],
+               if (is_not_null(x[["focal"]])) sprintf(" (focal: %s)", x[["focal"]]) else "", "\n"))
+  }
+
+  if (is_not_null(x[["covs"]])) {
+    cat(paste0(" - covariates: ", ifelse(length(names(x[["covs"]])) > 60, "too many to name", paste(names(x[["covs"]]), collapse = ", ")), "\n"))
+  }
+
+  if (is_not_null(x[["by"]])) {
+    cat(sprintf(" - by: %s\n", paste(names(x[["by"]]), collapse = ", ")))
+  }
+
   if (is_not_null(trim)) {
     if (trim < 1) {
       if (attr(x[["weights"]], "trim.lower")) trim <- c(1 - trim, trim)

@@ -105,19 +105,19 @@
 #' @references
 #' ## Binary treatments
 #'
-#' Pirracchio, R., Petersen, M. L., & van der Laan, M. (2015). Improving Propensity Score Estimators’ Robustness to Model Misspecification Using Super Learner. American Journal of Epidemiology, 181(2), 108–119. \doi{10.1093/aje/kwu253}
+#' Pirracchio, R., Petersen, M. L., & van der Laan, M. (2015). Improving Propensity Score Estimators’ Robustness to Model Misspecification Using Super Learner. *American Journal of Epidemiology*, 181(2), 108–119. \doi{10.1093/aje/kwu253}
 #'
 #' ## Multi-Category Treatments
 #'
-#' Imai, K., & Ratkovic, M. (2014). Covariate balancing propensity score. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 76(1), 243–263.
+#' Imai, K., & Ratkovic, M. (2014). Covariate balancing propensity score. *Journal of the Royal Statistical Society: Series B (Statistical Methodology)*, 76(1), 243–263.
 #'
 #' ## Continuous treatments
 #'
-#' Kreif, N., Grieve, R., Díaz, I., & Harrison, D. (2015). Evaluation of the Effect of a Continuous Treatment: A Machine Learning Approach with an Application to Treatment for Traumatic Brain Injury. Health Economics, 24(9), 1213–1228. \doi{10.1002/hec.3189}
+#' Kreif, N., Grieve, R., Díaz, I., & Harrison, D. (2015). Evaluation of the Effect of a Continuous Treatment: A Machine Learning Approach with an Application to Treatment for Traumatic Brain Injury. *Health Economics*, 24(9), 1213–1228. \doi{10.1002/hec.3189}
 #'
 #' ## Balance SuperLearner (`SL.method = "method.balance"`)
 #'
-#' Pirracchio, R., & Carone, M. (2018). The Balance Super Learner: A robust adaptation of the Super Learner to improve estimation of the average treatment effect in the treated based on propensity score matching. Statistical Methods in Medical Research, 27(8), 2504–2518. \doi{10.1177/0962280216682055}
+#' Pirracchio, R., & Carone, M. (2018). The Balance Super Learner: A robust adaptation of the Super Learner to improve estimation of the average treatment effect in the treated based on propensity score matching. *Statistical Methods in Medical Research*, 27(8), 2504–2518. \doi{10.1177/0962280216682055}
 #'
 #' See [`method_glm`] for additional references.
 #'
@@ -181,7 +181,7 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   covs <- as.data.frame(covs)
 
@@ -201,31 +201,29 @@ weightit2super <- function(covs, treat, s.weights, subset, estimand, focal,
 
   if (identical(A[["SL.method"]], "method.balance")) {
 
-    if (is_null(A[["criterion"]])) {
-      A[["criterion"]] <- A[["stop.method"]]
+    criterion <- A[["criterion"]]
+    if (is_null(criterion)) {
+      criterion <- A[["stop.method"]]
     }
 
-    if (is_null(A[["criterion"]])) {
+    if (is_null(criterion)) {
       .wrn("no `criterion` was provided. Using \"smd.mean\"")
-      A[["criterion"]] <- "smd.mean"
+      criterion <- "smd.mean"
     }
-    else if (length(A[["criterion"]]) > 1) {
-      .wrn("only one `criterion` is allowed at a time. Using just the first `criterion`")
-      A[["criterion"]] <- A[["criterion"]][1]
+    else {
+      chk::chk_string(criterion)
     }
 
     available.criteria <- cobalt::available.stats("binary")
 
-    if (is.character(A[["criterion"]]) &&
-        startsWith(A[["criterion"]], "es.")) {
-      subbed.crit <- sub("es.", "smd.", A[["criterion"]], fixed = TRUE)
+    if (startsWith(criterion, "es.")) {
+      subbed.crit <- sub("es.", "smd.", criterion, fixed = TRUE)
       subbed.match <- charmatch(subbed.crit, available.criteria)
       if (!anyNA(subbed.match) && subbed.match != 0L) {
-        A[["criterion"]] <- subbed.crit
+        criterion <- subbed.crit
       }
     }
 
-    criterion <- A[["criterion"]]
     criterion <- match_arg(criterion, available.criteria)
 
     init <- cobalt::bal.init(covs,
@@ -294,7 +292,7 @@ weightit2super.multi <- function(covs, treat, s.weights, subset, estimand, focal
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   covs <- as.data.frame(covs)
 
@@ -372,7 +370,7 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
     covs <- add_missing_indicators(covs)
   }
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (ncol(covs) > 1) {
     colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
@@ -380,12 +378,13 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
   }
 
   #Process density params
-  densfun <- get_dens_fun(use.kernel = isTRUE(A[["use.kernel"]]), bw = A[["bw"]],
+  densfun <- .get_dens_fun(use.kernel = isTRUE(A[["use.kernel"]]), bw = A[["bw"]],
                           adjust = A[["adjust"]], kernel = A[["kernel"]],
-                          n = A[["n"]], treat = treat, density = A[["density"]])
+                          n = A[["n"]], treat = treat, density = A[["density"]],
+                          weights = s.weights)
 
   #Stabilization - get dens.num
-  dens.num <- densfun(treat - mean(treat), s.weights)
+  dens.num <- densfun(scale_w(treat, s.weights))
 
   #Estimate GPS
   for (f in names(formals(SuperLearner::SuperLearner))) {
@@ -399,22 +398,21 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
 
   if (identical(B[["SL.method"]], "method.balance")) {
 
-    if (is_null(A[["criterion"]])) {
-      A[["criterion"]] <- A[["stop.method"]]
+    criterion <- A[["criterion"]]
+    if (is_null(criterion)) {
+      criterion <- A[["stop.method"]]
     }
 
-    if (is_null(A[["criterion"]])) {
+    if (is_null(criterion)) {
       .wrn("no `criterion` was provided. Using \"p.mean\"")
-      A[["criterion"]] <- "p.mean"
+      criterion <- "p.mean"
     }
-    else if (length(A[["criterion"]]) > 1) {
-      .wrn("only one `criterion` is allowed at a time. Using just the first `criterion`")
-      A[["criterion"]] <- A[["criterion"]][1]
+    else {
+      chk::chk_string(criterion)
     }
 
     available.criteria <- cobalt::available.stats("continuous")
 
-    criterion <- A[["criterion"]]
     criterion <- match_arg(criterion, available.criteria)
 
     init <- cobalt::bal.init(covs,
@@ -451,13 +449,16 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
     .err("(from `SuperLearner::SuperLearner()`) ", e., tidy = FALSE)
   })
 
-  if (discrete) gp.score <- fit$library.predict[,which.min(fit$cvRisk)]
-  else gp.score <- fit$SL.predict
+  gp.score <- {
+    if (discrete) fit$library.predict[,which.min(fit$cvRisk)]
+    else fit$SL.predict
+  }
 
   #Get weights
-  dens.denom <- densfun(treat - gp.score, s.weights)
+  r <- treat - gp.score
+  dens.denom <- densfun(r / sqrt(col.w.v(r, s.weights)))
 
-  w <- dens.num/dens.denom
+  w <- dens.num / dens.denom
 
   if (isTRUE(A[["use.kernel"]]) && isTRUE(A[["plot"]])) {
     d.n <- attr(dens.num, "density")
@@ -486,11 +487,10 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
       estimand <- attr(control$trimLogit, "vals")$estimand
       init <- attr(control$trimLogit, "vals")$init
 
-      tol <- .001
       for (i in seq_col(Z)) {
-        Z[Z[,i] < tol, i] <- tol
-        Z[Z[,i] > 1-tol, i] <- 1-tol
+        Z[,i] <- squish(Z[,i], .001)
       }
+
       w_mat <- .get_w_from_ps_internal_array(Z, treat = Y, estimand = estimand)
       cvRisk <- apply(w_mat, 2, cobalt::bal.compute, x = init)
 
@@ -534,7 +534,8 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
       init <- attr(control$trimLogit, "vals")$init
 
       w_mat <- apply(Z, 2, function(gp.score) {
-        dens.num/densfun(Y - gp.score, obsWeights)
+        r <- Y - gp.score
+        dens.num / densfun(r / sqrt(col.w.v(r, obsWeights)))
       })
 
       cvRisk <- apply(w_mat, 2, cobalt::bal.compute, x = init)
@@ -542,7 +543,8 @@ weightit2super.cont <- function(covs, treat, s.weights, subset, stabilize, missi
 
       loss <- function(coefs) {
         gp.score <- crossprod(t(Z), coefs/sum(coefs))
-        w <- dens.num/densfun(Y - gp.score, obsWeights)
+        r <- Y - gp.score
+        w <- dens.num / densfun(r / sqrt(col.w.v(r, obsWeights)))
         cobalt::bal.compute(init, weights = w)
       }
 

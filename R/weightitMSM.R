@@ -48,9 +48,7 @@
 #' included if `TRUE`.
 #' @param is.MSM.method whether the method estimates weights for multiple time
 #' points all at once (`TRUE`) or by estimating weights at each time point
-#' and then multiplying them together (`FALSE`). This is only relevant for
-#' `method = "optweight"`, which estimates weights for longitudinal
-#' treatments all at once, and for user-specified functions.
+#' and then multiplying them together (`FALSE`). This is only relevant for user-specified functions.
 #' @param weightit.force several methods are not valid for estimating weights
 #' with longitudinal treatments, and will produce an error message if
 #' attempted. Set to `TRUE` to bypass this error message.
@@ -166,24 +164,24 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm", stabilize = F
   #Checks
 
   ##Process method
-  check.acceptable.method(method, msm = TRUE, force = weightit.force)
+  .check_acceptable_method(method, msm = TRUE, force = weightit.force)
 
   if (is.character(method)) {
-    method <- method.to.proper.method(method)
+    method <- .method_to_proper_method(method)
     attr(method, "name") <- method
     if (missing(is.MSM.method)) is.MSM.method <- NULL
-    is.MSM.method <- process.MSM.method(is.MSM.method, method)
+    is.MSM.method <- .process_MSM_method(is.MSM.method, method)
   }
   else if (is.function(method)) {
     method.name <- paste(deparse(substitute(method)))
-    check.user.method(method)
+    .check_user_method(method)
     if (missing(is.MSM.method)) is.MSM.method <- NULL
-    is.MSM.method <- process.MSM.method(is.MSM.method, method)
+    is.MSM.method <- .process_MSM_method(is.MSM.method, method)
     attr(method, "name") <- method.name
   }
 
   #Process moments and int
-  moments.int <- process.moments.int(moments, int, method)
+  moments.int <- .process_moments_int(moments, int, method)
   moments <- moments.int[["moments"]]; int <- moments.int[["int"]]
 
   s.weights <- process.s.weights(s.weights, data)
@@ -281,14 +279,14 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm", stabilize = F
     treat.list[[i]] <- assign_treat_type(treat.list[[i]])
 
     #By is processed each for each time, but only last time is used for by.factor.
-    processed.by <- process.by(by, data = data,
+    processed.by <- .process_by(by, data = data,
                                treat = treat.list[[i]],
                                treat.name = treat.name,
                                by.arg = by.arg)
 
     #Process missing
     if (anyNA(reported.covs.list[[i]])) {
-      missing <- process.missing(missing, method, get_treat_type(treat.list[[i]]))
+      missing <- .process_missing(missing, method, get_treat_type(treat.list[[i]]))
     }
     else if (i == length(formula.list)) {
       missing <- ""
@@ -300,23 +298,20 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm", stabilize = F
   if (is.MSM.method) {
     #Returns weights (w)
 
-    A[["covs"]] <- covs.list
-    A[["treat"]] <- treat.list
+    A[["covs.list"]] <- covs.list
+    A[["treat.list"]] <- treat.list
     A[["s.weights"]] <- s.weights
     A[["by.factor"]] <- attr(processed.by, "by.factor")
-    A[["focal"]] <- character()
     A[["stabilize"]] <- stabilize
     A[["method"]] <- method
     A[["moments"]] <- moments
     A[["int"]] <- int
     A[["subclass"]] <- numeric()
-    A[["ps"]] <- numeric()
     A[["missing"]] <- missing
     A[["verbose"]] <- verbose
-    A[["is.MSM.method"]] <- TRUE
     A[["include.obj"]] <- include.obj
 
-    obj <- do.call("weightit.fit", A)
+    obj <- do.call("weightitMSM.fit", A)
 
     w <- obj[["weights"]]
     stabout <- NULL
@@ -407,15 +402,18 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm", stabilize = F
         stabout[[i]] <- stab.f[-2]
 
         stab.Mparts.list[[i]] <- attr(sw_obj, "Mparts")
-      }
 
+        if (is_not_null(stab.Mparts.list[[i]])) {
+          stab.Mparts.list[[i]]$wfun <- Invert(stab.Mparts.list[[i]]$wfun)
+        }
+      }
     }
 
     w <- Reduce("*", w.list, init = 1)
 
     if (stabilize) {
       sw <- Reduce("*", sw.list, init = 1)
-      w <- w*sw
+      w <- w * sw
 
       unique.stabout <- unique(stabout)
       if (length(unique.stabout) <= 1) stabout <- unique.stabout
@@ -423,14 +421,12 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm", stabilize = F
     else {
       stabout <- NULL
     }
+
+    if (include.obj) names(obj.list) <- names(treat.list)
   }
 
   if (all_the_same(w)) .err(sprintf("all weights are %s", w[1]))
 
-  if (all(lengths(ps.list) == 0)) ps.list <- NULL
-  else names(ps.list) <- names(treat.list)
-
-  if (include.obj) names(obj.list) <- names(treat.list)
 
   ## Assemble output object----
   out <- list(weights = w,
@@ -438,7 +434,7 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm", stabilize = F
               covs.list = reported.covs.list,
               estimand = "ATE",
               method = method,
-              ps.list = ps.list,
+              # ps.list = ps.list,
               s.weights = s.weights,
               #discarded = NULL,
               by = processed.by,
@@ -466,13 +462,14 @@ print.weightitMSM <- function(x, ...) {
   trim <- attr(x[["weights"]], "trim")
 
   cat("A " %+% italic("weightitMSM") %+% " object\n")
-  cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", method.to.phrase(x[["method"]]), ")\n"))
+  cat(paste0(" - method: \"", attr(x[["method"]], "name"), "\" (", .method_to_phrase(x[["method"]]), ")\n"))
   cat(paste0(" - number of obs.: ", length(x[["weights"]]), "\n"))
   cat(paste0(" - sampling weights: ", ifelse(all_the_same(x[["s.weights"]]), "none", "present"), "\n"))
   cat(paste0(" - number of time points: ", length(x[["treat.list"]]), " (", paste(names(x[["treat.list"]]), collapse = ", "), ")\n"))
   cat(paste0(" - treatment: \n",
              paste0(vapply(seq_along(x$covs.list), function(i) {
-               paste0("    + time ", i, ": ", if (treat.types[i] == "continuous") "continuous"
+               paste0("    + time ", i, ": ",
+                      if (treat.types[i] == "continuous") "continuous"
                       else paste0(nunique(x[["treat.list"]][[i]]), "-category",
                                   if (treat.types[i] == "multinomial") paste0(" (", paste(levels(x[["treat.list"]][[i]]), collapse = ", "), ")")
                                   else ""
@@ -513,7 +510,7 @@ print.weightitMSM <- function(x, ...) {
       cat(paste(" - weights trimmed at", word_list(paste0(round(100*trim, 2), "%")), "\n"))
     }
     else {
-      if (attr(x[["weights"]], "trim.lower")) t.b <- "top and bottom" else t.b <- "top"
+      t.b <- if (attr(x[["weights"]], "trim.lower")) "top and bottom" else "top"
       cat(paste(" - weights trimmed at the", t.b, trim, "\n"))
     }
   }

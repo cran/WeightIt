@@ -77,17 +77,20 @@
 #' @references
 #' ## Binary Treatments
 #'
-#' Hainmueller, J. (2012). Entropy Balancing for Causal Effects: A Multivariate Reweighting Method to Produce Balanced Samples in Observational Studies. Political Analysis, 20(1), 25–46. \doi{10.1093/pan/mpr025}
-#'
-#' Källberg, D., & Waernbaum, I. (2022). Large Sample Properties of Entropy Balancing Estimators of Average Causal Effects. ArXiv:2204.10623 [Stat]. \url{https://arxiv.org/abs/2204.10623}
+#' ### `estimand = "ATT"`
+#' Hainmueller, J. (2012). Entropy Balancing for Causal Effects: A Multivariate Reweighting Method to Produce Balanced Samples in Observational Studies. *Political Analysis*, 20(1), 25–46. \doi{10.1093/pan/mpr025}
 #'
 #' Zhao, Q., & Percival, D. (2017). Entropy balancing is doubly robust. Journal of Causal Inference, 5(1). \doi{10.1515/jci-2016-0010}
 #'
+#' ### `estimand = "ATE"`
+#'
+#' Källberg, D., & Waernbaum, I. (2023). Large Sample Properties of Entropy Balancing Estimators of Average Causal Effects. *Econometrics and Statistics*. \doi{10.1016/j.ecosta.2023.11.004}
+#'
 #' ## Continuous Treatments
 #'
-#' Tübbicke, S. (2022). Entropy Balancing for Continuous Treatments. Journal of Econometric Methods, 11(1), 71–89. \doi{10.1515/jem-2021-0002}
+#' Tübbicke, S. (2022). Entropy Balancing for Continuous Treatments. *Journal of Econometric Methods*, 11(1), 71–89. \doi{10.1515/jem-2021-0002}
 #'
-#' Vegetabile, B. G., Griffin, B. A., Coffman, D. L., Cefalu, M., Robbins, M. W., & McCaffrey, D. F. (2021). Nonparametric estimation of population average dose-response curves using entropy balancing weights for continuous exposures. Health Services and Outcomes Research Methodology, 21(1), 69–110. \doi{10.1007/s10742-020-00236-2}
+#' Vegetabile, B. G., Griffin, B. A., Coffman, D. L., Cefalu, M., Robbins, M. W., & McCaffrey, D. F. (2021). Nonparametric estimation of population average dose-response curves using entropy balancing weights for continuous exposures. *Health Services and Outcomes Research Methodology*, 21(1), 69–110. \doi{10.1007/s10742-020-00236-2}
 #'
 #' @examples
 #' data("lalonde", package = "cobalt")
@@ -129,12 +132,12 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(covs, int.poly.f(covs, poly = moments, int = int, center = TRUE))
+  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int, center = TRUE))
 
-  covs <- cbind(covs, quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
                                  focal = focal, treat = treat))
 
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
@@ -147,10 +150,15 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal,
     if (!is.numeric(A[["base.weight"]]) || length(A[["base.weight"]]) != length(treat)) {
       .err("the argument to `base.weight` must be a numeric vector with length equal to the number of units")
     }
-    else bw <- A[["base.weight"]]
+
+    bw <- A[["base.weight"]]
   }
 
-  reltol <- if_null_then(A[["reltol"]], 1e-10)
+  reltol <- if (is_null(A$reltol)) (.Machine$double.eps) else A$reltol
+  chk::chk_number(reltol)
+
+  maxit <- if (is_null(A$maxit)) 1e4 else A$maxit
+  chk::chk_count(maxit)
 
   eb <- function(C, s.weights_t, Q) {
     n <- nrow(C)
@@ -174,7 +182,7 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal,
                      method = "BFGS",
                      control = list(trace = 1,
                                     reltol = reltol,
-                                    maxit = if_null_then(A[["maxit"]], 200)),
+                                    maxit = maxit),
                      C = C, Q = Q)
 
     w <- W(opt.out$par, Q, C)
@@ -247,17 +255,23 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal,
 
       for (i in groups_to_weight) {
         C <- Xtreat[A == i & !sw0,,drop = FALSE]
+        n <- nrow(C)
         w[A == i & !sw0] <- drop(bw[A == i & !sw0] * exp(-C %*% Btreat[coef_ind[[i]]]))
+        if (sum(w[A == i & !sw0]) > n * .Machine$double.eps) {
+          w[A == i & !sw0] <- w[A == i & !sw0] * n / sum(w[A == i & !sw0])
+        }
       }
+
       w[!sw0] <- w[!sw0] / s.weights[!sw0]
+
       w
     },
     Xtreat = covs,
     A = treat,
-    btreat = unlist(lapply(fit.list, `[[`, "Z"))
+    btreat = unlist(grab(fit.list, "Z"))
   )
 
-  list(w = w, fit.obj = lapply(fit.list, `[[`, "opt.out"),
+  list(w = w, fit.obj = grab(fit.list, "opt.out"),
        Mparts = Mparts)
 }
 
@@ -282,37 +296,46 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, moments,
     if (!is.numeric(A[["base.weight"]]) || length(A[["base.weight"]]) != length(treat)) {
       .err("the argument to `base.weight` must be a numeric vector with length equal to the number of units")
     }
-    else bw <- A[["base.weight"]]
+
+    bw <- A[["base.weight"]]
   }
 
   bw <- bw[subset]
 
-  reltol <- if_null_then(A[["reltol"]], 1e-10)
+  s.weights <- s.weights / mean_fast(s.weights)
+
+  reltol <- if (is_null(A$reltol)) (.Machine$double.eps) else A$reltol
+  chk::chk_number(reltol)
+
+  maxit <- if (is_null(A$maxit)) 1e4 else A$maxit
+  chk::chk_count(maxit)
 
   d.moments <- max(if_null_then(A[["d.moments"]], 1), moments)
+  chk::chk_count(d.moments)
+
   k <- ncol(covs)
 
-  poly.covs <- int.poly.f(covs, poly = moments)
-  int.covs <- int.poly.f(covs, int = int)
+  poly.covs <- .int_poly_f(covs, poly = moments)
+  int.covs <- .int_poly_f(covs, int = int)
 
-  treat <- make.closer.to.1(treat)
-  for (i in seq_col(poly.covs)) poly.covs[,i] <- make.closer.to.1(poly.covs[,i])
-  for (i in seq_col(int.covs)) int.covs[,i] <- make.closer.to.1(int.covs[,i])
+  treat <- .make_closer_to_1(treat)
+  for (i in seq_col(poly.covs)) poly.covs[,i] <- .make_closer_to_1(poly.covs[,i])
+  for (i in seq_col(int.covs)) int.covs[,i] <- .make_closer_to_1(int.covs[,i])
   if (d.moments == moments) {
     d.poly.covs <- poly.covs
   }
   else {
-    d.poly.covs <- int.poly.f(covs, poly = d.moments)
-    for (i in seq_col(d.poly.covs)) d.poly.covs[,i] <- make.closer.to.1(d.poly.covs[,i])
+    d.poly.covs <- .int_poly_f(covs, poly = d.moments)
+    for (i in seq_col(d.poly.covs)) d.poly.covs[,i] <- .make_closer_to_1(d.poly.covs[,i])
   }
-  for (i in seq_col(covs)) covs[,i] <- make.closer.to.1(covs[,i])
+  for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   covs <- cbind(covs, poly.covs, int.covs, d.poly.covs)
   # colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
   # covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
   t.mat <- matrix(treat, ncol = 1, dimnames = list(NULL, "treat"))
-  if (d.moments > 1) t.mat <- cbind(t.mat, int.poly.f(t.mat, poly = d.moments))
+  if (d.moments > 1) t.mat <- cbind(t.mat, .int_poly_f(t.mat, poly = d.moments))
 
   treat_c <- sweep(t.mat, 2, cobalt::col_w_mean(t.mat, s.weights))
   covs_c <- sweep(covs, 2, cobalt::col_w_mean(covs, s.weights))
@@ -354,7 +377,7 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, moments,
                      method = "BFGS",
                      control = list(trace = 0,
                                     reltol = reltol,
-                                    maxit = if_null_then(A[["maxit"]], 200)),
+                                    maxit = maxit),
                      Q = Q, C = C)
 
     w <- W(opt.out$par, Q, C)
@@ -398,7 +421,14 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, moments,
       w <- rep(1, length(A))
 
       C <- Xtreat[!sw0,,drop = FALSE]
-      w[!sw0] <- drop(bw[!sw0] * exp(-C %*% Btreat)) / s.weights[!sw0]
+      n <- nrow(C)
+      w[!sw0] <- drop(bw[!sw0] * exp(-C %*% Btreat))
+
+      if (sum(w[!sw0]) > n * .Machine$double.eps) {
+        w[!sw0] <- w[!sw0] * n / sum(w[!sw0])
+      }
+
+      w[!sw0] <- w[!sw0] / s.weights[!sw0]
 
       w
     },
