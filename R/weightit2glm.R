@@ -14,11 +14,11 @@
 #'
 #' ## Multi-Category Treatments
 #'
-#' For multi-category treatments, the propensity scores are estimated using multinomial regression from one of a few functions depending on the argument supplied to `multi.method` (see Additional Arguments below). The following estimands are allowed: ATE, ATT, ATC, ATO, and ATM. The weights for each estimand are computed using the standard formulas or those mentioned above. Weights can also be computed using marginal mean weighting through stratification for the ATE, ATT, and ATC. See [get_w_from_ps()] for details.
+#' For multi-category treatments, the propensity scores are estimated using multinomial regression from one of a few functions depending on the argument supplied to `multi.method` (see Additional Arguments below). The following estimands are allowed: ATE, ATT, ATC, ATO, and ATM. The weights for each estimand are computed using the standard formulas or those mentioned above. Weights can also be computed using marginal mean weighting through stratification for the ATE, ATT, and ATC. See [get_w_from_ps()] for details. Ordinal treatments are treated exactly the same as non-order multi-category treatments except that additional models are available to estimate the generalized propensity score (e.g., ordinal logistic regression).
 #'
 #' ## Continuous Treatments
 #'
-#' For continuous treatments, the generalized propensity score is estimated using linear regression. The conditional density can be specified as normal or another distribution. In addition, kernel density estimation can be used instead of assuming a specific density for the numerator and denominator of the generalized propensity score by setting `use.kernel = TRUE`. Other arguments to [density()] can be specified to refine the density estimation parameters. `plot = TRUE` can be specified to plot the density for the numerator and denominator, which can be helpful in diagnosing extreme weights.
+#' For continuous treatments, the generalized propensity score is estimated using linear regression. The conditional density can be specified as normal or another distribution. In addition, kernel density estimation can be used instead of assuming a specific density for the numerator and denominator of the generalized propensity score by setting `density = "kernel"`. Other arguments to [density()] can be specified to refine the density estimation parameters. `plot = TRUE` can be specified to plot the density for the numerator and denominator, which can be helpful in diagnosing extreme weights.
 #'
 #' ## Longitudinal Treatments
 #'
@@ -40,7 +40,7 @@
 #'
 #' ## M-estimation
 #'
-#' For binary treatments, M-estimation is supported when `link` does not start with `"br."` and is neither `"flic"` nor `"flac"` (see below). For multi-category treatments, M-estimation is supported when `multi.method` is `"weightit"` (the default for non-ordered treatments) or `"glm"`. For continuous treatments, M-estimation is supported when `use.kernel` is not `TRUE`. The conditional treatment variance and unconditional treatment mean and variance are included as parameters to estimate, as these all go into calculation of the weights. For all treatment type, M-estimation is not supported when `missing = "saem"`. See [glm_weightit()] and `vignette("estimating-effects")` for details. For longitudinal treatments, M-estimation is supported whenever the underlying methods are.
+#' For binary treatments, M-estimation is supported when `link` is neither `"flic"` nor `"flac"` (see below). For multi-category treatments, M-estimation is supported when `multi.method` is `"weightit"` (the default for non-ordered treatments) or `"glm"`. For continuous treatments, M-estimation is supported when `density` is not `"kernel"`. The conditional treatment variance and unconditional treatment mean and variance are included as parameters to estimate, as these all go into calculation of the weights. For all treatment type, M-estimation is not supported when `missing = "saem"`. See [glm_weightit()] and `vignette("estimating-effects")` for details. For longitudinal treatments, M-estimation is supported whenever the underlying methods are.
 #'
 #' @section Additional Arguments:
 #' For binary treatments, the following additional argument can be specified:
@@ -56,14 +56,11 @@
 #'
 #' For continuous treatments, the following additional arguments may be supplied:
 #'   \describe{
-#'     \item{`density`}{A function corresponding the conditional density of the treatment. The standardized residuals of the treatment model will be fed through this function to produce the numerator and denominator of the generalized propensity score weights. If blank, [dnorm()] is used as recommended by Robins et al. (2000). This can also be supplied as a string containing the name of the function to be called. If the string contains underscores, the call will be split by the underscores and the latter splits will be supplied as arguments to the second argument and beyond. For example, if `density = "dt_2"` is specified, the density used will be that of a t-distribution with 2 degrees of freedom. Using a t-distribution can be useful when extreme outcome values are observed (Naimi et al., 2014). Ignored if `use.kernel = TRUE` (described below).
-#'     }
-#'     \item{`use.kernel`}{If `TRUE`, uses kernel density estimation through the [density()] function to estimate the numerator and denominator densities for the weights. If `FALSE`, the argument to the `density` parameter is used instead.
-#'     }
-#'     \item{`bw`, `adjust`, `kernel`, `n`}{If `use.kernel = TRUE`, the arguments to the [density()] function. The defaults are the same as those in `density` except that `n` is 10 times the number of units in the sample.
-#'     }
-#'     \item{`plot`}{If `use.kernel = TRUE` with continuous treatments, whether to plot the estimated density.
-#'     }
+#'     \item{`density`}{A function corresponding the conditional density of the treatment. The standardized residuals of the treatment model will be fed through this function to produce the numerator and denominator of the generalized propensity score weights. If blank, [dnorm()] is used as recommended by Robins et al. (2000). This can also be supplied as a string containing the name of the function to be called. If the string contains underscores, the call will be split by the underscores and the latter splits will be supplied as arguments to the second argument and beyond. For example, if `density = "dt_2"` is specified, the density used will be that of a t-distribution with 2 degrees of freedom. Using a t-distribution can be useful when extreme outcome values are observed (Naimi et al., 2014).
+#'
+#' Can also be `"kernel"` to use kernel density estimation, which calls [density()] to estimate the numerator and denominator densities for the weights. (This used to be requested by setting `use.kernel = TRUE`, which is now deprecated.)}
+#'     \item{`bw`, `adjust`, `kernel`, `n`}{If `density = "kernel"`, the arguments to [density()]. The defaults are the same as those in `density()` except that `n` is 10 times the number of units in the sample.}
+#'     \item{`plot`}{If `density = "kernel"`, whether to plot the estimated densities.}
 #'     \item{`link`}{The link used to fit the linear model for the generalized propensity score. Can be any allowed by [gaussian()].
 #'     }
 #'   }
@@ -168,9 +165,10 @@
 #' bal.tab(W2)
 #'
 #' #Balancing covariates with respect to re75 (continuous)
+#' #with kernel density estimate
 #' (W3 <- weightit(re75 ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
-#'                 method = "glm", use.kernel = TRUE))
+#'                 method = "glm", density = "kernel"))
 #' summary(W3)
 #' bal.tab(W3)
 NULL
@@ -207,7 +205,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
   #Process link
   acceptable.links <- {
     if (missing == "saem") "logit"
-    else c(expand.grid_string(c("", "br."), c("logit", "probit", "cloglog", "identity", "log", "cauchit")),
+    else c(expand_grid_string(c("", "br."), c("logit", "probit", "cloglog", "identity", "log", "cauchit")),
            "flic", "flac")
   }
 
@@ -245,7 +243,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
     },
     warning = function(w) {
       w <- conditionMessage(w)
-      if (w != "one argument not used by format '%i '") .wrn("(from misaem) ", w, tidy = FALSE)
+      if (w != "one argument not used by format '%i '") .wrn("(from `misaem::miss.glm()`) ", w, tidy = FALSE)
       invokeRestart("muffleWarning")
     })
 
@@ -264,8 +262,8 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
 
     modctrl_fun <- logistf::logistf.mod.control
     modcontrol <- do.call(modctrl_fun, c(A[["modcontrol"]],
-                                   A[setdiff(names(formals(modctrl_fun))[pmatch(names(A), names(formals(modctrl_fun)), 0)],
-                                             names(A[["modcontrol"]]))]))
+                                         A[setdiff(names(formals(modctrl_fun))[pmatch(names(A), names(formals(modctrl_fun)), 0)],
+                                                   names(A[["modcontrol"]]))]))
 
     withCallingHandlers({verbosely({
       data <- data.frame(treat, covs)
@@ -279,7 +277,9 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
     }, verbose = verbose)},
     warning = function(w) {
       w <- conditionMessage(w)
-      if (w != "non-integer #successes in a binomial glm!") .wrn("(from `glm()`) ", w, tidy = FALSE)
+      if (w != "non-integer #successes in a binomial glm!")
+        .wrn(sprintf("(from `logistf::%s()`) ", A[["link"]]),
+             w, tidy = FALSE)
       invokeRestart("muffleWarning")
     })
 
@@ -288,6 +288,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
   else {
     if (use.br) {
       rlang::check_installed("brglm2")
+
       ctrl_fun <- brglm2::brglmControl
       glm_method <- brglm2::brglmFit
       family <- binomial(link = A[["link"]])
@@ -306,7 +307,7 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
 
     if (family$link %in% c("log", "identity")) {
       #Need starting values because links are unbounded
-      start <- c(family$linkfun(w.m(treat, s.weights)), rep(0, ncol(covs)))
+      start <- c(family$linkfun(w.m(treat, s.weights)), rep.int(0, ncol(covs)))
     }
     else {
       #Default starting values from glm.fit() without weights; these
@@ -339,7 +340,8 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
     }, verbose = verbose)},
     warning = function(w) {
       w <- conditionMessage(w)
-      if (w != "non-integer #successes in a binomial glm!") .wrn("(from `glm()`) ", w, tidy = FALSE)
+      if (w != "non-integer #successes in a binomial glm!")
+        .wrn("(from `glm()`) ", w, tidy = FALSE)
       invokeRestart("muffleWarning")
     })
 
@@ -348,28 +350,28 @@ weightit2glm <- function(covs, treat, s.weights, subset, estimand, focal,
     if (any(p.score <= 1e-14) || any(p.score >= 1 - 1e-14)) {
       .wrn('propensity scores numerically equal to 0 or 1 were estimated, indicating perfect separation and infinite parameter estimates. These may yield problems with inference. Consider trying a different `link`. See `help("method_glm", package = "WeightIt")` for details')
     }
+
+    .psi <- .get_glm_psi(fit)
   }
 
   fit[["call"]] <- NULL
   fit.obj <- fit
 
-  #ps should be matrix of probs for each treat
   #Computing weights
   w <- .get_w_from_ps_internal_bin(ps = p.score, treat = treat, estimand,
                                    stabilize = stabilize, subclass = subclass)
 
   Mparts <- NULL
-  if (missing != "saem" && !use.br && !use.logistf) {
+  if (missing != "saem" && !use.logistf &&
+      !(use.br && identical(fit$type, "correction"))) {
     Mparts <- list(
       psi_treat = function(Btreat, A, Xtreat, SW) {
-        lin_pred <- drop(Xtreat %*% Btreat)
-        pred <- family$linkinv(lin_pred)
-        Xtreat * (SW * family$mu.eta(lin_pred) * (A - pred) / family$variance(pred))
+        .psi(B = Btreat, X = Xtreat, y = A, weights = SW)
       },
       wfun = function(Btreat, Xtreat, A) {
-        lin_pred <- drop(Xtreat %*% Btreat)
-        ps <- family$linkinv(lin_pred)
-        .get_w_from_ps_internal_bin(ps = ps, treat = A, estimand,
+        XB <- drop(Xtreat %*% Btreat)
+        p <- family$linkinv(XB)
+        .get_w_from_ps_internal_bin(ps = p, treat = A, estimand,
                                     stabilize = stabilize, subclass = subclass)
       },
       Xtreat = cbind(`(Intercept)` = 1, covs),
@@ -428,13 +430,16 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   }
   else if (ord.treat) {
     if (is_null(A$multi.method)) {
-      multi.method <- "polr"
+      multi.method <- "weightit"
     }
     else {
+      multi.method <- A$multi.method
+      chk::chk_string(multi.method)
+      multi.method <- tolower(multi.method)
+      if (multi.method == "mblogit") multi.method <- "mclogit"
       allowable.multi.methods <- c("polr", "weightit", "glm", "mclogit", "mnp", "brmultinom")
-      multi.method <- tolower(A$multi.method)
       multi.method <- match_arg(multi.method, allowable.multi.methods)
-      if (multi.method != "polr") {
+      if (!multi.method %in% c("weightit", "polr")) {
         ord.treat <- FALSE
       }
     }
@@ -442,8 +447,12 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   else if (is_not_null(A$multi.method)) {
     multi.method <- A$multi.method
     chk::chk_string(multi.method)
-    allowable.multi.methods <- c("weightit", "glm", "mclogit", "mnp", "brmultinom")
     multi.method <- tolower(multi.method)
+    if (multi.method == "polr") {
+      .err("`multi.method = \"polr\"` can only be used with an ordered treatment")
+    }
+    if (multi.method == "mblogit") multi.method <- "mclogit"
+    allowable.multi.methods <- c("weightit", "glm", "mclogit", "mnp", "brmultinom")
     multi.method <- match_arg(multi.method, allowable.multi.methods)
   }
   else {
@@ -452,6 +461,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
 
   # Process link
   link <- NULL
+  use.br <- FALSE
   if (is_null(multi.method)) {
     if (is_null(A[["link"]]) || identical(A[["link"]], "logit")) {
       multi.method <- "weightit"
@@ -466,31 +476,49 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       .wrn("`link` is ignored when `multi.method` is not specified")
     }
   }
-  else if (multi.method == "polr") {
-    acceptable.links <- c("logit", "probit", "loglog", "cloglog", "cauchit", "br.logit")
+  else if (ord.treat) {
+    acceptable.links <- {
+      if (multi.method == "polr") c("logit", "probit", "loglog", "cloglog", "cauchit", "br.logit")
+      else c("logit", "probit", "cloglog", "identity", "log", "cauchit")
+    }
+
     if (is_null(A[["link"]])) {
       link <- acceptable.links[1]
     }
     else {
       link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
       if (is.na(link)) {
-        .err(sprintf("only %s allowed as the link for multi-category ordinal treatments",
-                     word_list(acceptable.links, quotes = TRUE, is.are = TRUE)))
+        .err(sprintf("only %s allowed as the link for ordinal multi-category treatments with `multi.method = \"%s\"",
+                     word_list(acceptable.links, quotes = TRUE, is.are = TRUE),
+                     multi.method))
       }
-
-      use.br <- startsWith(link, "br.")
-      if (use.br) link <- substr(link, 4, nchar(link))
     }
+
+    use.br <- startsWith(link, "br.")
+    if (use.br) link <- substr(link, 4, nchar(link))
   }
   else if (multi.method == "saem") {
     if (is_not_null(A[["link"]]) && !identical(A[["link"]], "logit")) {
       .wrn("`link` is ignored when `missing = \"saem\"`")
     }
   }
-  else if (multi.method %in% c("weightit", "mclogit", "mnp", "brmultinom")) {
+  else if (multi.method == "weightit") {
+    acceptable.links <- c("logit")
+    if (is_null(A[["link"]])) {
+      link <- acceptable.links[1]
+    }
+    else {
+      link <- acceptable.links[pmatch(A[["link"]], acceptable.links, nomatch = 0)][1]
+      if (is.na(link)) {
+        .err(sprintf("only %s allowed as the link for non-ordinal multi-category treatments with `multi.method = \"weightit\"`",
+                     word_list(acceptable.links, quotes = TRUE, is.are = TRUE)))
+      }
+    }
+  }
+  else if (multi.method %in% c("mclogit", "mnp", "brmultinom")) {
     if (is_not_null(A[["link"]]) && !identical(A[["link"]], "logit")) {
-      .wrn(sprintf("`link` is ignored when `multi.method` is \"%s\"",
-                   multi.method))
+      .wrn(sprintf("`link` is ignored when `multi.method` is %s",
+                   add_quotes(multi.method)))
     }
   }
   else if (multi.method == "glm") {
@@ -509,12 +537,15 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
 
   # Fit model
   if (multi.method == "weightit") {
+    fit.fun <- if (ord.treat) ".ordinal_weightit.fit" else ".multinom_weightit.fit"
+
     verbosely({
-      fit.obj <- do.call(".mlogit_weightit.fit",
-                         c(list(x = cbind(1, covs),
-                                y = treat,
-                                weights = s.weights,
-                                hess = FALSE)),
+      fit.obj <- do.call(fit.fun,
+                         list(x = cbind(`(Intercept)` = 1, covs),
+                              y = treat,
+                              weights = s.weights,
+                              hess = FALSE,
+                              link = link),
                          quote = TRUE)
     }, verbose = verbose)
 
@@ -542,7 +573,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                        quote = TRUE)
       }, verbose = verbose)},
       error = function(e) {
-        .err(sprintf("there was a problem with the bias-reduced ordinal logit regression.\n       Try a different link.\n       Error message: %s", conditionMessage(e)), tidy = FALSE)
+        .err(sprintf("there was a problem with the bias-reduced ordinal logit regression.\n       Try a different link.\n       Error message: (from `brglm2::bracl()`) %s", conditionMessage(e)), tidy = FALSE)
       })
     }
     else {
@@ -593,7 +624,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       },
       warning = function(w) {
         w <- conditionMessage(w)
-        if (w != "one argument not used by format '%i '") .wrn("(from misaem) ", w, tidy = FALSE)
+        if (w != "one argument not used by format '%i '") .wrn("(from `misaem::miss.glm()`) ", w, tidy = FALSE)
         invokeRestart("muffleWarning")
       })
 
@@ -673,7 +704,7 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                               control = control), quote = TRUE)
     }, verbose = verbose)},
     error = function(e) {
-      .err(sprintf("There was a problem with the bias-reduced multinomial logit regression. Try a different `multi.method`.\n       Error message: (from brglm2) %s", conditionMessage(e)), tidy = FALSE)
+      .err(sprintf("There was a problem with the bias-reduced multinomial logit regression. Try a different `multi.method`.\n       Error message: (from `brglm2::brmultinom()`) %s", conditionMessage(e)), tidy = FALSE)
     })
 
     ps <- fit.obj$fitted.values
@@ -687,20 +718,26 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                                              names(A[["control"]]))]))
     family <- quasibinomial(link = link)
 
-    fit.list <- make_list(levels(treat))
+    fit.list <- .psi.list <- make_list(levels(treat))
 
     for (i in levels(treat)) {
       t_i <- as.numeric(treat == i)
       data_i <- data.frame(t_i, covs)
 
-      verbosely({
+      withCallingHandlers({verbosely({
         fit.list[[i]] <- do.call(stats::glm, list(formula(data_i), data = data_i,
                                                   family = family,
                                                   weights = s.weights,
                                                   control = control), quote = TRUE)
-      }, verbose = verbose)
+      }, verbose = verbose)},
+      warning = function(w) {
+        w <- conditionMessage(w)
+        if (w != "non-integer #successes in a binomial glm!") .wrn("(from `glm()`) ", w, tidy = FALSE)
+        invokeRestart("muffleWarning")
+      })
 
       ps[[i]] <- fit.list[[i]]$fitted.values
+      .psi.list[[i]] <- .get_glm_psi(fit.list[[i]])
     }
 
     fit.obj <- fit.list
@@ -731,25 +768,15 @@ weightit2glm.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   else if (multi.method == "glm") {
     Mparts <- list(
       psi_treat = function(Btreat, A, Xtreat, SW) {
-        coef_ind <- setNames(lapply(seq_len(nlevels(A)), function(i) {
-          (i - 1) * ncol(Xtreat) + seq_len(ncol(Xtreat))
-        }), levels(A))
+        Btreat <- matrix(Btreat, nrow = ncol(Xtreat))
 
-        do.call("cbind", lapply(levels(A), function(i) {
-          lin_pred <- drop(Xtreat %*% Btreat[coef_ind[[i]]])
-          pred <- family$linkinv(lin_pred)
-          Xtreat * (SW * family$mu.eta(lin_pred) * ((A == i) - pred) / family$variance(pred))
+        do.call("cbind", lapply(seq_along(levels(A)), function(i) {
+          .psi.list[[i]](Btreat[,i], Xtreat, A, SW)
         }))
       },
       wfun = function(Btreat, Xtreat, A) {
-        ps <- make_df(levels(A), length(A))
-        coef_ind <- setNames(lapply(seq_len(nlevels(A)), function(i) {
-          (i - 1) * ncol(Xtreat) + seq_len(ncol(Xtreat))
-        }), levels(A))
-
-        for (i in levels(A)) {
-          ps[[i]] <- family$linkinv(drop(Xtreat %*% Btreat[coef_ind[[i]]]))
-        }
+        ps <- family$linkinv(Xtreat %*% matrix(Btreat, nrow = ncol(Xtreat)))
+        colnames(ps) <- levels(A)
 
         .get_w_from_ps_internal_multi(ps, A, estimand = estimand, focal = focal,
                                       subclass = subclass, stabilize = stabilize)
@@ -795,9 +822,9 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
 
   #Process density params
   densfun <- .get_dens_fun(use.kernel = isTRUE(A[["use.kernel"]]), bw = A[["bw"]],
-                          adjust = A[["adjust"]], kernel = A[["kernel"]],
-                          n = A[["n"]], treat = treat, density = A[["density"]],
-                          weights = s.weights)
+                           adjust = A[["adjust"]], kernel = A[["kernel"]],
+                           n = A[["n"]], treat = treat, density = A[["density"]],
+                           weights = s.weights)
 
   #Stabilization - get dens.num
   un_p <- mean_fast(s.weights * treat)
@@ -885,7 +912,7 @@ weightit2glm.cont <- function(covs, treat, s.weights, subset, stabilize, missing
   }
 
   Mparts <- NULL
-  if (missing != "saem" && !isTRUE(A[["use.kernel"]])) {
+  if (missing != "saem" && !identical(A[["density"]], "kernel")) {
     Mparts <- list(
       psi_treat = function(Btreat, A, Xtreat, SW) {
         un_s2 <- exp(Btreat[1])

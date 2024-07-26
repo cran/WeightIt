@@ -12,7 +12,7 @@
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2024-05-04" />
+<meta name="date" content="2024-07-26" />
 
 <title>Using WeightIt to Estimate Balancing Weights</title>
 
@@ -51,7 +51,7 @@ overflow: visible;
 </style>
 <style type="text/css" data-origin="pandoc">
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -150,6 +150,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; }
 div.csl-bib-body { }
 div.csl-entry {
 clear: both;
+margin-bottom: 0em;
 }
 .hanging div.csl-entry {
 margin-left:2em;
@@ -363,7 +364,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <h1 class="title toc-ignore">Using WeightIt to Estimate Balancing
 Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2024-05-04</h4>
+<h4 class="date">2024-07-26</h4>
 
 
 
@@ -396,7 +397,7 @@ within the <code>cobalt</code> package, which we will use later on as
 well. Here, we are interested in the average treatment effect on the
 treated (ATT).</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;cobalt&quot;</span>)</span></code></pre></div>
-<pre><code>##  cobalt (Version 4.5.5.9000, Build Date: 2024-04-06)</code></pre>
+<pre><code>##  cobalt (Version 4.5.5.9000, Build Date: 2024-05-05)</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;lalonde&quot;</span>, <span class="at">package =</span> <span class="st">&quot;cobalt&quot;</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">head</span>(lalonde)</span></code></pre></div>
 <div class="kable-table">
@@ -627,16 +628,16 @@ of the weights.</p>
 ## 
 ## - Weight ranges:
 ## 
-##            Min                                Max
-## treated 1.0000    ||                         1.00
-## control 0.0188 |---------------------------| 9.42
+##            Min                                 Max
+## treated 1.0000    ||                         1.000
+## control 0.0187 |---------------------------| 9.421
 ## 
 ## - Units with the 5 most extreme weights by group:
-##                                            
-##               5      4      3      2      1
-##  treated      1      1      1      1      1
-##             608    381    597    303    411
-##  control 7.1271 7.5013 7.9999 9.0357 9.4204
+##                                           
+##               5      4      3     2      1
+##  treated      1      1      1     1      1
+##             608    381    597   303    411
+##  control 7.1272 7.5014 7.9998 9.036 9.4206
 ## 
 ## - Weight statistics:
 ## 
@@ -656,11 +657,11 @@ there are any gains in terms of balance:</p>
 ##                Type Diff.Adj     M.Threshold V.Ratio.Adj
 ## age         Contin.        0 Balanced, &lt;0.05       0.410
 ## educ        Contin.        0 Balanced, &lt;0.05       0.664
-## race_black   Binary       -0 Balanced, &lt;0.05           .
-## race_hispan  Binary        0 Balanced, &lt;0.05           .
+## race_black   Binary        0 Balanced, &lt;0.05           .
+## race_hispan  Binary       -0 Balanced, &lt;0.05           .
 ## race_white   Binary       -0 Balanced, &lt;0.05           .
 ## married      Binary        0 Balanced, &lt;0.05           .
-## nodegree     Binary        0 Balanced, &lt;0.05           .
+## nodegree     Binary       -0 Balanced, &lt;0.05           .
 ## re74        Contin.        0 Balanced, &lt;0.05       1.326
 ## re75        Contin.       -0 Balanced, &lt;0.05       1.335
 ## 
@@ -700,10 +701,10 @@ treatment effect estimation from the outcome model.</p>
 <span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit, <span class="at">variables =</span> <span class="st">&quot;treat&quot;</span>,</span>
 <span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>                <span class="at">newdata =</span> <span class="fu">subset</span>(lalonde, treat <span class="sc">==</span> <span class="dv">1</span>))</span></code></pre></div>
 <pre><code>## 
-##   Term Contrast Estimate Std. Error    z Pr(&gt;|z|)   S 2.5 % 97.5 %
-##  treat    1 - 0     1273        770 1.65   0.0983 3.3  -236   2783
+##   Term          Contrast Estimate Std. Error    z Pr(&gt;|z|)   S 2.5 % 97.5 %
+##  treat mean(1) - mean(0)     1273        770 1.65   0.0983 3.3  -236   2783
 ## 
-## Columns: term, contrast, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high 
+## Columns: term, contrast, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high, predicted_lo, predicted_hi, predicted 
 ## Type:  response</code></pre>
 <p>Our confidence interval for <code>treat</code> contains 0, so there
 isn’t evidence that <code>treat</code> has an effect on
@@ -899,11 +900,11 @@ estimated using logistic regression.</p>
 ##  - number of obs.: 7500
 ##  - sampling weights: none
 ##  - number of time points: 3 (A_1, A_2, A_3)
-##  - treatment: 
+##  - treatment:
 ##     + time 1: 2-category
 ##     + time 2: 2-category
 ##     + time 3: 2-category
-##  - covariates: 
+##  - covariates:
 ##     + baseline: X1_0, X2_0
 ##     + after time 1: X1_1, X2_1, A_1, X1_0, X2_0
 ##     + after time 2: X1_2, X2_2, A_2, X1_1, X2_1, A_1, X1_0, X2_0
@@ -1055,7 +1056,8 @@ treatment regime using
 <code>marginaleffects::avg_predictions()</code>:</p>
 <div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
 <span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>(p <span class="ot">&lt;-</span> <span class="fu">avg_predictions</span>(fit,</span>
-<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>                      <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">&quot;A_1&quot;</span>, <span class="st">&quot;A_2&quot;</span>, <span class="st">&quot;A_3&quot;</span>)))</span></code></pre></div>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>                      <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">&quot;A_1&quot;</span>, <span class="st">&quot;A_2&quot;</span>, <span class="st">&quot;A_3&quot;</span>),</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>                      <span class="at">type =</span> <span class="st">&quot;response&quot;</span>))</span></code></pre></div>
 <pre><code>## 
 ##  A_1 A_2 A_3 Estimate Std. Error    z Pr(&gt;|z|)     S 2.5 % 97.5 %
 ##    0   0   0    0.687     0.0166 41.4   &lt;0.001   Inf 0.654  0.719
@@ -1090,7 +1092,7 @@ all.</p>
 </div>
 <div id="references" class="section level2 unnumbered">
 <h2 class="unnumbered">References</h2>
-<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="refs" class="references csl-bib-body hanging-indent" entry-spacing="0">
 <div id="ref-austinIntroductionPropensityScore2011" class="csl-entry">
 Austin, Peter C. 2011. <span>“An Introduction to Propensity Score
 Methods for Reducing the Effects of Confounding in Observational

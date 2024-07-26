@@ -77,7 +77,7 @@
 #'
 #' ## `estimand = "ATT"`
 #'
-#' Sant’Anna, P. H. C., & Zhao, J. (2020). Doubly robust difference-in-differences estimators. *Journal of Econometrics*, 219(1), 101–122. \doi{10.1016/j.jeconom.2020.06.003}
+#' Sant'Anna, P. H. C., & Zhao, J. (2020). Doubly robust difference-in-differences estimators. *Journal of Econometrics*, 219(1), 101–122. \doi{10.1016/j.jeconom.2020.06.003}
 #'
 #' @examples
 #' data("lalonde", package = "cobalt")
@@ -115,7 +115,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
   covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int, center = TRUE))
 
   covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                                 focal = focal, treat = treat))
+                                  focal = focal, treat = treat))
 
   for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
@@ -127,8 +127,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
   t.lev <- get_treated_level(treat)
   treat <- binarize(treat, one = t.lev)
 
-  if (is_null(A$link)) A$link <- "logit"
-  link <- A$link
+  link <- if_null_then(A$link, "logit")
   chk::chk_string(link)
   chk::chk_subset(link, c("logit", "probit", "cauchit", "cloglog"))
 
@@ -145,36 +144,29 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
   n <- length(treat)
   k <- ncol(C)
 
-  # start <- setNames(rep(0, k), colnames(C))
+  # start <- setNames(rep.int(0, k), colnames(C))
   start <- glm.fit(C, treat, weights = s.weights, family = .fam)$coefficients
 
-  if (estimand == "ATE") {
-    ps <- rep(0, n)
+  f <- function(B, X, A, SW, .psi) {
+    .colMeans(.psi(B, X, A, SW), n, k)
+  }
 
+  if (estimand == "ATE") {
+    ps <- rep.int(0, n)
+
+    # Control weights
     psi0 <- function(B, X, A, SW) {
-      p <- .fam$linkinv(drop(X %*% B))
+      p <- rep.int(0, n)
+      p[A == 0] <- .fam$linkinv(drop(X[A == 0,, drop = FALSE] %*% B))
       SW * ((1 - A)/(1 - p) - 1) * X
     }
 
-    f0 <- function(B, X, A, SW) {
-      .colMeans(psi0(B, X, A, SW), n, k)
-    }
-
-    psi1 <- function(B, X, A, SW) {
-      p <- .fam$linkinv(drop(X %*% B))
-      SW * (A/p - 1) * X
-    }
-
-    f1 <- function(B, X, A, SW) {
-      .colMeans(psi1(B, X, A, SW), n, k)
-    }
-
-    # Control weights
     verbosely({
-      fit.list[["0"]] <- rootSolve::multiroot(f0, start = start,
+      fit.list[["0"]] <- rootSolve::multiroot(f, start = start,
                                               X = C,
                                               A = treat,
                                               SW = s.weights,
+                                              .psi = psi0,
                                               rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
                                               verbose = TRUE)
     }, verbose = verbose)
@@ -184,11 +176,18 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
     ps[treat == 0] <- .fam$linkinv(drop(C[treat == 0,, drop = FALSE] %*% par.list[["0"]]))
 
     #Treated weights
+    psi1 <- function(B, X, A, SW) {
+      p <- rep.int(1, n)
+      p[A == 1] <- .fam$linkinv(drop(X[A == 1,, drop = FALSE] %*% B))
+      SW * (A/p - 1) * X
+    }
+
     verbosely({
-      fit.list[["1"]] <- rootSolve::multiroot(f1, start = par.list[["0"]],
+      fit.list[["1"]] <- rootSolve::multiroot(f, start = par.list[["0"]],
                                               X = C,
                                               A = treat,
                                               SW = s.weights,
+                                              .psi = psi1,
                                               rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
                                               verbose = TRUE)
     }, verbose = verbose)
@@ -208,15 +207,12 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
                     SW * (A * (1 - p) / p - (1 - A)) * X
                   })
 
-    f <- function(B, X, A, SW) {
-      .colMeans(psi(B, X, A, SW), n, k)
-    }
-
     verbosely({
       fit.list[[1]] <- rootSolve::multiroot(f, start = start,
                                             A = treat,
                                             X = C,
                                             SW = s.weights,
+                                            .psi = psi,
                                             rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
                                             verbose = TRUE)
     }, verbose = verbose)
@@ -280,7 +276,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int, center = TRUE))
 
   covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                                 focal = focal, treat = treat))
+                                  focal = focal, treat = treat))
 
   for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
@@ -289,8 +285,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
 
   C <- cbind(`(Intercept)` = 1, covs)
 
-  if (is_null(A$link)) A$link <- "logit"
-  link <- A$link
+  link <- if_null_then(A$link, "logit")
   chk::chk_string(link)
   link <- match_arg(link, c("logit", "probit", "cauchit", "cloglog"))
 
@@ -300,24 +295,23 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                              "ATE" = levels(treat),
                              setdiff(levels(treat), focal))
 
-
-  w <- rep(1, length(treat))
+  w <- rep.int(1, length(treat))
 
   fit.list <- make_list(groups_to_weight)
   par.list <- make_list(groups_to_weight)
 
   k <- ncol(C)
 
-  start <- setNames(rep(0, k), colnames(C))
+  start <- setNames(rep.int(0, k), colnames(C))
+
+  f <- function(B, X, A, SW, .psi) {
+    .colMeans(.psi(B, X, A, SW), length(A), k)
+  }
 
   if (estimand == "ATE") {
     psi <- function(B, X, A, SW) {
       p <- .fam$linkinv(drop(X %*% B))
       SW * (A / p - 1) * X
-    }
-
-    f <- function(B, X, A, SW) {
-      .colMeans(psi(B, X, A, SW), length(A), k)
     }
 
     for (i in groups_to_weight) {
@@ -326,6 +320,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                                               A = as.numeric(treat == i),
                                               X = C,
                                               SW = s.weights,
+                                              .psi = psi,
                                               rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
                                               verbose = TRUE)
       }, verbose = verbose)
@@ -346,10 +341,6 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       SW * (A - (1 - A) * p / (1 - p)) * X
     }
 
-    f <- function(B, X, A, SW) {
-      .colMeans(psi(B, X, A, SW), length(A), k)
-    }
-
     for (i in groups_to_weight) {
 
       verbosely({
@@ -357,6 +348,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
                                               A = as.numeric(treat[treat %in% c(i, focal)] == focal),
                                               X = C[treat %in% c(i, focal),, drop = FALSE],
                                               SW = s.weights[treat %in% c(i, focal)],
+                                              .psi = psi,
                                               rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
                                               verbose = TRUE)
       }, verbose = verbose)
@@ -375,7 +367,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       estimand,
       "ATT" = function(Btreat, A, Xtreat, SW) {
         coef_ind <- setNames(lapply(seq_along(groups_to_weight), function(i) {
-          (i - 1) * ncol(Xtreat) + seq_len(ncol(Xtreat))
+          (i - 1) * ncol(Xtreat) + seq_col(Xtreat)
         }), groups_to_weight)
 
         do.call("cbind", lapply(groups_to_weight, function(i) {
@@ -390,7 +382,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       },
       "ATE" = function(Btreat, A, Xtreat, SW) {
         coef_ind <- setNames(lapply(seq_along(groups_to_weight), function(i) {
-          (i - 1) * ncol(Xtreat) + seq_len(ncol(Xtreat))
+          (i - 1) * ncol(Xtreat) + seq_col(Xtreat)
         }), groups_to_weight)
 
         do.call("cbind", lapply(groups_to_weight, function(i) {
@@ -401,10 +393,10 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       estimand,
       "ATT" = function(Btreat, Xtreat, A) {
         coef_ind <- setNames(lapply(seq_along(groups_to_weight), function(i) {
-          (i - 1) * ncol(Xtreat) + seq_len(ncol(Xtreat))
+          (i - 1) * ncol(Xtreat) + seq_col(Xtreat)
         }), groups_to_weight)
 
-        w <- rep(1, length(A))
+        w <- rep.int(1, length(A))
 
         for (i in groups_to_weight) {
           ps_i <- .fam$linkinv(drop(Xtreat[A == i,, drop = FALSE] %*% Btreat[coef_ind[[i]]]))
@@ -413,10 +405,10 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       },
       "ATE" = function(Btreat, Xtreat, A) {
         coef_ind <- setNames(lapply(seq_along(groups_to_weight), function(i) {
-          (i - 1) * ncol(Xtreat) + seq_len(ncol(Xtreat))
+          (i - 1) * ncol(Xtreat) + seq_col(Xtreat)
         }), groups_to_weight)
 
-        w <- rep(1, length(A))
+        w <- rep.int(1, length(A))
 
         for (i in groups_to_weight) {
           ps_i <- .fam$linkinv(drop(Xtreat[A == i,, drop = FALSE] %*% Btreat[coef_ind[[i]]]))

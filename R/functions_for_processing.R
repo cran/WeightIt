@@ -234,8 +234,10 @@ allowable.methods <- {c("glm" = "glm", "ps" = "glm",
           treated <- unique.treat[unique.treat.bin == 1]
         }
         else {
-          if (is.factor(treat)) treated <- levels(treat)[2]
-          else treated <- unique.treat[unique.treat.bin == 1]
+          treated <- {
+            if (is.factor(treat)) levels(treat)[2]
+            else unique.treat[unique.treat.bin == 1]
+          }
 
           if (estimand == "ATT") {
             .msg(sprintf("assuming %s the treated level. If not, supply an argument to `focal`",
@@ -268,7 +270,7 @@ allowable.methods <- {c("glm" = "glm", "ps" = "glm",
     }
   }
 
-  list(focal = as.character(focal),
+  list(focal = focal,
        estimand = estimand,
        reported.estimand = reported.estimand,
        treated = if (is.factor(treated)) as.character(treated) else treated)
@@ -321,13 +323,15 @@ allowable.methods <- {c("glm" = "glm", "ps" = "glm",
 
   by.components <- data.frame(by)
 
-  if (is_not_null(colnames(by))) names(by.components) <- colnames(by)
-  else names(by.components) <- by.name
+  names(by.components) <- {
+    if (is_not_null(colnames(by))) colnames(by)
+    else by.name
+  }
 
   by.factor <- {
-    if (is_null(by)) factor(rep(1L, n), levels = 1L)
-    else factor(by.components[[1]], levels = unique(by.components[[1]]),
-                labels = paste(names(by.components), "=", unique(by.components[[1]])))
+    if (is_null(by)) factor(rep.int(1L, n), levels = 1L)
+    else factor(by.components[[1]], levels = sort(unique(by.components[[1]])),
+                labels = paste(names(by.components), "=", sort(unique(by.components[[1]]))))
   }
   # by.vars <- acceptable.bys[vapply(acceptable.bys, function(x) equivalent.factors(by, data[[x]]), logical(1L))]
 
@@ -495,7 +499,7 @@ allowable.methods <- {c("glm" = "glm", "ps" = "glm",
   #int=whether to include interactions or not; currently only 2-way are supported
   #poly=degree of polynomials to include; will also include all below poly. If 1, no polynomial will be included
 
-  if (is_null(ex)) ex <- rep(FALSE, ncol(d))
+  if (is_null(ex)) ex <- rep.int(FALSE, ncol(d))
 
   binary.vars <- is_binary_col(d)
 
@@ -568,7 +572,7 @@ allowable.methods <- {c("glm" = "glm", "ps" = "glm",
       if (length(qu) != 1) {
         .err("`quantile` must be a number between 0 and 1, a named list thereof, a named vector thereof, or a named list of lists thereof")
       }
-      qu <- setNames(rep(qu, sum(!binary.vars)),
+      qu <- setNames(rep.int(qu, sum(!binary.vars)),
                      colnames(d)[!binary.vars])
     }
     qu <- as.list(qu)
@@ -710,7 +714,7 @@ get.s.d.denom.cont.weightit <- function(s.d.denom = NULL) {
     }
     else {
       t.levels <- unique(treat)
-      bad.treat.groups <- setNames(rep(FALSE, length(t.levels)), t.levels)
+      bad.treat.groups <- setNames(rep.int(FALSE, length(t.levels)), t.levels)
       for (i in t.levels) {
         ti <- which(treat == i)
         if (all(is.na(w[ti])) || all(check_if_zero(w[ti]))) bad.treat.groups[as.character(i)] <- TRUE
@@ -736,86 +740,6 @@ get.s.d.denom.cont.weightit <- function(s.d.denom = NULL) {
   if (any(tw < 0)) {
     .wrn("some weights are negative; these cannot be used in most model fitting functions, including `(g)lm_weightit()`")
   }
-}
-
-.ps_to_ps_mat <- function(ps, treat, assumed.treated = NULL, treat.type = NULL,
-                         treated = NULL, estimand = NULL) {
-  if (is_(ps, c("matrix", "data.frame"))) {
-    ps.names <- rownames(ps)
-  }
-  else if (is_(ps, "numeric")) {
-    ps.names <- names(ps)
-    ps <- matrix(ps, ncol = 1)
-  }
-
-  if (is.factor(treat)) t.levels <- levels(treat)
-  else t.levels <- unique(treat, nmax = length(treat)/4)
-
-  if (treat.type == "binary") {
-    if ((!is.matrix(ps) || !is.numeric(ps)) &&
-        (!is.data.frame(ps) || !all(vapply(ps, is.numeric, logical(1L))))) {
-      .err("`ps` must be a matrix, data frame, or vector of propensity scores")
-    }
-
-    if (ncol(ps) == 1) {
-      if (can_str2num(treat) &&
-          all(check_if_zero(binarize(treat) - str2num(treat)))) {
-        treated.level <- 1
-      }
-      else if (is_not_null(treated)) {
-        if (!treated %in% treat) {
-          .err("the argument to `treated` must be a value in `treat`")
-        }
-        treated.level <- treated
-      }
-      else if (is_not_null(assumed.treated)) {
-        treated.level <- assumed.treated
-      }
-      else if (is_not_null(colnames(ps)) && colnames(ps) %in% as.character(t.levels)) {
-        treated.level <- colnames(ps)
-      }
-      else {
-        .err("if the treatment has two non-0/1 levels and `ps` is a vector or has only one column, an argument to `treated` must be supplied")
-      }
-
-      t.levels <- c(treated.level, t.levels[t.levels != treated.level])
-      ps <- matrix(c(ps[, 1], 1 - ps[, 1]), ncol = 2, dimnames = list(ps.names, as.character(t.levels)))
-    }
-    else if (ncol(ps) == 2) {
-      if (!all(as.character(t.levels) %in% colnames(ps))) {
-        .err("if `ps` has two columns, they must be named with the treatment levels")
-      }
-    }
-    else {
-      .err("`ps` cannot have more than two columns if the treatment is binary")
-    }
-
-  }
-  else if (treat.type == "multinomial") {
-    if ((!is.matrix(ps) || !is.numeric(ps)) &&
-        (!is.data.frame(ps) || !all(vapply(ps, is.numeric, logical(1L))))) {
-      .err("`ps` must be a matrix or data frame of propensity scores")
-    }
-
-    if (ncol(ps) == 1) {
-      if (toupper(estimand) != "ATE") {
-        .err("with multi-category treatments, `ps` can be a vector or have only one column only if the estimand is the ATE")
-      }
-
-      ps <- matrix(rep(ps, nunique(treat)), nrow = length(treat), dimnames = list(ps.names, t.levels))
-    }
-    else if (ncol(ps) == nunique(treat)) {
-      if (!all(t.levels %in% colnames(ps))) {
-        .err("the columns of `ps` must be named with the treatment levels")
-      }
-    }
-    else {
-      .err("`ps` must have as many columns as there are treatment levels")
-    }
-
-  }
-
-  ps
 }
 
 .subclass_ps_multi <- function(ps_mat, treat, estimand = "ATE", focal = NULL, subclass) {
@@ -1009,45 +933,68 @@ stabilize_w <- function(weights, treat) {
   if (is_null(n)) n <- 10 * length(treat)
   if (is_null(adjust)) adjust <- 1
 
-  if (use.kernel) {
+  if (!isFALSE(use.kernel)) {
+    if (isTRUE(use.kernel)) {
+      .wrn("`use.kernel` is deprecated; use `density = \"kernel\"` instead. Setting `density = \"kernel\"`")
+      density <- "kernel"
+    }
+    else {
+      .wrn("`use.kernel` is deprecated")
+    }
+  }
+
+  if (identical(density, "kernel")) {
     if (is_null(bw)) bw <- "nrd0"
     if (is_null(kernel)) kernel <- "gaussian"
 
     densfun <- function(p) {
-      d <- density(p, n = n,
-                   weights = weights/sum(weights), give.Rkern = FALSE,
-                   bw = bw, adjust = adjust, kernel = kernel)
+      d <- stats::density(p, n = n,
+                          weights = weights/sum(weights), give.Rkern = FALSE,
+                          bw = bw, adjust = adjust, kernel = kernel)
       out <- with(d, approxfun(x = x, y = y))(p)
       attr(out, "density") <- d
       out
     }
   }
   else {
-    if (is_null(density)) density <- dnorm
-    else if (is.function(density)) density <- density
+    if (is_null(density)) .density <- function(x) dnorm(x)
+    else if (is.function(density)) .density <- function(x) density(x)
+    else if (identical(density, "dlaplace")) {
+      .density <- function(x) {
+        mu <- 0
+        b <- 1
+        exp(-abs(x - mu)/b)/(2 * b)
+      }
+    }
     else if (is.character(density) && length(density == 1)) {
       splitdens <- strsplit(density, "_", fixed = TRUE)[[1]]
-      if (is_not_null(splitdens1 <- get0(splitdens[1], mode = "function", envir = parent.frame()))) {
-        if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
-          .err(sprintf("%s is not an appropriate argument to `density` because %s cannot be coerced to numeric",
-                       density, word_list(splitdens[-1], and.or = "or", quotes = TRUE)))
-        }
-        density <- function(x) {
-          tryCatch(do.call(splitdens1, c(list(x), as.list(str2num(splitdens[-1])))),
-                   error = function(e) .err(sprintf("Error in applying density:\n  %s", conditionMessage(e)), tidy = FALSE))
-        }
-      }
-      else {
+
+      if (is_null(splitdens1 <- get0(splitdens[1], mode = "function", envir = parent.frame()))) {
         .err(sprintf("%s is not an appropriate argument to `density` because %s is not an available function",
                      density, splitdens[1]))
       }
+
+      if (length(splitdens) > 1 && !can_str2num(splitdens[-1])) {
+        .err(sprintf("%s is not an appropriate argument to `density` because %s cannot be coerced to numeric",
+                     density, word_list(splitdens[-1], and.or = "or", quotes = TRUE)))
+      }
+
+      .density <- function(x) {
+        tryCatch(do.call(splitdens1, c(list(x), as.list(str2num(splitdens[-1])))),
+                 error = function(e) {
+                   .err(sprintf("Error in applying density:\n  %s", conditionMessage(e)), tidy = FALSE)
+                 })
+      }
+
     }
-    else .err("the argument to `density` cannot be evaluated as a density function")
+    else {
+      .err("the argument to `density` cannot be evaluated as a density function")
+    }
 
     densfun <- function(p) {
       # sd <- sd(p)
       # sd <- sqrt(col.w.v(p, s.weights))
-      dens <- density(p)
+      dens <- .density(p)
       if (is_null(dens) || !is.numeric(dens) || anyNA(dens)) {
         .err("there was a problem with the output of `density`. Try another density function or leave it blank to use the Gaussian density")
       }
@@ -1059,7 +1006,7 @@ stabilize_w <- function(weights, treat) {
                    max(p) + 3 * adjust * bw.nrd0(p),
                    length.out = n)
       attr(dens, "density") <- data.frame(x = x,
-                                          y = density(x))
+                                          y = .density(x))
       dens
     }
   }
@@ -1071,7 +1018,7 @@ stabilize_w <- function(weights, treat) {
                                         subclass = NULL, stabilize = FALSE) {
 
   estimand <- toupper(estimand)
-  w <- rep(1, length(treat))
+  w <- rep.int(1, length(treat))
 
   #Assume treat is binary
   if (is_not_null(subclass)) {
@@ -1087,18 +1034,18 @@ stabilize_w <- function(weights, treat) {
     w[i1] <- 1 / ps[i1]
   }
   else if (estimand == "ATT") {
-    w[i0] <- ps[i0] / (1 - ps[i0])
+    w[i0] <- .p2o(ps[i0])
   }
   else if (estimand == "ATC") {
-    w[i1] <- (1 - ps[i1]) / ps[i1]
+    w[i1] <- .p2o(1 - ps[i1])
   }
   else if (estimand == "ATO") {
     w[i0] <- ps[i0]
     w[i1] <- (1 - ps[i1])
   }
   else if (estimand == "ATM") {
-    w[i0] <- pmin(ps[i0], 1 - ps[i0]) / (1 - ps[i0])
-    w[i1] <- pmin(ps[i1], 1 - ps[i1]) / ps[i1]
+    w[i0][ps[i0] < .5] <- .p2o(ps[i0][ps[i0] < .5])
+    w[i1][ps[i1] > .5] <- .p2o(1 - ps[i1][ps[i1] > .5])
   }
   else if (estimand == "ATOS") {
     w[i0] <- 1 / (1 - ps[i0])
@@ -1131,7 +1078,7 @@ stabilize_w <- function(weights, treat) {
                                           subclass = NULL, stabilize = FALSE) {
 
   estimand <- toupper(estimand)
-  w <- rep(0, length(treat))
+  w <- rep.int(0, length(treat))
 
   ps_mat <- ps
 
@@ -1190,8 +1137,14 @@ stabilize_w <- function(weights, treat) {
     ps <- matrix(ps, ncol = 1)
   }
 
+  eps <- 1e-8
+
   if (length(dim(ps)) == 2) {
     #Binary treatment, vector ps
+
+    w <- ps
+    w[] <- 0
+
     if (is_not_null(subclass)) {
       #Get MMW subclass propensity scores
       for (p in seq_col(ps)) {
@@ -1199,27 +1152,44 @@ stabilize_w <- function(weights, treat) {
       }
     }
 
+    t1 <- which(treat == 1)
+    t0 <- which(treat == 0)
+
     if (estimand == "ATE") {
-      w <- treat/ps + (1-treat)/(1-ps)
+      ps[t1,][ps[t1,] < eps] <- eps
+      ps[t0,][ps[t0,] > 1 - eps] <- 1 - eps
+
+      w[t1,] <- 1 / ps[t1,]
+      w[t0,] <- 1 / (1 - ps[t0,])
     }
     else if (estimand == "ATT") {
-      w <- treat + (1-treat) * ps/(1-ps)
+      ps[t0,][ps[t0,] > 1 - eps] <- 1 - eps
+
+      w[t1,] <- 1
+      w[t0,] <- .p2o(ps[t0,])
     }
     else if (estimand == "ATC") {
-      w <- treat*(1-ps)/ps + (1-treat)
+      ps[t1,][ps[t1,] < eps] <- eps
+
+      w[t1,] <- .p2o(1 - ps[t1,])
+      w[t0,] <- 1
     }
     else if (estimand == "ATO") {
-      w <- ps * (1-ps)
+      w[t1,] <- 1 - ps[t1,]
+      w[t0,] <- ps[t0,]
     }
     else if (estimand == "ATM") {
-      w <- (treat/ps + (1-treat)/(1-ps))
-      w <- w * pmin(ps, 1 - ps)
+      pslt.5 <- ps < .5
+      w[t1,][pslt.5[t1,]] <- 1
+      w[t1,][!pslt.5[t1,]] <- .p2o(1 - ps[t1,][!pslt.5[t1,]])
+
+      w[t0,][pslt.5[t0,]] <- .p2o(ps[t0,][pslt.5[t0,]])
+      w[t0,][!pslt.5[t0,]] <- 1
     }
 
     if (stabilize) {
-      for (i in 0:1) {
-        w[treat == i] <- mean_fast(treat == i) * w[treat == i]
-      }
+      w[t1] <- w[t1] * length(t1) / length(treat)
+      w[t0] <- w[t0] * length(t0) / length(treat)
     }
   }
   else if (length(dim(ps)) == 3) {
@@ -1231,31 +1201,55 @@ stabilize_w <- function(weights, treat) {
         ps[,,p] <- .subclass_ps_multi(ps[,,p], treat, estimand, focal, subclass)
     }
 
+    ps <- squish(ps, eps)
+
     w <- matrix(0, ncol = dim(ps)[3], nrow = dim(ps)[1])
     t.levs <- unique(treat)
-    for (i in t.levs) w[treat == i,] <- 1/ps[treat == i, as.character(i),]
+
+      for (i in t.levs) {
+        w[treat == i,] <- 1 / ps[treat == i, as.character(i),]
+      }
 
     if (estimand == "ATE") {
+      #Do nothing
     }
     else if (estimand %in% c("ATT", "ATC")) {
-      w <- w * ps[, as.character(focal),]
+      not_focal <- which(treat != focal)
+      w[-not_focal,] <- 1
+      w[not_focal,] <- w[not_focal,] * ps[not_focal, as.character(focal),]
     }
     else if (estimand == "ATO") {
-      w <- w / colSums(aperm(1/ps, c(2,1,3)))
+      w <- w / colSums(aperm(1/ps, c(2, 1, 3)))
     }
     else if (estimand == "ATM") {
+      treat <- as.integer(treat)
+
       for (p in seq_len(dim(ps)[3])) {
-        w[,p] <- w[,p] * do.call("pmin", lapply(seq_len(dim(ps)[2]), function(i) ps[,i,p]))
+        # w[,p] <- w[,p] * do.call("pmin", lapply(seq_len(dim(ps)[2]), function(i) ps[,i,p]))
+
+        ps_p <- ps[,,p]
+        min_ind <- max.col(-ps_p, ties.method = "first")
+        no_match <- which(ps_p[cbind(seq_along(treat), treat)] != ps_p[cbind(seq_along(treat), min_ind)])
+
+        if (length(no_match) < length(treat)) {
+          w[-no_match, p] <- 1
+        }
+
+        if (length(no_match) > 0) {
+          w[no_match, p] <- w[no_match, p] * ps_p[cbind(no_match, min_ind[no_match])]
+        }
       }
     }
 
     if (stabilize) {
       for (i in t.levs) {
-        w[treat == i,] <- mean_fast(treat == i)*w[treat == i,]
+        w[treat == i,] <- mean_fast(treat == i) * w[treat == i,]
       }
     }
   }
-  else .err("don't know how to process more than 3 dims (likely a bug)")
+  else {
+    .err("don't know how to process more than 3 dims (likely a bug)")
+  }
 
   w
 }
@@ -1265,9 +1259,9 @@ plot_density <- function(d.n, d.d) {
   d.n_ <- cbind(as.data.frame(d.n[c("x", "y")]), dens = "Numerator Density", stringsAsfactors = FALSE)
   d.all <- rbind(d.d_, d.n_)
   d.all$dens <- factor(d.all$dens, levels = c("Numerator Density", "Denominator Density"))
-  pl <- ggplot(d.all, aes(x = d.all$x, y = d.all$y)) + geom_line() +
+  pl <- ggplot(d.all, aes(x = .data$x, y = .data$y)) + geom_line() +
     labs(title = "Weight Component Densities", x = "E[Treat|X]", y = "Density") +
-    facet_grid(rows = vars(dens)) + theme(panel.background = element_rect(fill = "white"),
+    facet_grid(rows = vars(.data$dens)) + theme(panel.background = element_rect(fill = "white"),
                                           panel.border = element_rect(fill = NA, color = "black"),
                                           axis.text.x = element_text(color = "black"),
                                           axis.text.y = element_text(color = "black"),
@@ -1333,13 +1327,16 @@ generalized_inverse <- function(sigma) {
 }
 
 #Compute gradient numerically using centered difference
-gradient <- function(.f, .x, .eps = 1e-8, ...) {
+.gradient <- function(.f, .x, .eps = 1e-8, parm = NULL, ...) {
+  if (is_null(parm)) {
+    parm <- seq_along(.x)
+  }
 
   .x0 <- .x
 
   .eps <- pmax(abs(.x) * .eps, .eps)
 
-  for (j in seq_along(.x)) {
+  for (j in parm) {
     # forward
     .x[j] <- .x0[j] + .eps[j]/2
 
@@ -1347,8 +1344,8 @@ gradient <- function(.f, .x, .eps = 1e-8, ...) {
     f_new_forward <- .f(.x, ...)
 
     if (j == 1L) {
-      jacob <- matrix(0, nrow = length(f_new_forward), ncol = length(.x),
-                      dimnames = list(names(f_new_forward), names(.x)))
+      jacob <- matrix(0, nrow = length(f_new_forward), ncol = length(parm),
+                      dimnames = list(names(f_new_forward), names(.x)[parm]))
     }
 
     # backward
@@ -1365,5 +1362,82 @@ gradient <- function(.f, .x, .eps = 1e-8, ...) {
   jacob
 }
 
-#To pass CRAN checks:
-utils::globalVariables(c("dens"))
+#Convert probability to odds
+.p2o <- function(p) {
+  p / (1 - p)
+}
+
+#Get psi function (individual contributions to gradient) from glm fit
+.get_glm_psi <- function(fit) {
+  family <- fit$family
+
+  if (!identical(fit$class, "brglmFit") ||
+      identical(fit$type, "ML") || identical(fit$type, "correction")) {
+    psi <- function(B, X, y, weights, offset = 0) {
+      XB <- drop(X %*% B) + offset
+      p <- family$linkinv(XB)
+      D <- family$mu.eta(XB)
+      V <- family$variance(p)
+
+      X * (weights * D * (y - p) / V)
+    }
+  }
+  else {
+    br_type <- fit$type
+    if (is_null(fit$control[["a"]])) {
+      rlang::check_installed("brglm2")
+      fit$control[["a"]] <- formals(brglm2::brglmControl)[["a"]]
+    }
+
+    br_psi <- function(X, W, D, p, XB, V) {
+      DD <- family$d2mu.deta(XB)
+      Wt <- W * D^2 / V #"working weight"
+
+      ## Compute hat values
+      XWt <- sqrt(Wt) * X
+      q <- qr(XWt)
+      Q <- qr.Q(q)
+      H <- rowSums(Q * Q)
+
+      if (br_type %in% c("AS_mixed", "AS_mean")) {
+        AA <- .5 * X * H * DD / D
+        return(AA)
+      }
+
+      V1 <- family$d1variance(p)
+
+      if (br_type == "MPL_Jeffreys") {
+        return(fit$control[["a"]] * X * H * (2 * DD / D - V1 * D / V))
+      }
+
+      #br_type == "AS_median"
+      R_matrix <- qr.R(q)
+      info_unscaled <- crossprod(R_matrix)
+      inverse_info_unscaled <- chol2inv(R_matrix)
+
+      b_vector <- vapply(seq_col(X), function(j) {
+        inverse_info_unscaled_j <- inverse_info_unscaled[j, ]
+        vcov_j <- tcrossprod(inverse_info_unscaled_j) / inverse_info_unscaled_j[j]
+        hats_j <- rowSums((X %*% vcov_j) * X) * Wt
+
+        inverse_info_unscaled_j %*% colSums(X * (hats_j * (D * V1 / (6 * V) - DD / (2 * D))))
+      }, numeric(1L))
+
+      AA <- .5 * X * H * DD / D
+      sweep(AA, 2, info_unscaled %*% b_vector / nrow(X), "+")
+    }
+
+    psi <-  function(B, X, y, weights, offset = 0) {
+      XB <- drop(X %*% B) + offset
+      p <- family$linkinv(XB)
+      D <- family$mu.eta(XB)
+      V <- family$variance(p)
+
+      .psi <- X * (weights * D * (y - p) / V)
+
+      .psi + br_psi(X, weights, D, p, XB, V)
+    }
+  }
+
+  psi
+}
