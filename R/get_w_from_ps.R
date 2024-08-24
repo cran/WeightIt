@@ -199,22 +199,27 @@
 #'                     estimand = "ATT", treated = "A")
 #' all.equal(w1, w3)
 #'
-#' #Using MMWS
+#' # Using MMWS
 #' w4 <- get_w_from_ps(ps, treat = lalonde$treat,
 #'                     estimand = "ATE", subclass = 20,
 #'                     stabilize = TRUE)
-#' @examplesIf requireNamespace("gbm", quietly = TRUE)
-#' #A multi-category example using GBM predicted probabilities
-#' library(gbm)
-#' T3 <- factor(sample(c("A", "B", "C"), nrow(lalonde), replace = TRUE))
 #'
-#' gbm.fit <- gbm(T3 ~ age + educ + race + married +
-#'                  nodegree + re74 + re75, data = lalonde,
-#'                distribution = "multinomial", n.trees = 200,
-#'                interaction.depth = 3)
-#' ps.multi <- drop(predict(gbm.fit, type = "response",
-#'                          n.trees = 200))
-#' w <- get_w_from_ps(ps.multi, T3, estimand = "ATE")
+#' # A multi-category example using predicted probabilities
+#' # from multinomial logistic regression
+#' T3 <- factor(sample(c("A", "B", "C"), nrow(lalonde),
+#'                     replace = TRUE))
+#'
+#' multi.fit <- multinom_weightit(
+#'   T3 ~ age + educ + race + married +
+#'     nodegree + re74 + re75, data = lalonde,
+#'   vcov = "none"
+#' )
+#'
+#' ps.multi <- fitted(multi.fit)
+#' head(ps.multi)
+#'
+#' w5 <- get_w_from_ps(ps.multi, treat = T3,
+#'                     estimand = "ATE")
 
 #' @export
 get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = NULL,
@@ -270,8 +275,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     }
     else {
       #Li & Li (2019)
-      w[] <- 1 / (ps_mat[cbind(seq_len(n), treat)] *
-        rowSums(1 / ps_mat))
+      w[] <- 1 / (ps_mat[cbind(seq_len(n), treat)] * rowSums(1 / ps_mat))
     }
   }
   else if (estimand == "ATM") {
@@ -343,9 +347,9 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
       .err("`ps` must be a matrix, data frame, or vector of propensity scores")
     }
 
-    if (ncol(ps) == 1) {
+    if (ncol(ps) == 1L) {
       if (is_not_null(treated)) {
-        if (!treated %in% t.levels) {
+        if (treated %nin% t.levels) {
           .err("the argument to `treated` must be a value in `treat`")
         }
         treated.level <- treated
@@ -368,7 +372,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
       ps <- matrix(c(1 - ps[, 1], ps[, 1]), ncol = 2,
                    dimnames = list(ps.names, as.character(t.levels)))
     }
-    else if (ncol(ps) == 2) {
+    else if (ncol(ps) == 2L) {
       if (!all(as.character(t.levels) %in% colnames(ps))) {
         .err("if `ps` has two columns, they must be named with the treatment levels")
       }
@@ -378,7 +382,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     }
 
   }
-  else if (treat.type == "multinomial") {
+  else if (treat.type == "multi-category") {
     if (is.matrix(ps)) {
       if (!is.numeric(ps)) {
         .err("`ps` must be numeric when supplied as a matrix")

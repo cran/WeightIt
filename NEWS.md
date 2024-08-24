@@ -1,6 +1,28 @@
 WeightIt News and Updates
 ======
 
+# `WeightIt` 1.3.0
+
+* Added `anova()` methods for `glm_weightit`, `multinom_weightit`, `ordinal_weightit`, and `coxph_weightit` objects to perform Wald tests for comparing nested models. The models do not have to be symbolically nested.
+
+* Added the new user-facing object `.weightit_methods`, which contains information on each method and the options allowed with it. This is used within `WeightIt` for checking arguments but can also be used by other package developers who call functions in `WeightIt`. See `help(".weightit_methods")` for details.
+
+* `plot.weightit()` can be used with `method = "optweight"` to display the dual variables.
+
+* `missing` no longer allows partial matching.
+
+* `moments` can now be set to 0 when `quantile` is supplied to ensure balance on the quantiles without the moments for the methods that accepts `quantiles`. Thanks to @BERENZ for the suggestion.
+
+* For `ordinal_weightit` objects, `summary()` now has the option to omit thresholds from the output.
+
+* Fixed a bug in `ordinal_weightit()` where the Hessian (and therefore the HC0 robust variance) were calculated incorrectly when come coefficients were aliased (i.e., due to linearly dependent predictors).
+
+* Fixed a bug in `print.summary.glm_weightit()` when confidence intervals were requested. A new printing function is used that produces slightly nicer tables.
+
+* Fixes to vignettes and tests to satisfy CRAN checks.
+
+* Minor bug, performance, and readability fixes.
+
 # `WeightIt` 1.2.0
 
 * Added two new functions, `multinom_weightit()` and `ordinal_weightit()` for multinomial logistic regression and ordinal regression with capabilities to estimate a covariance matrix that accounts for estimation of the weights using M-estimation. Previously, multinomial logistic regression could be requested using `glm_weightit()` with `family = "multinomial"`; this has been deprecated.
@@ -393,7 +415,7 @@ WeightIt News and Updates
 
 * Fixed bug when using objects not in the data set in `weightit()`. Behavior has changed to include transformed covariates entered in formula in `weightit()` output.
 
-* Fixed bug resulting from potential colinearity when using `ebal` or `ebcw`.
+* Fixed bug resulting from potential collinearity when using `ebal` or `ebcw`.
 
 * Added a vignette.
 

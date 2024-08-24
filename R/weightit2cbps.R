@@ -45,6 +45,7 @@
 #' M-estimation is supported for the just-identified CBPS (the default, setting `over = FALSE`) for binary and multi-category treatments. See [glm_weightit()] and `vignette("estimating-effects")` for details.
 #'
 #' @section Additional Arguments:
+#' `moments` and `int` are accepted. See [weightit()] for details.
 #'
 #' The following additional arguments can be specified:
 #'   \describe{
@@ -58,6 +59,9 @@
 #'     }
 #'     \item{`maxit`}{the maximum number of iterations for convergence of the optimization. Passed to the `control` argument of `optim()`. Default is 1000.
 #'     }
+#'     \item{`quantile`}{
+#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75)` to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
+#'   }
 #' }
 #'
 #' @section Additional Outputs:
@@ -136,7 +140,7 @@
 #'                 method = "cbps"))
 #' summary(W3)
 #' cobalt::bal.tab(W3)
-#'
+#' \donttest{
 #' #Longitudinal treatments
 #' data("msmdata")
 #' (W4 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
@@ -146,6 +150,7 @@
 #'                    method = "cbps"))
 #' summary(W4)
 #' cobalt::bal.tab(W4)
+#' }
 NULL
 
 weightit2cbps <- function(covs, treat, s.weights, estimand, focal, subset,
@@ -161,10 +166,9 @@ weightit2cbps <- function(covs, treat, s.weights, estimand, focal, subset,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int, center = TRUE))
-
-  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                                  focal = focal, treat = treat))
+  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                            focal = focal, treat = treat))
 
   t.lev <- get_treated_level(treat)
   treat <- binarize(treat, one = t.lev)
@@ -173,7 +177,7 @@ weightit2cbps <- function(covs, treat, s.weights, estimand, focal, subset,
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
   mod_covs <- svd(cbind(`(Intercept)` = 1, scale(covs)))$u
-  bal_covs <- svd(cbind(`(Intercept)` = 1, scale(covs)))$u
+  bal_covs <- mod_covs
 
   over <- if_null_then(A$over, FALSE)
   chk::chk_flag(over)
@@ -350,16 +354,15 @@ weightit2cbps.multi <- function(covs, treat, s.weights, estimand, focal, subset,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int, center = TRUE))
-
-  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                                  focal = focal, treat = treat))
+  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                            focal = focal, treat = treat))
 
   colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
   mod_covs <- svd(cbind(`(Intercept)` = 1, scale(covs)))$u
-  bal_covs <- svd(cbind(`(Intercept)` = 1, scale(covs)))$u
+  bal_covs <- mod_covs
 
   over <- if_null_then(A$over, FALSE)
   chk::chk_flag(over)
@@ -591,19 +594,16 @@ weightit2cbps.cont <- function(covs, treat, s.weights, subset, missing, moments,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int, center = TRUE, orthogonal_poly = TRUE))
-
-  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                                  treat = treat))
+  covs <- .int_poly_f(covs, poly = moments, int = int, center = TRUE, orthogonal_poly = TRUE)
 
   colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
-  treat <- (treat - w.m(treat, s.weights)) / sqrt(col.w.v(treat, s.weights))
+  treat <- scale_w(treat, s.weights)
 
-  covs <- scale(covs,
-                center = col.w.m(covs, s.weights),
-                scale = sqrt(col.w.v(covs, s.weights)))
+  for (i in seq_col(covs)) {
+    covs[,i] <- scale_w(covs[,i], s.weights)
+  }
 
   mod_covs <- cbind(`(Intercept)` = 1,
                     scale(svd(covs)$u))
@@ -768,39 +768,46 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
   treat.types <- character(length(treat.list))
 
   for (i in seq_along(covs.list)) {
-    covs.list[[i]] <- covs.list[[i]][subset, , drop = FALSE]
     treat.list[[i]] <- treat.list[[i]][subset]
-
-    if (missing == "ind") {
-      covs.list[[i]] <- add_missing_indicators(covs.list[[i]])
-    }
-
-    covs.list[[i]] <- cbind(covs.list[[i]], .int_poly_f(covs.list[[i]], poly = moments,
-                                                        int = int, center = TRUE))
-
-    covs.list[[i]] <- cbind(covs.list[[i]], .quantile_f(covs.list[[i]], qu = A[["quantile"]],
-                                                        s.weights = s.weights,
-                                                        treat = treat.list[[i]]))
-
-    colinear.covs.to.remove <- setdiff(colnames(covs.list[[i]]), colnames(make_full_rank(covs.list[[i]])))
-    covs.list[[i]] <- covs.list[[i]][, colnames(covs.list[[i]]) %nin% colinear.covs.to.remove, drop = FALSE]
 
     if (!has_treat_type(treat.list[[i]])) {
       treat.list[[i]] <- assign_treat_type(treat.list[[i]])
     }
     treat.types[i] <- get_treat_type(treat.list[[i]])
 
+    covs.list[[i]] <- covs.list[[i]][subset, , drop = FALSE]
+
+    if (missing == "ind") {
+      covs.list[[i]] <- add_missing_indicators(covs.list[[i]])
+    }
+
+    if (treat.types[i] %in% c("binary", "multi-category")) {
+      covs.list[[i]] <- cbind(.int_poly_f(covs.list[[i]], poly = moments,
+                                          int = int, center = TRUE),
+                              .quantile_f(covs.list[[i]], qu = A[["quantile"]],
+                                          s.weights = s.weights))
+    }
+    else {
+      covs.list[[i]] <- .int_poly_f(covs.list[[i]], poly = moments,
+                                    int = int, center = TRUE)
+    }
+
+    colinear.covs.to.remove <- setdiff(colnames(covs.list[[i]]), colnames(make_full_rank(covs.list[[i]])))
+    covs.list[[i]] <- covs.list[[i]][, colnames(covs.list[[i]]) %nin% colinear.covs.to.remove, drop = FALSE]
+
     treat.list[[i]] <- switch(
       treat.types[i],
       "binary" = binarize(treat.list[[i]], one = get_treated_level(treat.list[[i]])),
-      "multinomial" = factor(treat.list[[i]]),
-      "continuous"= (treat.list[[i]] - w.m(treat.list[[i]], s.weights)) / sqrt(col.w.v(treat.list[[i]], s.weights))
+      "multi-category" = factor(treat.list[[i]]),
+      "continuous" = scale_w(treat.list[[i]], s.weights)
     )
 
+    for (j in seq_col(covs.list[[i]])) {
+      covs.list[[i]][,j] <- scale_w(covs.list[[i]][,j], s.weights)
+    }
+
     covs.list[[i]] <- cbind(`(Intercept)` = 1,
-                            scale(svd(scale(covs.list[[i]],
-                                            center = col.w.m(covs.list[[i]], s.weights),
-                                            scale = sqrt(col.w.v(covs.list[[i]], s.weights))))$u))
+                            scale(svd(covs.list[[i]])$u))
   }
 
   over <- if_null_then(A$over, FALSE)
@@ -822,8 +829,8 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
     coef_ind[[i]] <- length(unlist(coef_ind)) + switch(
       treat.types[i],
       "binary" = seq_col(covs.list[[i]]),
-      "multinomial" = seq_len((nlevels(treat.list[[i]]) - 1) * ncol(covs.list[[i]])),
-      "continuous" = seq_len(3 + ncol(covs.list[[i]]))
+      "multi-category" = seq_len((nlevels(treat.list[[i]]) - 1L) * ncol(covs.list[[i]])),
+      "continuous" = seq_len(3L + ncol(covs.list[[i]]))
     )
   }
 
@@ -832,7 +839,7 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
            "binary" = function(B, X, A) {
              plogis(drop(X %*% B))
            },
-           "multinomial" = function(B, X, A) {
+           "multi-category" = function(B, X, A) {
              qq <- exp(X %*% matrix(B, nrow = ncol(X)))
 
              pp <- cbind(1, qq) / (1 + rowSums(qq))
@@ -853,7 +860,7 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
            "binary" = function(p, A, B) {
              A / p + (1 - A) / (1 - p)
            },
-           "multinomial" = function(p, A, B) {
+           "multi-category" = function(p, A, B) {
              w <- numeric(length(A))
              for (a in levels(A)) {
                w[A == a] <- 1 / p[A == a, a]
@@ -880,7 +887,7 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
            "binary" = function(w, B, X, A, SW) {
              SW * w * (A - (1 - A)) * X
            },
-           "multinomial" = function(w, B, X, A, SW) {
+           "multi-category" = function(w, B, X, A, SW) {
              do.call("cbind", lapply(utils::combn(levels(treat.list[[i]]), 2, simplify = FALSE), function(co) {
                SW * w * ((A == co[1]) - (A == co[2])) * X
              }))
@@ -922,7 +929,7 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
     switch(treat.types[i],
            "binary" = glm.fit(covs.list[[i]], treat.list[[i]], family = binomial(),
                               weights = s.weights)$coefficients,
-           "multinomial" = .multinom_weightit.fit(covs.list[[i]], treat.list[[i]], hess = FALSE,
+           "multi-category" = .multinom_weightit.fit(covs.list[[i]], treat.list[[i]], hess = FALSE,
                                                   weights = s.weights)$coefficients,
            "continuous" = {
              init.fit <- lm.wfit(covs.list[[i]], treat.list[[i]], w = s.weights)
@@ -955,7 +962,7 @@ weightitMSM2cbps <- function(covs.list, treat.list, s.weights, subset, missing, 
              "binary" = function(p, X, A, SW) {
                SW * (A - p) * X
              },
-             "multinomial" = function(p, X, A, SW) {
+             "multi-category" = function(p, X, A, SW) {
                do.call("cbind", lapply(levels(A), function(i) {
                  SW * ((A == i) - p[,i]) * X
                }))

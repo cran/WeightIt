@@ -8,7 +8,7 @@
 #'
 #' In general, this method relies on estimating weights by solving a quadratic programming problem subject to approximate or exact balance constraints. This method relies on \pkgfun{optweight}{optweight} from the \CRANpkg{optweight} package.
 #'
-#' Because `optweight()` offers finer control and uses the same syntax as `weightit()`, it is recommended that \pkgfun{optweight}{optweight} be used instead of `weightit` with `method = "optweight"`.
+#' Because `optweight()` offers finer control and uses the same syntax as `weightit()`, it is recommended that \pkgfun{optweight}{optweight} be used instead of `weightit()` with `method = "optweight"`.
 #'
 #' ## Binary Treatments
 #'
@@ -47,7 +47,7 @@
 #'
 #' \describe{
 #'   \item{`quantile`}{
-#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75`) to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
+#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75)` to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
 #'   }
 #' }
 #'
@@ -70,6 +70,8 @@
 #'
 #' @details
 #' Stable balancing weights are weights that solve a constrained optimization problem, where the constraints correspond to covariate balance and the loss function is the variance (or other norm) of the weights. These weights maximize the effective sample size of the weighted sample subject to user-supplied balance constraints. An advantage of this method over entropy balancing is the ability to allow approximate, rather than exact, balance through the `tols` argument, which can increase precision even for slight relaxations of the constraints.
+#'
+#' `plot()` can be used on the output of `weightit()` with `method = "optweight"` to display the dual variables; see Examples and [plot.weightit()] for more details.
 #'
 #' @note
 #' The specification of `tols` differs between `weightit()` and `optweight()`. In `weightit()`, one tolerance value should be included per level of each factor variable, whereas in `optweight()`, all levels of a factor are given the same tolerance, and only one value needs to be supplied for a factor variable. Because of the potential for confusion and ambiguity, it is recommended to only supply one value for `tols` in `weightit()` that applies to all variables. For finer control, use `optweight()` directly.
@@ -106,6 +108,7 @@
 #'                 tols = 0))
 #' summary(W1)
 #' cobalt::bal.tab(W1)
+#' plot(W1)
 #'
 #' #Balancing covariates with respect to race (multi-category)
 #' (W2 <- weightit(race ~ age + educ + married +
@@ -114,13 +117,15 @@
 #'                 tols = .01))
 #' summary(W2)
 #' cobalt::bal.tab(W2)
+#' plot(W2)
 #'
 #' #Balancing covariates with respect to re75 (continuous)
-#' (W3 <- weightit(re75 ~ age + educ + married +
-#'                   nodegree + re74, data = lalonde,
-#'                 method = "optweight", tols = .05))
-#' summary(W3)
-#' cobalt::bal.tab(W3)
+# (W3 <- weightit(re75 ~ age + educ + married +
+#                   nodegree + re74, data = lalonde,
+#                 method = "optweight", tols = .05))
+# summary(W3)
+# cobalt::bal.tab(W3)
+# plot(W3)
 NULL
 
 weightit2optweight <- function(covs, treat, s.weights, subset, estimand, focal, missing,
@@ -133,10 +138,9 @@ weightit2optweight <- function(covs, treat, s.weights, subset, estimand, focal, 
   treat <- factor(treat[subset])
   s.weights <- s.weights[subset]
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
-
-  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                                 focal = focal, treat = treat))
+  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                            focal = focal, treat = treat))
 
   for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
@@ -182,7 +186,8 @@ weightit2optweight.cont <- function(covs, treat, s.weights, subset, missing, mom
   treat <- treat[subset]
   s.weights <- s.weights[subset]
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+  covs <- .int_poly_f(covs, poly = moments, int = int)
+
   for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
   if (missing == "ind") {
@@ -221,45 +226,97 @@ weightit2optweight.cont <- function(covs, treat, s.weights, subset, missing, mom
 weightitMSM2optweight <- function(covs.list, treat.list, s.weights, subset, missing, moments, int, verbose, ...) {
   A <- list(...)
   rlang::check_installed("optweight")
-  if (is_not_null(covs.list)) {
-    covs.list <- lapply(covs.list, function(c) {
-      covs <- c[subset, , drop = FALSE]
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
-      for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
-      if (missing == "ind") {
-        covs <- add_missing_indicators(covs)
-      }
+  s.weights <- s.weights[subset]
+  treat.types <- character(length(treat.list))
 
-      covs
-    })
-  }
-  if (is_not_null(treat.list)) {
-    treat.list <- lapply(treat.list, function(t) {
-      treat <- t[subset]
-      if (get_treat_type(t) != "continuous") treat <- factor(treat)
-      return(treat)
-    })
-  }
-  if (is_not_null(s.weights)) {
-    s.weights <- s.weights[subset]
+  for (i in seq_along(treat.list)) {
+    treat.list[[i]] <- treat.list[[i]][subset]
+
+    if (!has_treat_type(treat.list[[i]])) {
+      treat.list[[i]] <- assign_treat_type(treat.list[[i]])
+    }
+    treat.types[i] <- get_treat_type(treat.list[[i]])
+
+    if (get_treat_type(treat.list[[i]]) != "continuous") {
+      treat.list[[i]] <- factor(treat.list[[i]])
+    }
+
+    covs.list[[i]] <- covs.list[[i]][subset, , drop = FALSE]
+
+    if (missing == "ind") {
+      covs.list[[i]] <- add_missing_indicators(covs.list[[i]])
+    }
+
+    covs.list[[i]] <- cbind(covs.list[[i]],
+                            .int_poly_f(covs.list[[i]], poly = moments, int = int))
+
+    if (treat.types[i] %in% c("binary", "multi-category")) {
+      covs.list[[i]] <- cbind(.int_poly_f(covs.list[[i]], poly = moments, int = int, center = TRUE),
+                              .quantile_f(covs.list[[i]], qu = A[["quantile"]], s.weights = s.weights,
+                                          treat = treat.list[[i]]))
+    }
+    else {
+      covs.list[[i]] <- cbind(covs.list[[i]], .int_poly_f(covs.list[[i]], poly = moments,
+                                                          int = int, center = TRUE))
+    }
+
+    for (j in seq_col(covs.list[[i]])) {
+      covs.list[[i]][,j] <- .make_closer_to_1(covs.list[[i]][,j])
+    }
   }
 
   baseline.data <- data.frame(treat.list[[1]], covs.list[[1]])
   baseline.formula <- formula(baseline.data)
-  if ("tols" %in% names(A)) A[["tols"]] <- optweight::check.tols(baseline.formula, baseline.data, A[["tols"]], stop = TRUE)
+  if ("tols" %in% names(A)) {
+    A[["tols"]] <- optweight::check.tols(baseline.formula, baseline.data, A[["tols"]], stop = TRUE)
+  }
+
   if ("targets" %in% names(A)) {
     .wrn("`targets` cannot be used through WeightIt and will be ignored")
     A[["targets"]] <- NULL
   }
 
   verbosely({
-    out <- do.call(optweight::optweight.fit, c(list(treat = treat.list,
-                                                    covs = covs.list,
-                                                    s.weights = s.weights,
-                                                    verbose = TRUE),
-                                               A), quote = TRUE)
+    out <- do.call(optweight::optweight.fit,
+                   c(list(treat = treat.list,
+                          covs = covs.list,
+                          s.weights = s.weights,
+                          verbose = TRUE),
+                     A),
+                   quote = TRUE)
   }, verbose = verbose)
 
   list(w = out$w, fit.obj = out)
+}
+
+.plot_duals_optweight <- function(info, by = NULL) {
+
+  use.by <- is_not_null(by)
+
+  if (!use.by) {
+    info <- list("z" = info)
+  }
+
+  d <- do.call("rbind", lapply(seq_along(info), function(i) {
+    cbind(info[[i]]$duals, by = names(info)[i])
+  }))
+
+  d$by <- factor(d$by, levels = names(info))
+
+  title <- "Dual Variables for Constraints"
+  # }
+  d$cov <- factor(d$cov, levels = rev(unique(d$cov)))
+  d$constraint <- factor(d$constraint, levels = unique(d$constraint, nmax = 2),
+                         labels = paste("Constraint:", unique(d$constraint, nmax = 2)))
+
+  p <- ggplot(d, aes(y = .data$cov, x = .data$dual)) +
+    geom_col() +
+    geom_vline(xintercept = 0) +
+    labs(x = "Absolute Dual Variable", y = "Covariate", title = title) +
+    scale_x_continuous(expand = expansion(c(0, 0.05))) +
+    facet_grid(rows = vars(.data$constraint),
+               if (use.by) vars(.data$by) else NULL) +
+    theme_bw()
+  p
 }

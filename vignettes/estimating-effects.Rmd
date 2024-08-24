@@ -8,7 +8,7 @@ output:
         toc: true
 vignette: >
   %\VignetteIndexEntry{Estimating Effects After Weighting}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 bibliography: references.bib
 link-citations: true
@@ -25,8 +25,8 @@ pre code {
 }
 </style>
 ```
-```{r, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval=T)
+```{r, cache = FALSE, include = FALSE, eval = TRUE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE)
 options(width = 200, digits= 4)
 
 me_ok <- requireNamespace("marginaleffects", quietly = TRUE)
@@ -192,11 +192,7 @@ In addition to `WeightIt` and whatever package may be required to estimate the w
 -   `marginaleffects` provides the `avg_comparisons()` function for performing g-computation and estimating the SEs and confidence intervals of the average estimate potential outcomes and treatment effects
 -   `survival` provides `coxph()` to estimate the coefficients in a Cox-proportional hazards model for the marginal hazard ratio, which is called internally by `coxph_weightit()` for survival outcomes
 
-```{r,message=FALSE,warning=FALSE, include=FALSE, eval=!me_ok}
-library("WeightIt")
-```
-
-```{r,message=FALSE,warning=FALSE, eval=me_ok}
+```{r,message=FALSE,warning=FALSE, eval= if (me_ok) TRUE else 1L}
 library("WeightIt")
 library("marginaleffects")
 ```
@@ -441,7 +437,7 @@ fit <- lm_weightit(Y_C ~ splines::ns(Ac, df = 4) *
 
 Next we use `avg_predictions()` first to compute the expected potential outcome under a representative set of treatment values. We'll examine 31 treatment values from the 10th to 90th percentiles of `Ac` because estimates outside those ranges tend to be imprecise.
 
-```{r}
+```{r, eval = me_ok}
 #Represenative values of Ac:
 values <- with(d, seq(quantile(Ac, .1),
                       quantile(Ac, .9),
@@ -456,7 +452,7 @@ Although one can examine the expected potential outcomes, it is often more usefu
 
 [^4]: You can also use `plot_predictions()`, though after requesting the predictions in the prior step it is quicker to use `ggplot()`.
 
-```{r, fig.height=3.5, fig.width=7}
+```{r, eval = me_ok, fig.height=3.5, fig.width=7}
 library("ggplot2")
 ggplot(p, aes(x = Ac)) +
   geom_line(aes(y = estimate)) +
@@ -472,7 +468,7 @@ Another way to characterize the effect of continuous treatments is to examine th
 
 [^5]: You can also use `plot_slopes()`
 
-```{r, fig.height=3.5, fig.width=7}
+```{r, eval = me_ok, fig.height=3.5, fig.width=7}
 # Estimate the pointwise derivatives at representative
 # values of Ac
 s <- avg_slopes(fit,
@@ -524,14 +520,14 @@ fit <- glm_weightit(Y_B ~ A_1 * A_2 * A_3 * (X1_0 + X2_0),
 
 Then, we compute the average expected potential outcomes under each treatment regime using `marginaleffects::avg_predictions()`:
 
-```{r}
+```{r, eval = me_ok}
 (p <- avg_predictions(fit,
                       variables = c("A_1", "A_2", "A_3")))
 ```
 
 We can compare individual predictions using `marginaleffects::hypotheses()`. For example, to compare all treatment histories to just the first treatment history (i.e., in which all units are untreated for all time periods), we can run the following:
 
-```{r}
+```{r, eval = me_ok}
 hypotheses(p, "reference")
 ```
 
@@ -567,14 +563,14 @@ fit <- lm_weightit(Y_C ~ A * X5 * (X1 + X2 + X3),
 
 To estimate the subgroup ATEs, we can use `avg_comparisons()`, this time specifying the `by` argument to signify that we want treatment effects stratified by the moderator.
 
-```{r}
+```{r, eval = me_ok}
 avg_comparisons(fit, variables = "A",
                 by = "X5")
 ```
 
 We can see that the subgroup mean differences differ from each other, and we can formally test for moderation using another call to `avg_comparisons()`, this time using the `hypothesis` argument to signify that we want to compare effects between subgroups:
 
-```{r}
+```{r, eval = me_ok}
 avg_comparisons(fit, variables = "A",
                 by = "X5",
                 hypothesis = "pairwise")

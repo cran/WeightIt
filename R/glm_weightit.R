@@ -364,7 +364,7 @@ lm_weightit <- function(formula, data, weightit,
                         contrasts = NULL, ...) {
   cal <- cal0 <- match.call()
   cal[[1]] <- quote(WeightIt::glm_weightit)
-  cal$family = quote(stats::gaussian())
+  cal$family <- quote(stats::gaussian())
   fit <- eval.parent(cal)
   fit$call <- cal0
   fit
@@ -416,7 +416,9 @@ lm_weightit <- function(formula, data, weightit,
     attr(vcov, "R") <- R
 
     if (vcov == "FWB") {
-      if (is_not_null(weightit) && weightit$method %in% c("bart", "npcbps")) {
+      #Error for weighting methods that don't accept s.weights
+      if (is_not_null(weightit) && is.character(weightit$method) &&
+          !.weightit_methods[[weightit$method]]$s.weights_ok) {
         .err(sprintf("`vcov = \"FWB\"` cannot be used with `method = %s`",
                      add_quotes(weightit$method)))
       }
@@ -518,12 +520,12 @@ lm_weightit <- function(formula, data, weightit,
 
     if (is_not_null(weightit)) {
       wcall <- weightit$call
-      # wenv <- environment(weightit$formula)
       wenv <- weightit$env
     }
     else {
       weightit_boot <- list(weights = 1)
     }
+
     genv <- environment(fit$formula)
 
     fwbfun <- function(data, w) {
@@ -588,7 +590,6 @@ lm_weightit <- function(formula, data, weightit,
     genv <- environment(fit$formula)
     if (is_not_null(weightit)) {
       wcall <- weightit$call
-      # wenv <- environment(weightit$formula)
       wenv <- weightit$env
       data <- eval(wcall$data, wenv)
       if (is_null(data)) {
@@ -840,9 +841,9 @@ lm_weightit <- function(formula, data, weightit,
 }
 
 .process_fit <- function(fit, weightit, vcov, glm_weightit_call, x, y) {
-  if (is_not_null(weightit)) {
-    fit$model[["(s.weights)"]] <- weightit$s.weights
-    fit$model[["(weights)"]] <- weightit$weights * weightit$s.weights
+  if (is_not_null(weightit) && is_not_null(fit[["model"]])) {
+    fit$model[["(s.weights)"]] <- weightit[["s.weights"]]
+    fit$model[["(weights)"]] <- weightit[["weights"]] * weightit[["s.weights"]]
   }
 
   fit$vcov_type <- vcov

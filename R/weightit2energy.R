@@ -54,7 +54,7 @@
 #'     \item{`improved`}{`logical`; whether to use the improved energy balancing weights as described by Huling and Mak (2024) when `estimand = "ATE"`. This involves optimizing balance not only between each treatment group and the overall sample, but also between each pair of treatment groups. Huling and Mak (2024) found that the improved energy balancing weights generally outperformed standard energy balancing. Default is `TRUE`; set to `FALSE` to use the standard energy balancing weights instead (not recommended).
 #'     }
 #'   \item{`quantile`}{
-#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75`) to request one quantile for each covariate.
+#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75)` to request one quantile for each covariate.
 #'   }
 #'   }
 #'
@@ -153,7 +153,7 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal,
   d <- if_null_then(A[["dist.mat"]], "scaled_euclidean")
   A[["dist.mat"]] <- NULL
 
-  if (is.character(d) && length(d) == 1L) {
+  if (chk::vld_string(d)) {
     dist.covs <- transform_covariates(data = covs, method = d,
                                       s.weights = s.weights, discarded = !subset)
     d <- unname(eucdist_internal(dist.covs))
@@ -168,7 +168,6 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal,
       .err(sprintf("`dist.mat` must be one of %s or a square, symmetric distance matrix with a value for all pairs of units",
                    word_list(weightit_distances(), "or", quotes = TRUE)))
     }
-
   }
 
   d <- unname(d[subset, subset])
@@ -223,55 +222,16 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal,
     lvec <- c(rep.int(min.w, n), 1, 1)
     uvec <- c(ifelse(check_if_zero(s.weights), min.w, Inf), 1, 1)
 
-    if (moments != 0 || int) {
-      #Exactly balance moments and/or interactions
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+    if (moments > 0 || int || is_not_null(A[["quantile"]])) {
+      #Exactly balance moments, interactions, and/or quantiles
+      covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                    .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights))
 
       targets <- col.w.m(covs, s.weights)
 
       Amat <- cbind(Amat, covs * s.weights_n_0, covs * s.weights_n_1)
       lvec <- c(lvec, targets, targets)
       uvec <- c(uvec, targets, targets)
-    }
-
-    if (is_not_null(A[["quantile"]])) {
-      qu <- .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights)
-
-      targets <- col.w.m(qu, s.weights)
-
-      Amat <- cbind(Amat, qu * s.weights_n_0, qu * s.weights_n_1)
-      lvec <- c(lvec, targets, targets)
-      uvec <- c(uvec, targets, targets)
-    }
-  }
-  else if (estimand == "ATO") {
-
-    nn <- tcrossprod(s.weights_n_0 - s.weights_n_1)
-
-    P <- -d * nn
-
-    q <- NULL
-
-    #Constraints for positivity and sum of weights
-    Amat <- cbind(diagn, s.weights_n_0, s.weights_n_1)
-    lvec <- c(rep.int(min.w, n), 1, 1)
-    uvec <- c(ifelse(check_if_zero(s.weights), min.w, Inf), 1, 1)
-
-    if (moments != 0 || int) {
-      #Exactly balance moments and/or interactions
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
-
-      Amat <- cbind(Amat, covs * (s.weights_n_0 - s.weights_n_1))
-      lvec <- c(lvec, rep.int(0, ncol(covs)))
-      uvec <- c(uvec, rep.int(0, ncol(covs)))
-    }
-
-    if (is_not_null(A[["quantile"]])) {
-      qu <- .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights)
-
-      Amat <- cbind(Amat, qu * (s.weights_n_0 - s.weights_n_1))
-      lvec <- c(lvec, rep.int(0, ncol(qu)))
-      uvec <- c(uvec, rep.int(0, ncol(qu)))
     }
   }
   else if (estimand == "ATT") {
@@ -285,25 +245,15 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal,
     lvec <- c(rep.int(min.w, n0), 1)
     uvec <- c(ifelse(check_if_zero(s.weights[t0]), min.w, Inf), 1)
 
-    if (moments != 0 || int) {
-      #Exactly balance moments and/or interactions
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+    if (moments > 0 || int || is_not_null(A[["quantile"]])) {
+      #Exactly balance moments, interactions, and/or quantiles
+      covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                    .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                                focal = 1, treat = treat))
 
       targets <- col.w.m(covs[t1,, drop = FALSE], s.weights[t1])
 
       Amat <- cbind(Amat, covs[t0,, drop = FALSE] * s.weights_n_0[t0])
-
-      lvec <- c(lvec, targets)
-      uvec <- c(uvec, targets)
-    }
-
-    if (is_not_null(A[["quantile"]])) {
-      qu <- .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                       focal = 1, treat = treat)
-
-      targets <- col.w.m(qu[t1,, drop = FALSE], s.weights[t1])
-
-      Amat <- cbind(Amat, qu[t0,, drop = FALSE] * s.weights_n_0[t0])
 
       lvec <- c(lvec, targets)
       uvec <- c(uvec, targets)
@@ -320,25 +270,15 @@ weightit2energy <- function(covs, treat, s.weights, subset, estimand, focal,
     lvec <- c(rep.int(min.w, n1), 1)
     uvec <- c(ifelse(check_if_zero(s.weights[t1]), min.w, Inf), 1)
 
-    if (moments != 0 || int) {
-      #Exactly balance moments and/or interactions
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+    if (moments > 0 || int || is_not_null(A[["quantile"]])) {
+      #Exactly balance moments, interactions, and/or quantiles
+      covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                    .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                                focal = 0, treat = treat))
 
       targets <- col.w.m(covs[t0,, drop = FALSE], s.weights[t0])
 
       Amat <- cbind(Amat, covs[t1,, drop = FALSE] * s.weights_n_1[t1])
-
-      lvec <- c(lvec, targets)
-      uvec <- c(uvec, targets)
-    }
-
-    if (is_not_null(A[["quantile"]])) {
-      qu <- .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                       focal = 0, treat = treat)
-
-      targets <- col.w.m(qu[t0,, drop = FALSE], s.weights[t0])
-
-      Amat <- cbind(Amat, qu[t1,, drop = FALSE] * s.weights_n_1[t1])
 
       lvec <- c(lvec, targets)
       uvec <- c(uvec, targets)
@@ -428,7 +368,7 @@ weightit2energy.multi <- function(covs, treat, s.weights, subset, estimand, foca
   d <- if_null_then(A[["dist.mat"]], "scaled_euclidean")
   A[["dist.mat"]] <- NULL
 
-  if (is.character(d) && length(d) == 1L) {
+  if (chk::vld_string(d)) {
     dist.covs <- transform_covariates(data = covs, method = d,
                                       s.weights = s.weights, discarded = !subset)
     d <- unname(eucdist_internal(dist.covs))
@@ -495,23 +435,14 @@ weightit2energy.multi <- function(covs, treat, s.weights, subset, estimand, foca
     lvec <- c(rep.int(min.w, n), rep.int(1, length(levels_treat)))
     uvec <- c(ifelse(check_if_zero(s.weights), min.w, Inf), rep.int(1, length(levels_treat)))
 
-    if (moments != 0 || int) {
-      #Exactly balance moments and/or interactions
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+    if (moments > 0 || int || is_not_null(A[["quantile"]])) {
+      #Exactly balance moments, interactions, and/or quantiles
+      covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                    .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights))
 
       targets <- col.w.m(covs, s.weights)
 
       Amat <- cbind(Amat, do.call("cbind", apply(s.weights_n_t, 2, function(x) covs * x, simplify = FALSE)))
-      lvec <- c(lvec, rep.int(targets, length(levels_treat)))
-      uvec <- c(uvec, rep.int(targets, length(levels_treat)))
-    }
-
-    if (is_not_null(A[["quantile"]])) {
-      qu <- .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights)
-
-      targets <- col.w.m(qu, s.weights)
-
-      Amat <- cbind(Amat, do.call("cbind", apply(s.weights_n_t, 2, function(x) qu * x, simplify = FALSE)))
       lvec <- c(lvec, rep.int(targets, length(levels_treat)))
       uvec <- c(uvec, rep.int(targets, length(levels_treat)))
     }
@@ -531,27 +462,16 @@ weightit2energy.multi <- function(covs, treat, s.weights, subset, estimand, foca
     lvec <- c(rep.int(min.w, sum(!in_focal)), rep.int(1, length(non_focal)))
     uvec <- c(ifelse(check_if_zero(s.weights[!in_focal]), min.w, Inf), rep.int(1, length(non_focal)))
 
-    if (moments != 0 || int) {
-      #Exactly balance moments and/or interactions
-      covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+    if (moments > 0 || int || is_not_null(A[["quantile"]])) {
+      #Exactly balance moments, interactions, and/or quantiles
+      covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                    .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                                focal = focal, treat = treat))
 
       targets <- col.w.m(covs[in_focal,, drop = FALSE], s.weights[in_focal])
 
       Amat <- cbind(Amat, do.call("cbind", apply(s.weights_n_t[!in_focal, non_focal, drop = FALSE], 2,
                                                  function(x) covs[!in_focal,, drop = FALSE] * x,
-                                                 simplify = FALSE)))
-      lvec <- c(lvec, rep.int(targets, length(non_focal)))
-      uvec <- c(uvec, rep.int(targets, length(non_focal)))
-    }
-
-    if (is_not_null(A[["quantile"]])) {
-      qu <- .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
-                       focal = focal, treat = treat)
-
-      targets <- col.w.m(qu[in_focal,, drop = FALSE], s.weights[in_focal])
-
-      Amat <- cbind(Amat, do.call("cbind", apply(s.weights_n_t[!in_focal, non_focal, drop = FALSE], 2,
-                                                 function(x) qu[!in_focal,, drop = FALSE] * x,
                                                  simplify = FALSE)))
       lvec <- c(lvec, rep.int(targets, length(non_focal)))
       uvec <- c(uvec, rep.int(targets, length(non_focal)))
@@ -623,8 +543,6 @@ weightit2energy.multi <- function(covs, treat, s.weights, subset, estimand, foca
   list(w = w, fit.obj = opt.out)
 }
 
-# weightit2energy.multi <- weightit2energy
-
 weightit2energy.cont <- function(covs, treat, s.weights, subset, missing, moments, int, verbose, ...) {
   rlang::check_installed("osqp")
 
@@ -637,7 +555,7 @@ weightit2energy.cont <- function(covs, treat, s.weights, subset, missing, moment
   Xdist <- if_null_then(A[["dist.mat"]], "scaled_euclidean")
   A[["dist.mat"]] <- NULL
 
-  if (is.character(Xdist) && length(Xdist) == 1L) {
+  if (chk::vld_string(Xdist)) {
     dist.covs <- transform_covariates(data = covs, method = Xdist,
                                       s.weights = s.weights, discarded = !subset)
     Xdist <- unname(eucdist_internal(X = dist.covs))
@@ -651,7 +569,6 @@ weightit2energy.cont <- function(covs, treat, s.weights, subset, missing, moment
       .err(sprintf("`dist.mat` must be one of %s or a square, symmetric distance matrix with a value for all pairs of units",
                    word_list(weightit_distances(), "or", quotes = TRUE)))
     }
-
   }
 
   Xdist <- unname(Xdist[subset, subset])
@@ -727,39 +644,32 @@ weightit2energy.cont <- function(covs, treat, s.weights, subset, missing, moment
   P <- Pdcow + PebA + PebX
   q <- qebA + qebX
 
-  P <- P * outer(s.weights, s.weights)
+  P <- P * tcrossprod(s.weights)
   q <- q * s.weights
 
   Amat <- cbind(diag(n), s.weights)
   lvec <- c(rep.int(min.w, n), n)
   uvec <- c(ifelse(sw0, min.w, Inf), n)
 
-  if (d.moments != 0) {
-    d.covs <- covs
+  if (d.moments > 0) {
+    d.covs <- .int_poly_f(covs, poly = d.moments)
     d.treat <- cbind(poly(treat, degree = d.moments))
 
-    if (d.moments > 1) {
-      d.covs <- cbind(d.covs, .int_poly_f(d.covs, poly = d.moments))
-    }
-
-    X.targets <- col.w.m(d.covs, s.weights)
-    A.targets <- col.w.m(d.treat, s.weights)
-
-    d.covs <- scale(d.covs, center = X.targets, scale = FALSE)
-    d.treat <- scale(d.treat, center = A.targets, scale = FALSE)
+    d.covs <- center(d.covs, col.w.m(d.covs, s.weights))
+    d.treat <- center(d.treat, col.w.m(d.treat, s.weights))
 
     Amat <- cbind(Amat, d.covs * s.weights, d.treat * s.weights)
     lvec <- c(lvec, rep.int(0, ncol(d.covs)), rep.int(0, ncol(d.treat)))
     uvec <- c(uvec, rep.int(0, ncol(d.covs)), rep.int(0, ncol(d.treat)))
   }
 
-  if (moments != 0 || int) {
-    covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+  if (moments > 0 || int) {
+    covs <- .int_poly_f(covs, poly = moments, int = int)
 
     X.means <- col.w.m(covs, s.weights)
     A.mean <- w.m(treat, s.weights)
 
-    covs <- scale(covs, center = X.means, scale = FALSE)
+    covs <- center(covs, X.means)
     treat <- treat - A.mean
 
     Amat <- cbind(Amat, covs * treat * s.weights)

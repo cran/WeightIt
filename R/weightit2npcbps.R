@@ -45,7 +45,7 @@
 #'
 #' \describe{
 #'   \item{`quantile`}{
-#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75`) to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
+#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75)` to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
 #'   }
 #' }
 #'
@@ -96,10 +96,6 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
 
   A <- list(...)
 
-  if (!all_the_same(s.weights)) {
-    .err("sampling weights cannot be used with `method = \"npcbps\"`")
-  }
-
   covs <- covs[subset, , drop = FALSE]
   treat <- factor(treat[subset])
 
@@ -107,9 +103,9 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
-
-  covs <- cbind(covs, .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights))
+  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
+                .quantile_f(covs, qu = A[["quantile"]], s.weights = s.weights,
+                            treat = treat))
 
   for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
@@ -118,9 +114,13 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
 
   new.data <- data.frame(treat = treat, covs)
 
+  corprior <- if_null_then(A[["corprior"]], .01)
+
   tryCatch({verbosely({
-    fit <- do.call(CBPS::npCBPS, c(list(formula(new.data), data = new.data, print.level = 1), A),
-                   quote = TRUE)
+    fit <- CBPS::npCBPS(formula(new.data),
+                        data = new.data,
+                        corprior = corprior,
+                        print.level = 1)
   }, verbose = verbose)},
   error = function(e) {
     e. <- conditionMessage(e)
@@ -141,10 +141,6 @@ weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, moment
 
   A <- list(...)
 
-  if (!all_the_same(s.weights)) {
-    .err("sampling weights cannot be used with `method = \"npcbps\"`")
-  }
-
   covs <- covs[subset, , drop = FALSE]
   treat <- treat[subset]
 
@@ -154,16 +150,20 @@ weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, moment
 
   for (i in seq_col(covs)) covs[,i] <- .make_closer_to_1(covs[,i])
 
-  covs <- cbind(covs, .int_poly_f(covs, poly = moments, int = int))
+  covs <- .int_poly_f(covs, poly = moments, int = int)
 
   colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
   new.data <- data.frame(treat = treat, covs)
 
+  corprior <- if_null_then(A[["corprior"]], .01)
+
   tryCatch({verbosely({
-    fit <- do.call(CBPS::npCBPS, c(list(formula(new.data), data = new.data, print.level = 1), A),
-                   quote = TRUE)
+    fit <- CBPS::npCBPS(formula(new.data),
+                        data = new.data,
+                        corprior = corprior,
+                        print.level = 1)
   }, verbose = verbose)},
   error = function(e) {
     e. <- conditionMessage(e)

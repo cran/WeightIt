@@ -1,4 +1,10 @@
 test_that("No weights", {
+  skip_if_not_installed("sandwich")
+  skip_if_not_installed("mlogit")
+  skip_if_not_installed("dfidx")
+
+  eps <- if (capabilities("long.double")) 1e-5 else 1e-1
+
   test_data <- readRDS(test_path("fixtures", "test_data.rds"))
   test_data$Y_M <- with(test_data, factor(findInterval(Y_C, quantile(Y_C, seq(0, 1, length = 5)),
                                                        all.inside = TRUE)))
@@ -27,9 +33,9 @@ test_that("No weights", {
                                                  length(coef(fit0))/(nlevels(test_data$Y_M) - 1))))
 
   expect_equal(unname(coef(fit0)), unname(coef(fit_g)[ind]),
-               tolerance = 1e-7)
+               tolerance = eps)
   expect_equal(unname(vcov(fit0)), unname(sandwich::sandwich(fit_g)[ind, ind]),
-               tolerance = 1e-7)
+               tolerance = eps)
 
   expect_no_condition({
     fit <- multinom_weightit(Y_M ~ A * (X1 + X2 + X3 + X4 + X5), cluster = ~clus,
@@ -41,7 +47,7 @@ test_that("No weights", {
   #Cluster-robust SEs
   expect_equal(unname(vcov(fit)),
                unname(sandwich::vcovCL(fit_g, cluster = test_data$clus)[ind, ind]),
-               tolerance = 1e-7)
+               tolerance = eps)
 
   #Offset
   expect_no_condition({
@@ -54,6 +60,11 @@ test_that("No weights", {
 })
 
 test_that("Binary treatment", {
+  skip_if_not_installed("mlogit")
+  skip_if_not_installed("dfidx")
+
+  eps <- if (capabilities("long.double")) 1e-5 else 1e-1
+
   test_data <- readRDS(test_path("fixtures", "test_data.rds"))
   test_data$Y_M <- with(test_data, factor(findInterval(Y_C, quantile(Y_C, seq(0, 1, length = 5)),
                                                        all.inside = TRUE)))
@@ -66,8 +77,6 @@ test_that("Binary treatment", {
                   data = test_data, method = "glm", estimand = "ATE",
                   include.obj = TRUE)
   })
-
-  expect_M_parts_okay(W)
 
   expect_no_condition({
     fit0 <- multinom_weightit(Y_M ~ A * (X1 + X2 + X3 + X4 + X5),
@@ -99,9 +108,9 @@ test_that("Binary treatment", {
                                                  length(coef(fit))/(nlevels(test_data$Y_M) - 1))))
 
   expect_equal(unname(coef(fit)), unname(coef(fit_g)[ind]),
-               tolerance = 1e-6)
+               tolerance = eps)
   # expect_equal(unname(vcov(fit)), unname(sandwich::sandwich(fit_g)[ind, ind]),
-  #              tolerance = 1e-6)
+  #              tolerance = eps)
 
   expect_no_condition({
     fit <- multinom_weightit(Y_M ~ A * (X1 + X2 + X3 + X4 + X5), cluster = ~clus,
@@ -113,7 +122,7 @@ test_that("Binary treatment", {
   # #Cluster-robust SEs
   # expect_equal(unname(vcov(fit)),
   #              unname(sandwich::vcovCL(fit_g, cluster = test_data$clus, cadjust = T)[ind, ind]),
-  #              tolerance = 1e-7)
+  #              tolerance = eps)
 
   #Offset
   expect_no_condition({

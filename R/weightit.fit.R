@@ -41,11 +41,10 @@
 #' ignored and set to `"glm"`.
 #' @param moments,int,subclass arguments to customize the weight estimation.
 #' See [weightit()] for details.
-#' @param is.MSM.method see [weightitMSM()]. Typically can be ignored.
 #' @param missing `character`; how missing data should be handled. The
-#' options depend on the `method` used. If `NULL`, `covs` covs
+#' options depend on the `method` used. If `NULL`, `covs`
 #' will be checked for `NA` values, and if present, `missing` will be
-#' set to `"ind"`. If `""`, `covs` covs will not be checked for
+#' set to `"ind"`. If `""`, `covs` will not be checked for
 #' `NA` values; this can be faster when it is known there are none.
 #' @param verbose whether to print additional information output by the fitting
 #' function.
@@ -133,8 +132,10 @@
 weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.factor = NULL,
                          estimand = "ATE", focal = NULL, stabilize = FALSE,
                          ps = NULL, moments = NULL, int = FALSE,
-                         subclass = NULL, is.MSM.method = FALSE, missing = NULL,
+                         subclass = NULL, missing = NULL,
                          verbose = FALSE, include.obj = FALSE, ...) {
+
+  A <- list(...)
 
   #Checks
   if (!check_if_call_from_fun(weightit) && !check_if_call_from_fun(weightitMSM)) {
@@ -153,13 +154,15 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     chk::chk_flag(include.obj)
 
     if (length(treat) != nrow(covs)) {
-      .err("`treat` and `'covs` must contain the same number of units")
+      .err("`treat` and `covs` must contain the same number of units")
     }
 
     if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
     treat.type <- get_treat_type(treat)
 
     .check_acceptable_method(method, msm = FALSE, force = FALSE)
+
+    .check_method_treat.type(method, treat.type)
 
     if (is_not_null(ps)) {
       chk::chk_vector(ps)
@@ -169,15 +172,23 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
         .err("`ps` and `treat` must be the same length")
       }
 
-      method <- "glm"
+      if (is_not_null(ps) && is_not_null(method) &&
+          !is.function(method) &&
+          !identical(method, "glm")) {
+        .wrn("`ps` is supplied, so `method` will be ignored")
+      }
+
+      method <- NULL
     }
 
     if (is_null(s.weights)) {
       s.weights <- rep.int(1, length(treat))
     }
     else {
-      chk::chk_vector(s.weights)
+      .chk_basic_vector(s.weights)
       chk::chk_numeric(s.weights)
+
+      .check_method_s.weights(method, s.weights)
 
       if (length(s.weights) != length(treat)) {
         .err("`s.weights` and `treat` must be the same length")
@@ -201,14 +212,14 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     focal <- f.e.r[["focal"]]
     estimand <- f.e.r[["estimand"]]
 
-    .chk_null_or(missing, chk::chk_string)
+    chk::chk_null_or(missing, vld = chk::vld_string)
 
     if (is_null(missing)) {
-      if (anyNA(covs)) missing <- "ind"
+      if (is_not_null(method) && anyNA(covs)) missing <- "ind"
       else missing <- ""
     }
     else if (missing != "" && anyNA(covs)) {
-      missing <- .process_missing(missing, method, treat.type)
+      missing <- .process_missing(missing, method)
     }
     else missing <- ""
 
@@ -216,9 +227,14 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     if (is_not_null(subclass)) .check_subclass(method, treat.type)
 
     #Process moments and int
-    moments.int <- .process_moments_int(moments, int, method)
-    moments <- moments.int[["moments"]]
-    int <- moments.int[["int"]]
+    m.i.q <- .process_moments_int_quantile(moments = moments,
+                                           int = int,
+                                           quantile = A[["quantile"]],
+                                           method = method)
+
+    moments <- m.i.q[["moments"]]
+    int <- m.i.q[["int"]]
+    A["quantile"] <- m.i.q["quantile"]
   }
   else {
     if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
@@ -236,96 +252,66 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
 
   obj <- NULL
 
-  if (!is.function(method)) {
-    fun <- "weightit"
-
-    if (is.MSM.method) fun <- paste0(fun, "MSM")
-
-    if (is_null(ps))
-      fun <- paste0(fun, "2", method)
-    else
-      fun <- paste0(fun, "2ps")
-
-    if (!is.MSM.method) {
-      fun <- switch(treat.type,
-                    "multinomial" = paste.(fun, "multi"),
-                    "continuous" = paste.(fun, "cont"),
-                    fun)
+  if (is.function(method)) {
+    fun <- "weightit2user"
+  }
+  else {
+    fun <- {
+      if (is_not_null(ps)) "weightit2ps"
+      else if (is_null(method)) "weightit2null"
+      else sprintf("weightit2%s", method)
     }
 
-    ####
-    # if (FORMULA.TEST) fun <- paste0(".", fun)
-    ####
-    # fun <- get1(fun, mode = "function")
+    fun <- switch(treat.type,
+                  "multi-category" = paste.(fun, "multi"),
+                  "continuous" = paste.(fun, "cont"),
+                  fun)
   }
 
+  A["covs"] <- list(covs)
+  A["treat"] <- list(treat)
+  A["s.weights"] <- list(s.weights)
+  A["estimand"] <- list(estimand)
+  A["focal"] <- list(focal)
+  A["stabilize"] <- list(stabilize)
+  A["subclass"] <- list(subclass)
+  A["ps"] <- list(ps)
+  A["moments"] <- list(moments)
+  A["int"] <- list(int)
+  A["missing"] <- list(missing)
+  A["verbose"] <- list(verbose)
+
   for (i in levels(by.factor)) {
+    A["subset"] <- list(by.factor == i)
+
     #Run method
-    if (!is.function(method)) {
-      obj <- do.call(fun,
-                     alist(covs = covs,
-                           treat = treat,
-                           s.weights = s.weights,
-                           subset = by.factor == i,
-                           estimand = estimand,
-                           focal = focal,
-                           stabilize = stabilize,
-                           subclass = subclass,
-                           ps = ps,
-                           moments = moments,
-                           int = int,
-                           missing = missing,
-                           verbose = verbose,
-                           ...))
+    if (is.function(method)) {
+      A["Fun"] <- list(method)
     }
-    else if (is.MSM.method) {
-      obj <- weightitMSM2user(Fun = method,
-                              covs.list = covs,
-                              treat.list = treat,
-                              s.weights = s.weights,
-                              subset = by.factor == i,
-                              stabilize = stabilize,
-                              missing = missing,
-                              verbose = verbose,
-                              ...)
-    }
-    else {
-      obj <- weightit2user(Fun = method,
-                           covs = covs,
-                           treat = treat,
-                           s.weights = s.weights,
-                           subset = by.factor == i,
-                           estimand = estimand,
-                           focal = focal,
-                           stabilize = stabilize,
-                           subclass = subclass,
-                           ps = ps,
-                           missing = missing,
-                           moments = moments,
-                           int = int,
-                           verbose = verbose,
-                           ...)
-    }
+
+    obj <- do.call(fun, A)
 
     #Extract weights
     if (is_null(obj)) {
-      .err("no object was created. This is probably a bug,\n     and you should report it at https://github.com/ngreifer/WeightIt/issues")
+      .err("no object was created. This is probably a bug, and you should report it at https://github.com/ngreifer/WeightIt/issues")
     }
+
     if (is_null(obj$w) || all(is.na(obj$w))) {
-      .wrn("no weights were estimated. This is probably a bug,\n     and you should report it at https://github.com/ngreifer/WeightIt/issues")
+      .wrn("no weights were estimated. This is probably a bug, and you should report it at https://github.com/ngreifer/WeightIt/issues")
     }
+
     if (any(!is.finite(obj$w))) {
       .wrn("some weights were estimated as `NA`, which means a value was impossible to compute (e.g., Inf). Check for extreme values of the treatment or covariates and try removing them. Non-finite weights will be set to 0")
       obj$w[!is.finite(obj$w)] <- 0
     }
-    # else if (any(!is.finite(obj$w))) probably.a.bug()
+    # else if (any(!is.finite(obj$w))) probably_a_bug()
 
     out$weights[by.factor == i] <- obj$w
     if (is_not_null(obj$ps)) {
       out$ps[by.factor == i] <- obj$ps
     }
 
-    if (include.obj) {
+    if (include.obj && is_not_null(obj$fit.obj)) {
       fit.obj[[i]] <- obj$fit.obj
     }
 
@@ -333,10 +319,15 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
   }
 
   if (include.obj) {
-    if (nlevels(by.factor) == 1) {
-      fit.obj <- fit.obj[[1]]
+    if (any(lengths(fit.obj) > 0)) {
+      if (nlevels(by.factor) == 1) {
+        fit.obj <- fit.obj[[1]]
+      }
+      out$fit.obj <- fit.obj
     }
-    out$fit.obj <- fit.obj
+    else {
+      .wrn("`include.obj` was set to `TRUE`, but no fit object was returned by the fitting function")
+    }
   }
 
   if (nlevels(by.factor) == 1) {
@@ -369,6 +360,8 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
                             subclass = NULL, is.MSM.method = FALSE, missing = NULL,
                             verbose = FALSE, include.obj = FALSE, ...) {
 
+  A <- list(...)
+
   #Checks
   if (!check_if_call_from_fun(weightitMSM)) {
 
@@ -394,24 +387,27 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
     for (i in seq_along(treat.list)) {
       n <- length(treat.list[[i]])
 
+      if (n != length(treat.list[[1]])) {
+        .err("the number of units must be the same for each time point")
+      }
+
       if (nrow(covs.list[[i]]) != n) {
         .err("treatment and covariates must have the same number of units")
       }
+
       if (anyNA(treat.list[[i]])) {
         .err(sprintf("no missing values are allowed in the treatment variable. Missing values found in treat.list[[%s]]", i))
       }
 
       treat.list[[i]] <- assign_treat_type(treat.list[[i]])
-
-      if (anyNA(covs.list[[i]])) {
-        missing <- .process_missing(missing, method, get_treat_type(treat.list[[i]]))
-      }
-      else if (i == length(covs.list)) {
-        missing <- ""
-      }
     }
 
     .check_acceptable_method(method, msm = TRUE, force = FALSE)
+
+    missing <- {
+      if (is_null(method) || !any(vapply(covs.list, anyNA, logical(1L)))) ""
+      else .process_missing(missing, method)
+    }
 
     if (is_null(s.weights)) {
       s.weights <- rep.int(1, n)
@@ -420,8 +416,10 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
       chk::chk_vector(s.weights)
       chk::chk_numeric(s.weights)
 
+      .check_method_s.weights(method, s.weights)
+
       if (length(s.weights) != n) {
-        .err("`s.weights` and `treat` must be the same length")
+        .err("`s.weights` must have length equal to the number of units")
       }
     }
 
@@ -432,14 +430,19 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
       chk::chk_factor(by.factor)
 
       if (length(by.factor) != n) {
-        .err("`by.factor` and `treat` must be the same length")
+        .err("`by.factor` must have length equal to the number of units")
       }
     }
 
     #Process moments and int
-    moments.int <- .process_moments_int(moments, int, method)
-    moments <- moments.int[["moments"]]
-    int <- moments.int[["int"]]
+    m.i.q <- .process_moments_int_quantile(moments = moments,
+                                           int = int,
+                                           quantile = A[["quantile"]],
+                                           method = method)
+
+    moments <- m.i.q[["moments"]]
+    int <- m.i.q[["int"]]
+    A["quantile"] <- m.i.q["quantile"]
   }
   else {
     for (i in seq_along(treat.list)) {
@@ -458,66 +461,69 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
 
   obj <- NULL
 
-  if (!is.function(method)) {
-    fun <- paste0("weightitMSM2", method)
+  if (is.function(method)) {
+    fun <- "weightitMSM2user"
+  }
+  else {
+    fun <- {
+      if (is_null(method)) "weightitMSM2null"
+      else sprintf("weightitMSM2%s", method)
+    }
   }
 
+  A["covs.list"] <- list(covs.list)
+  A["treat.list"] <- list(treat.list)
+  A["s.weights"] <- list(s.weights)
+  A["estimand"] <- list(estimand)
+  A["focal"] <- list(focal)
+  A["moments"] <- list(moments)
+  A["int"] <- list(int)
+  A["stabilize"] <- list(stabilize)
+  A["subclass"] <- list(subclass)
+  A["missing"] <- list(missing)
+  A["verbose"] <- list(verbose)
+
   for (i in levels(by.factor)) {
+    A["subset"] <- list(by.factor == i)
+
     #Run method
-    if (!is.function(method)) {
-      obj <- do.call(fun,
-                     alist(covs.list = covs.list,
-                           treat.list = treat.list,
-                           s.weights = s.weights,
-                           subset = by.factor == i,
-                           estimand = estimand,
-                           focal = focal,
-                           stabilize = stabilize,
-                           subclass = subclass,
-                           moments = moments,
-                           int = int,
-                           missing = missing,
-                           verbose = verbose,
-                           ...))
+    if (is.function(method)) {
+      A["Fun"] <- list(method)
     }
-    else {
-      obj <- weightitMSM2user(Fun = method,
-                              covs.list = covs.list,
-                              treat.list = treat.list,
-                              s.weights = s.weights,
-                              subset = by.factor == i,
-                              stabilize = stabilize,
-                              missing = missing,
-                              verbose = verbose,
-                              ...)
-    }
+
+    obj <- do.call(fun, A)
 
     #Extract weights
     if (is_null(obj)) {
-      .err("no object was created. This is probably a bug,\n     and you should report it at https://github.com/ngreifer/WeightIt/issues")
+      .err("no object was created. This is probably a bug, and you should report it at https://github.com/ngreifer/WeightIt/issues")
     }
     if (is_null(obj$w) || all(is.na(obj$w))) {
-      .wrn("no weights were estimated. This is probably a bug,\n     and you should report it at https://github.com/ngreifer/WeightIt/issues")
+      .wrn("no weights were estimated. This is probably a bug, and you should report it at https://github.com/ngreifer/WeightIt/issues")
     }
     if (any(!is.finite(obj$w))) {
       .wrn("some weights were estimated as `NA`, which means a value was impossible to compute (e.g., Inf). Check for extreme values of the treatment or covariates and try removing them. Non-finite weights will be set to 0")
       obj$w[!is.finite(obj$w)] <- 0
     }
-    # else if (any(!is.finite(obj$w))) probably.a.bug()
+    # else if (any(!is.finite(obj$w))) probably_a_bug()
 
     out$weights[by.factor == i] <- obj$w
 
-    if (include.obj) {
-      fit.obj[i] <- list(obj$fit.obj)
+    if (include.obj && is_not_null(obj$fit.obj)) {
+      fit.obj[[i]] <- obj$fit.obj
     }
 
     info[i] <- list(obj$info)
   }
 
   if (include.obj) {
-    out$fit.obj <- {
-      if (nlevels(by.factor) == 1) fit.obj[[1]]
-      else fit.obj
+    if (any(lengths(fit.obj) > 0)) {
+      if (nlevels(by.factor) == 1) {
+        fit.obj <- fit.obj[[1]]
+      }
+      out$fit.obj <- fit.obj
+    }
+    else {
+      .wrn("`include.obj` was set to `TRUE`, but no fit object was returned by the fitting function")
     }
   }
 

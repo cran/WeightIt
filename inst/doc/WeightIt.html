@@ -12,7 +12,7 @@
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2024-07-26" />
+<meta name="date" content="2024-08-23" />
 
 <title>Using WeightIt to Estimate Balancing Weights</title>
 
@@ -364,7 +364,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <h1 class="title toc-ignore">Using WeightIt to Estimate Balancing
 Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2024-07-26</h4>
+<h4 class="date">2024-08-23</h4>
 
 
 
@@ -397,7 +397,7 @@ within the <code>cobalt</code> package, which we will use later on as
 well. Here, we are interested in the average treatment effect on the
 treated (ATT).</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;cobalt&quot;</span>)</span></code></pre></div>
-<pre><code>##  cobalt (Version 4.5.5.9000, Build Date: 2024-05-05)</code></pre>
+<pre><code>##  cobalt (Version 4.5.5, Build Date: 2024-04-02)</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;lalonde&quot;</span>, <span class="at">package =</span> <span class="st">&quot;cobalt&quot;</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">head</span>(lalonde)</span></code></pre></div>
 <div class="kable-table">
@@ -694,12 +694,11 @@ treatment effect estimation from the outcome model.</p>
 <div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="co"># Fit outcome model</span></span>
 <span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">lm_weightit</span>(re78 <span class="sc">~</span> treat <span class="sc">*</span> (age <span class="sc">+</span> educ <span class="sc">+</span> race <span class="sc">+</span> married <span class="sc">+</span></span>
 <span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>                                     nodegree <span class="sc">+</span> re74 <span class="sc">+</span> re75),</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>                   <span class="at">data =</span> lalonde, <span class="at">weightit =</span> W.out)</span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a></span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a><span class="co"># G-computation for the treatment effect</span></span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit, <span class="at">variables =</span> <span class="st">&quot;treat&quot;</span>,</span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>                <span class="at">newdata =</span> <span class="fu">subset</span>(lalonde, treat <span class="sc">==</span> <span class="dv">1</span>))</span></code></pre></div>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>                   <span class="at">data =</span> lalonde, <span class="at">weightit =</span> W.out)</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># G-computation for the treatment effect</span></span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit, <span class="at">variables =</span> <span class="st">&quot;treat&quot;</span>,</span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>                <span class="at">newdata =</span> <span class="fu">subset</span>(lalonde, treat <span class="sc">==</span> <span class="dv">1</span>))</span></code></pre></div>
 <pre><code>## 
 ##   Term          Contrast Estimate Std. Error    z Pr(&gt;|z|)   S 2.5 % 97.5 %
 ##  treat mean(1) - mean(0)     1273        770 1.65   0.0983 3.3  -236   2783
@@ -720,8 +719,8 @@ described in detail at <code>vignette(&quot;estimating-effects&quot;)</code>.</p
 marginal structural models as well. This time, we’ll use the sample data
 set <code>msmdata</code> to estimate our weights. Data must be in “wide”
 format, with one row per unit.</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;msmdata&quot;</span>)</span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="fu">head</span>(msmdata)</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;msmdata&quot;</span>)</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">head</span>(msmdata)</span></code></pre></div>
 <div class="kable-table">
 <table>
 <thead>
@@ -827,15 +826,15 @@ on all variables measured prior to that treatment, including previous
 treatments.</p>
 <p>Using <code>cobalt</code>, we can examine the initial imbalance at
 each time point and overall:</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;cobalt&quot;</span>) <span class="co">#if not already attached</span></span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="fu">bal.tab</span>(<span class="fu">list</span>(A_1 <span class="sc">~</span> X1_0 <span class="sc">+</span> X2_0,</span>
-<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>             A_2 <span class="sc">~</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
-<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0,</span>
-<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>             A_3 <span class="sc">~</span> X1_2 <span class="sc">+</span> X2_2 <span class="sc">+</span></span>
-<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>               A_2 <span class="sc">+</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
-<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0),</span>
-<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>        <span class="at">data =</span> msmdata, <span class="at">stats =</span> <span class="fu">c</span>(<span class="st">&quot;m&quot;</span>, <span class="st">&quot;ks&quot;</span>),</span>
-<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>        <span class="at">which.time =</span> .all)</span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;cobalt&quot;</span>) <span class="co">#if not already attached</span></span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">bal.tab</span>(<span class="fu">list</span>(A_1 <span class="sc">~</span> X1_0 <span class="sc">+</span> X2_0,</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>             A_2 <span class="sc">~</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0,</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>             A_3 <span class="sc">~</span> X1_2 <span class="sc">+</span> X2_2 <span class="sc">+</span></span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>               A_2 <span class="sc">+</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0),</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>        <span class="at">data =</span> msmdata, <span class="at">stats =</span> <span class="fu">c</span>(<span class="st">&quot;m&quot;</span>, <span class="st">&quot;ks&quot;</span>),</span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>        <span class="at">which.time =</span> .all)</span></code></pre></div>
 <pre><code>## Balance by Time Point
 ## 
 ##  - - - Time: 1 - - - 
@@ -886,15 +885,15 @@ treatments and to that of <code>bal.tab()</code> for longitudinal
 treatments. We’ll use <code>method = &quot;glm&quot;</code> and
 <code>stabilize = TRUE</code> for stabilized propensity score weights
 estimated using logistic regression.</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>Wmsm.out <span class="ot">&lt;-</span> <span class="fu">weightitMSM</span>(<span class="fu">list</span>(A_1 <span class="sc">~</span> X1_0 <span class="sc">+</span> X2_0,</span>
-<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>                             A_2 <span class="sc">~</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
-<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>                               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0,</span>
-<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>                             A_3 <span class="sc">~</span> X1_2 <span class="sc">+</span> X2_2 <span class="sc">+</span></span>
-<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>                               A_2 <span class="sc">+</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
-<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>                               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0),</span>
-<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>                        <span class="at">data =</span> msmdata, <span class="at">method =</span> <span class="st">&quot;glm&quot;</span>,</span>
-<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>                        <span class="at">stabilize =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a>Wmsm.out</span></code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>Wmsm.out <span class="ot">&lt;-</span> <span class="fu">weightitMSM</span>(<span class="fu">list</span>(A_1 <span class="sc">~</span> X1_0 <span class="sc">+</span> X2_0,</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>                             A_2 <span class="sc">~</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>                               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0,</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>                             A_3 <span class="sc">~</span> X1_2 <span class="sc">+</span> X2_2 <span class="sc">+</span></span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>                               A_2 <span class="sc">+</span> X1_1 <span class="sc">+</span> X2_1 <span class="sc">+</span></span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>                               A_1 <span class="sc">+</span> X1_0 <span class="sc">+</span> X2_0),</span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>                        <span class="at">data =</span> msmdata, <span class="at">method =</span> <span class="st">&quot;glm&quot;</span>,</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a>                        <span class="at">stabilize =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a>Wmsm.out</span></code></pre></div>
 <pre><code>## A weightitMSM object
 ##  - method: &quot;glm&quot; (propensity score weighting with GLM)
 ##  - number of obs.: 7500
@@ -919,7 +918,7 @@ estimated weights. Printing the output of <code>weightitMSM()</code>
 provides some details about the function call and the output. We can
 take a look at the quality of the weights with <code>summary()</code>,
 just as we could for point treatments.</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="fu">summary</span>(Wmsm.out)</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">summary</span>(Wmsm.out)</span></code></pre></div>
 <pre><code>##                         Time 1                        
 ##                   Summary of weights
 ## 
@@ -1012,8 +1011,8 @@ just as we could for point treatments.</p>
 <p>Displayed are summaries of how the weights perform at each time point
 with respect to variability. Next, we’ll examine how well they perform
 with respect to covariate balance.</p>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="fu">bal.tab</span>(Wmsm.out, <span class="at">stats =</span> <span class="fu">c</span>(<span class="st">&quot;m&quot;</span>, <span class="st">&quot;ks&quot;</span>),</span>
-<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>        <span class="at">which.time =</span> .none)</span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a><span class="fu">bal.tab</span>(Wmsm.out, <span class="at">stats =</span> <span class="fu">c</span>(<span class="st">&quot;m&quot;</span>, <span class="st">&quot;ks&quot;</span>),</span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>        <span class="at">which.time =</span> .none)</span></code></pre></div>
 <pre><code>## Balance summary across all time points
 ##        Times    Type Max.Diff.Adj Max.KS.Adj
 ## X1_0 1, 2, 3 Contin.        0.033      0.018
@@ -1046,18 +1045,18 @@ respect to means and KS statistics. Now we can estimate our treatment
 effects.</p>
 <p>First, we fit a marginal structural model for the outcome using
 <code>glm()</code> with the weights included:</p>
-<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a><span class="co"># Fit outcome model</span></span>
-<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">glm_weightit</span>(Y_B <span class="sc">~</span> A_1 <span class="sc">*</span> A_2 <span class="sc">*</span> A_3 <span class="sc">*</span> (X1_0 <span class="sc">+</span> X2_0),</span>
-<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>                    <span class="at">data =</span> msmdata,</span>
-<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>                    <span class="at">weightit =</span> Wmsm.out,</span>
-<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>                    <span class="at">family =</span> binomial)</span></code></pre></div>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="co"># Fit outcome model</span></span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">glm_weightit</span>(Y_B <span class="sc">~</span> A_1 <span class="sc">*</span> A_2 <span class="sc">*</span> A_3 <span class="sc">*</span> (X1_0 <span class="sc">+</span> X2_0),</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>                    <span class="at">data =</span> msmdata,</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>                    <span class="at">weightit =</span> Wmsm.out,</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>                    <span class="at">family =</span> binomial)</span></code></pre></div>
 <p>Then, we compute the average expected potential outcomes under each
 treatment regime using
 <code>marginaleffects::avg_predictions()</code>:</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
-<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>(p <span class="ot">&lt;-</span> <span class="fu">avg_predictions</span>(fit,</span>
-<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>                      <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">&quot;A_1&quot;</span>, <span class="st">&quot;A_2&quot;</span>, <span class="st">&quot;A_3&quot;</span>),</span>
-<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>                      <span class="at">type =</span> <span class="st">&quot;response&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>(p <span class="ot">&lt;-</span> <span class="fu">avg_predictions</span>(fit,</span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>                      <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">&quot;A_1&quot;</span>, <span class="st">&quot;A_2&quot;</span>, <span class="st">&quot;A_3&quot;</span>),</span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>                      <span class="at">type =</span> <span class="st">&quot;response&quot;</span>))</span></code></pre></div>
 <pre><code>## 
 ##  A_1 A_2 A_3 Estimate Std. Error    z Pr(&gt;|z|)     S 2.5 % 97.5 %
 ##    0   0   0    0.687     0.0166 41.4   &lt;0.001   Inf 0.654  0.719
@@ -1079,14 +1078,14 @@ we can use <code>hypotheses()</code>, identifying the rows of the
 <code>avg_predictions()</code> output. For example, to compare the
 regimes with no treatment for all three time points vs. the regime with
 treatment for all three time points, we would run</p>
-<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a><span class="fu">hypotheses</span>(p, <span class="st">&quot;b8 - b1 = 0&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="fu">hypotheses</span>(p, <span class="st">&quot;b8 - b1 = 0&quot;</span>)</span></code></pre></div>
 <pre><code>## 
 ##     Term Estimate Std. Error     z Pr(&gt;|z|)    S  2.5 % 97.5 %
 ##  b8-b1=0   -0.265     0.0308 -8.61   &lt;0.001 56.9 -0.325 -0.204
 ## 
 ## Columns: term, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high 
 ## Type:  response</code></pre>
-<p>These results indicate that receive treatment at all time points
+<p>These results indicate that receiving treatment at all time points
 reduces the risk of the outcome relative to not receiving treatment at
 all.</p>
 </div>

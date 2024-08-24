@@ -79,7 +79,7 @@ as.weightit.weightit.fit <- function(x, covs = NULL, ...) {
 as.weightit.default <- function(x, treat, covs = NULL, estimand = NULL,
                                 s.weights = NULL, ps = NULL, ...) {
 
-  if (!is.numeric(x) || !is.vector(x)) {
+  if (!is.numeric(x) || is_not_null(dim(x))) {
     .err("`x` must be a numeric vector of weights")
   }
 
@@ -105,14 +105,14 @@ as.weightit.default <- function(x, treat, covs = NULL, estimand = NULL,
     }
   }
 
-  .chk_null_or(estimand, chk::chk_string)
-  .chk_null_or(s.weights, chk::chk_numeric)
+  chk::chk_null_or(estimand, vld = chk::vld_string)
+  chk::chk_null_or(s.weights, vld = chk::vld_numeric)
 
   if (is_not_null(s.weights) && length(s.weights) != length(treat)) {
     .err("`s.weights` and `treat` must be the same length")
   }
 
-  .chk_null_or(ps, chk::chk_numeric)
+  chk::chk_null_or(ps, vld = chk::vld_numeric)
 
   if (is_not_null(ps) && length(ps) != length(treat)) {
     .err("`ps` and `treat` must be the same length")
@@ -151,7 +151,7 @@ as.weightitMSM <- function(x, ...) {
 as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = NULL,
                                    s.weights = NULL, ps.list = NULL, ...) {
 
-  if (!is.numeric(x) || !is.vector(x)) {
+  if (!is.numeric(x) || is_not_null(dim(x))) {
     .err("`x` must be a numeric vector of weights")
   }
 
@@ -159,7 +159,7 @@ as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = N
   chk::chk_list(treat.list)
 
   if (!all(vapply(treat.list, is.atomic, logical(1L))) ||
-      !all(vapply(treat.list, is.vector, logical(1L)))) {
+      !all(vapply(treat.list, function(z) is_null(dim(z)), logical(1L)))) {
     .err("`treat.list` must be a list of atomic vectors (i.e., numeric, logical, or character) or factors")
   }
 
@@ -177,7 +177,7 @@ as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = N
     }
   }
 
-  .chk_null_or(covs.list, chk::chk_list)
+  chk::chk_null_or(covs.list, vld = chk::vld_list)
   if (is_not_null(covs.list)) {
     if (!all(vapply(covs.list, is.data.frame, logical(1L)))) {
       .err("`covs.list` must be a list of data.frames for each time point")
@@ -193,24 +193,28 @@ as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = N
     }
   }
 
-  .chk_null_or(estimand, chk::chk_string)
-  .chk_null_or(s.weights, chk::chk_numeric)
+  chk::chk_null_or(estimand, vld = chk::vld_string)
+  chk::chk_null_or(s.weights, vld = chk::vld_numeric)
 
   if (is_not_null(s.weights) && length(s.weights) != length(weights)) {
     .err("`s.weights` and `x` must be the same length")
   }
 
-  .chk_null_or(ps.list, chk::chk_list)
+  chk::chk_null_or(ps.list, vld = chk::vld_list)
   if (is_not_null(ps.list)) {
     if (length(ps.list) != length(treat.list)) {
       .err("`ps.list` must have the same number of time points as `treat.list`")
     }
-    if (!all(vapply(ps.list, is.vector, logical(1L), "numeric"))) {
+
+    if (!all(vapply(ps.list, is.numeric, logical(1L))) ||
+        !all(vapply(ps.list, function(z) is_null(dim(z)), logical(1L)))) {
       .err("`ps.list` must be a list of numeric vectors")
     }
+
     if (!all_the_same(lengths(ps.list))) {
       .err("each component of `ps.list` must have the same length")
     }
+
     if (length(weights) != length(ps.list[[1]])) {
       .err("`x` and each component of `ps.list` must be the same length")
     }
