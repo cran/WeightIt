@@ -31,7 +31,7 @@
 #' @param stabilize `logical`; whether or not to stabilize the weights.
 #' For the methods that involve estimating propensity scores, this involves
 #' multiplying each unit's weight by the proportion of units in their treatment
-#' group. Default is `FALSE`.
+#' group. Default is `FALSE`. Note this differs from its use with [weightit()].
 #' @param focal when multi-category treatments are used and ATT weights are
 #' requested, which group to consider the "treated" or focal group. This group
 #' will not be weighted, and the other groups will be weighted to be more like
@@ -241,8 +241,10 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     treat.type <- get_treat_type(treat)
   }
 
+  missing <- .process_missing2(missing, covs)
+
   out <- make_list(c("weights", "treat", "estimand", "method", "ps", "s.weights",
-                     "focal", "fit.obj", "info"))
+                     "focal", "missing", "fit.obj", "info"))
   out$weights <- out$ps <- rep.int(NA_real_, length(treat))
 
   if (include.obj) {
@@ -348,6 +350,7 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
   out$method <- method
   out$s.weights <- s.weights
   out$focal <- focal
+  out$missing <- missing
 
   class(out) <- "weightit.fit"
 
@@ -446,11 +449,13 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
   }
   else {
     for (i in seq_along(treat.list)) {
-      if (!has_treat_type(treat.list[[i]])) treat.list[[i]] <- assign_treat_type(treat.list[[i]])
+      if (!has_treat_type(treat.list[[i]])) {
+        treat.list[[i]] <- assign_treat_type(treat.list[[i]])
+      }
     }
   }
 
-  out <- make_list(c("weights", "treat.list", "method", "s.weights",
+  out <- make_list(c("weights", "treat.list", "method", "s.weights", "missing",
                      "fit.obj", "info"))
   out$weights <- rep.int(NA_real_, length(treat.list[[1]]))
 
@@ -540,6 +545,7 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
   out$treat.list <- treat.list
   out$method <- method
   out$s.weights <- s.weights
+  out$missing <- missing
 
   class(out) <- "weightitMSM.fit"
 
