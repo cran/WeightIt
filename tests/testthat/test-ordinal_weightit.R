@@ -56,7 +56,7 @@ test_that("No weights", {
                            data = test_data)
   })
 
-  expect_failure(expect_equal(coef(fit0), coef(fit)))
+  expect_not_equal(coef(fit0), coef(fit), tolerance = eps)
 
   fit_g <- MASS::polr(Y_O ~ A * (X1 + X2 + X3 + X4 + X5) + offset(off),
                       data = test_data, Hess = TRUE,
@@ -84,6 +84,15 @@ test_that("No weights", {
   expect_equal(coef(fit), .coef(fit_g),
                tolerance = eps)
   expect_equal(vcov(fit), sandwich::sandwich(fit_g),
+               tolerance = eps)
+
+  #Test using sandwich functions
+  expect_no_condition({
+    fit0 <- ordinal_weightit(Y_O ~ A * (X1 + X2 + X3 + X4 + X5),
+                             data = test_data)
+  })
+
+  expect_equal(vcov(fit0), sandwich::sandwich(fit0),
                tolerance = eps)
 })
 
@@ -158,7 +167,7 @@ test_that("Binary treatment", {
                            data = test_data, weightit = W)
   })
 
-  expect_failure(expect_equal(coef(fit0), coef(fit)))
+  expect_not_equal(coef(fit0), coef(fit), tolerance = eps)
 
   suppressWarnings({
     fit_g <- MASS::polr(Y_O ~ A * (X1 + X2 + X3 + X4 + X5) + offset(off),
@@ -189,4 +198,17 @@ test_that("Binary treatment", {
   # expect_equal(vcov(fit), sandwich::sandwich(fit_g),
   #              tolerance = eps)
 
+  #Test using sandwich functions
+  expect_no_condition({
+    fit0 <- ordinal_weightit(Y_O ~ A * (X1 + X2 + X3 + X4 + X5),
+                             data = test_data, weightit = W)
+  })
+
+  expect_equal(vcov(fit0),
+               sandwich::sandwich(fit0),
+               tolerance = eps)
+
+  expect_equal(vcov(fit0, type = "HC0"),
+               sandwich::sandwich(fit0, asympt = FALSE),
+               tolerance = eps)
 })

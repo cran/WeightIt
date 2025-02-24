@@ -55,8 +55,16 @@ test_that("No weights", {
                         data = test_data)
   })
 
-  expect_failure(expect_equal(coef(fit0), coef(fit)))
+  expect_not_equal(coef(fit0), coef(fit), tolerance = eps)
 
+  #Test using sandwich functions
+  expect_no_condition({
+    fit0 <- glm_weightit(Y_B ~ A * (X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9),
+                         data = test_data, family = binomial)
+  })
+
+  expect_equal(vcov(fit0), sandwich::sandwich(fit0),
+               tolerance = eps)
 })
 
 test_that("Binary treatment", {
@@ -130,6 +138,19 @@ test_that("Binary treatment", {
                            data = test_data)
   })
 
-  expect_failure(expect_equal(coef(fit0), coef(fit)))
+  expect_not_equal(coef(fit0), coef(fit), tolerance = eps)
 
+  #Test using sandwich functions
+  expect_no_condition({
+    fit0 <- multinom_weightit(Y_M ~ A * (X1 + X2 + X3 + X4 + X5),
+                              data = test_data, weightit = W)
+  })
+
+  expect_equal(vcov(fit0),
+               sandwich::sandwich(fit0),
+               tolerance = eps)
+
+  expect_equal(vcov(fit0, type = "HC0"),
+               sandwich::sandwich(fit0, asympt = FALSE),
+               tolerance = eps)
 })

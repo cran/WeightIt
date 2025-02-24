@@ -12,7 +12,7 @@
 
 <meta name="author" content="Noah Greifer" />
 
-<meta name="date" content="2024-11-04" />
+<meta name="date" content="2025-02-24" />
 
 <title>Using WeightIt to Estimate Balancing Weights</title>
 
@@ -364,7 +364,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <h1 class="title toc-ignore">Using WeightIt to Estimate Balancing
 Weights</h1>
 <h4 class="author">Noah Greifer</h4>
-<h4 class="date">2024-11-04</h4>
+<h4 class="date">2025-02-24</h4>
 
 
 
@@ -628,16 +628,16 @@ of the weights.</p>
 ## 
 ## - Weight ranges:
 ## 
-##            Min                                 Max
-## treated 1.0000    ||                         1.000
-## control 0.0187 |---------------------------| 9.421
+##            Min                                Max
+## treated 1.0000    ||                         1.00
+## control 0.0188 |---------------------------| 9.42
 ## 
 ## - Units with the 5 most extreme weights by group:
-##                                           
-##               5      4      3     2      1
-##  treated      1      1      1     1      1
-##             608    381    597   303    411
-##  control 7.1272 7.5014 7.9998 9.036 9.4206
+##                                            
+##               5      4      3      2      1
+##  treated      1      1      1      1      1
+##             608    381    597    303    411
+##  control 7.1271 7.5013 7.9999 9.0357 9.4204
 ## 
 ## - Weight statistics:
 ## 
@@ -659,11 +659,11 @@ there are any gains in terms of balance:</p>
 ## educ        Contin.        0 Balanced, &lt;0.05       0.664
 ## race_black   Binary        0 Balanced, &lt;0.05           .
 ## race_hispan  Binary       -0 Balanced, &lt;0.05           .
-## race_white   Binary       -0 Balanced, &lt;0.05           .
-## married      Binary        0 Balanced, &lt;0.05           .
+## race_white   Binary        0 Balanced, &lt;0.05           .
+## married      Binary       -0 Balanced, &lt;0.05           .
 ## nodegree     Binary       -0 Balanced, &lt;0.05           .
-## re74        Contin.        0 Balanced, &lt;0.05       1.326
-## re75        Contin.       -0 Balanced, &lt;0.05       1.335
+## re74        Contin.       -0 Balanced, &lt;0.05       1.326
+## re75        Contin.        0 Balanced, &lt;0.05       1.335
 ## 
 ## Balance tally for mean differences
 ##                     count
@@ -672,7 +672,7 @@ there are any gains in terms of balance:</p>
 ## 
 ## Variable with the greatest mean difference
 ##  Variable Diff.Adj     M.Threshold
-##      re75       -0 Balanced, &lt;0.05
+##      re74       -0 Balanced, &lt;0.05
 ## 
 ## Effective sample sizes
 ##            Control Treated
@@ -698,15 +698,14 @@ treatment effect estimation from the outcome model.</p>
 <div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># G-computation for the treatment effect</span></span>
 <span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
 <span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a><span class="fu">avg_comparisons</span>(fit, <span class="at">variables =</span> <span class="st">&quot;treat&quot;</span>,</span>
-<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>                <span class="at">newdata =</span> <span class="fu">subset</span>(lalonde, treat <span class="sc">==</span> <span class="dv">1</span>))</span></code></pre></div>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>                <span class="at">newdata =</span> <span class="fu">subset</span>(treat <span class="sc">==</span> <span class="dv">1</span>))</span></code></pre></div>
 <pre><code>## 
 ##  Estimate Std. Error    z Pr(&gt;|z|)   S 2.5 % 97.5 %
 ##      1273        770 1.65   0.0983 3.3  -236   2783
 ## 
 ## Term: treat
 ## Type:  probs 
-## Comparison: mean(1) - mean(0)
-## Columns: term, contrast, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high, predicted_lo, predicted_hi, predicted</code></pre>
+## Comparison: 1 - 0</code></pre>
 <p>Our confidence interval for <code>treat</code> contains 0, so there
 isn’t evidence that <code>treat</code> has an effect on
 <code>re78</code>. Several types of standard errors are available in
@@ -913,13 +912,12 @@ estimated using logistic regression.</p>
 ##     + baseline: (none)
 ##     + after time 1: A_1
 ##     + after time 2: A_1, A_2, A_1:A_2</code></pre>
-<p>No matter which method is selected, <code>weightitMSM()</code>
-estimates separate weights for each time period and then takes the
-product of the weights for each individual to arrive at the final
-estimated weights. Printing the output of <code>weightitMSM()</code>
-provides some details about the function call and the output. We can
-take a look at the quality of the weights with <code>summary()</code>,
-just as we could for point treatments.</p>
+<p><code>weightitMSM()</code> estimates separate weights for each time
+period and then takes the product of the weights for each individual to
+arrive at the final estimated weights. Printing the output of
+<code>weightitMSM()</code> provides some details about the function call
+and the output. We can take a look at the quality of the weights with
+<code>summary()</code>, just as we could for point treatments.</p>
 <div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">summary</span>(Wmsm.out)</span></code></pre></div>
 <pre><code>##                         Time 1                        
 ##                   Summary of weights
@@ -1057,8 +1055,7 @@ treatment regime using
 <code>marginaleffects::avg_predictions()</code>:</p>
 <div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;marginaleffects&quot;</span>)</span>
 <span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a>(p <span class="ot">&lt;-</span> <span class="fu">avg_predictions</span>(fit,</span>
-<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>                      <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">&quot;A_1&quot;</span>, <span class="st">&quot;A_2&quot;</span>, <span class="st">&quot;A_3&quot;</span>),</span>
-<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a>                      <span class="at">type =</span> <span class="st">&quot;response&quot;</span>))</span></code></pre></div>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>                      <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">&quot;A_1&quot;</span>, <span class="st">&quot;A_2&quot;</span>, <span class="st">&quot;A_3&quot;</span>)))</span></code></pre></div>
 <pre><code>## 
 ##  A_1 A_2 A_3 Estimate Std. Error    z Pr(&gt;|z|)     S 2.5 % 97.5 %
 ##    0   0   0    0.687     0.0166 41.4   &lt;0.001   Inf 0.654  0.719
@@ -1070,24 +1067,19 @@ treatment regime using
 ##    1   1   0    0.378     0.0163 23.2   &lt;0.001 393.1 0.346  0.410
 ##    1   1   1    0.422     0.0261 16.1   &lt;0.001 192.3 0.371  0.473
 ## 
-## Type:  response 
-## Columns: A_1, A_2, A_3, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high</code></pre>
+## Type:  probs</code></pre>
 <p>We can compare the expected potential outcomes under each regime
 using <code>marginaleffects::hypotheses()</code>. To get all pairwise
 comparisons, supply the <code>avg_predictions()</code> output to
-<code>hypotheses(., &quot;pairwise&quot;)</code>. To compare individual regimes,
+<code>hypotheses(., ~ pairwise)</code>. To compare individual regimes,
 we can use <code>hypotheses()</code>, identifying the rows of the
 <code>avg_predictions()</code> output. For example, to compare the
 regimes with no treatment for all three time points vs. the regime with
 treatment for all three time points, we would run</p>
 <div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="fu">hypotheses</span>(p, <span class="st">&quot;b8 - b1 = 0&quot;</span>)</span></code></pre></div>
 <pre><code>## 
-##  Estimate Std. Error     z Pr(&gt;|z|)    S  2.5 % 97.5 %
-##    -0.265     0.0308 -8.61   &lt;0.001 56.9 -0.325 -0.204
-## 
-## Term: b8-b1=0
-## Type:  response 
-## Columns: term, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high</code></pre>
+##  Hypothesis Estimate Std. Error     z Pr(&gt;|z|)    S  2.5 % 97.5 %
+##     b8-b1=0   -0.265     0.0308 -8.61   &lt;0.001 56.9 -0.325 -0.204</code></pre>
 <p>These results indicate that receiving treatment at all time points
 reduces the risk of the outcome relative to not receiving treatment at
 all.</p>

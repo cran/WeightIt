@@ -1,6 +1,5 @@
 weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal,
                         stabilize, subclass, missing, ps, .data, verbose, ...) {
-  A <- list(...)
 
   fit.obj <- NULL
 
@@ -9,20 +8,20 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal,
   treat <- factor(treat)
   treat_sub <- factor(treat[subset])
 
-  t.lev <- get_treated_level(treat)
+  t.lev <- get_treated_level(treat, estimand, focal)
   c.lev <- setdiff(levels(treat_sub), t.lev)
 
   if (is.matrix(ps) || is.data.frame(ps)) {
     if (nrow(ps) == n) {
-      if (ncol(ps) == 1) {
+      if (ncol(ps) == 1L) {
 
-        ps <- data.frame(ps[subset,1], 1-ps[subset,1])
+        ps <- data.frame(ps[subset, 1L], 1 - ps[subset, 1L])
 
         names(ps) <- c(t.lev, c.lev)
 
         p.score <- ps[[t.lev]]
       }
-      else if (ncol(ps) == 2) {
+      else if (ncol(ps) == 2L) {
 
         if (all(colnames(ps) %in% levels(treat_sub))) {
           ps <- as.data.frame(ps[subset, , drop = FALSE])
@@ -36,17 +35,17 @@ weightit2ps <- function(covs, treat, s.weights, subset, estimand, focal,
       }
     }
   }
-  else if (is.numeric(ps)) {
-    if (length(ps) == n) {
-      ps <- data.frame(ps[subset], 1-ps[subset])
+  else if (is.numeric(ps) && length(ps) == n) {
+    ps <- data.frame(ps[subset], 1 - ps[subset])
 
-      names(ps) <- c(t.lev, c.lev)
+    names(ps) <- c(t.lev, c.lev)
 
-      p.score <- ps[[t.lev]]
-    }
+    p.score <- ps[[t.lev]]
   }
 
-  if (is_null(p.score)) .err("`ps` must be a numeric vector with a propensity score for each unit")
+  if (is_null(p.score)) {
+    .err("`ps` must be a numeric vector with a propensity score for each unit")
+  }
 
   #ps should be matrix of probs for each treat
   #Computing weights
@@ -68,10 +67,10 @@ weightit2ps.multi <- function(covs, treat, s.weights, subset, estimand, focal,
     if (all(dim(ps) == c(n, nunique(treat)))) {
       ps <- setNames(as.data.frame(ps), levels(treat))[subset, , drop = FALSE]
     }
-    else if (all(dim(ps) == c(n, 1))) {
+    else if (nrow(ps) == n && ncol(ps) == 1L) {
       ps <- setNames(list2DF(lapply(levels(treat), function(x) {
         p_ <- rep.int(1, length(treat))
-        p_[treat == x] <- ps[treat == x, 1]
+        p_[treat == x] <- ps[treat == x, 1L]
         p_
       })), levels(treat))[subset, , drop = FALSE]
     }
@@ -91,9 +90,13 @@ weightit2ps.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       bad.ps <- TRUE
     }
   }
-  else bad.ps <- TRUE
+  else {
+    bad.ps <- TRUE
+  }
 
-  if (bad.ps) .err("`ps` must be a numeric vector with a propensity score for each unit or a matrix \n\twith the probability of being in each treatment for each unit")
+  if (bad.ps) {
+    .err("`ps` must be a numeric vector with a propensity score for each unit or a matrix \n\twith the probability of being in each treatment for each unit")
+  }
 
   #ps should be matrix of probs for each treat
   #Computing weights
@@ -104,15 +107,14 @@ weightit2ps.multi <- function(covs, treat, s.weights, subset, estimand, focal,
 }
 
 weightit2ps.cont <- function(covs, treat, s.weights, subset, stabilize, missing, ps, verbose, ...) {
-  A <- list(...)
 
   treat <- treat[subset]
   s.weights <- s.weights[subset]
 
   #Process density params
-  densfun <- .get_dens_fun(use.kernel = isTRUE(A[["use.kernel"]]), bw = A[["bw"]],
-                          adjust = A[["adjust"]], kernel = A[["kernel"]],
-                          n = A[["n"]], treat = treat, density = A[["density"]],
+  densfun <- .get_dens_fun(use.kernel = isTRUE(...get("use.kernel")), bw = ...get("bw"),
+                          adjust = ...get("adjust"), kernel = ...get("kernel"),
+                          n = ...get("n"), treat = treat, density = ...get("density"),
                           weights = s.weights)
 
   #Stabilization - get dens.num
@@ -124,7 +126,7 @@ weightit2ps.cont <- function(covs, treat, s.weights, subset, stabilize, missing,
 
   w <- exp(log.dens.num - log.dens.denom)
 
-  if (isTRUE(A[["plot"]])) {
+  if (isTRUE(...get("plot"))) {
     d.n <- attr(log.dens.num, "density")
     d.d <- attr(log.dens.denom, "density")
     plot_density(d.n, d.d, log = TRUE)

@@ -64,7 +64,7 @@ W
 Evaluating weights has two components: evaluating the covariate balance
 produced by the weights, and evaluating whether the weights will allow
 for sufficient precision in the eventual effect estimate. For the first
-goal, functions in the `cobalt` package, which are fully compatible with
+goal, functions in the *cobalt* package, which are fully compatible with
 *WeightIt*, can be used, as demonstrated below:
 
 ``` r
@@ -125,23 +125,24 @@ summary(W)
     #> Unweighted  429.       185
     #> Weighted     99.82     185
 
-Desirable qualities include small coefficients of variation close to 0
-and large effective sample sizes.
+Desirable qualities include large effective sample sizes, which imply
+low variability in the weights (and therefore increased precision in
+estimating the treatment effect).
 
 Finally, we can estimate the effect of the treatment using a weighted
 outcome model, accounting for estimation of the weights in the standard
 error of the effect estimate:
 
 ``` r
-fit <- glm_weightit(re78 ~ treat, data = lalonde,
-                    weightit = W)
+fit <- lm_weightit(re78 ~ treat, data = lalonde,
+                   weightit = W)
 
 summary(fit, ci = TRUE)
 ```
 
     #> 
     #> Call:
-    #> glm_weightit(formula = re78 ~ treat, data = lalonde, weightit = W)
+    #> lm_weightit(formula = re78 ~ treat, data = lalonde, weightit = W)
     #> 
     #> Coefficients:
     #>             Estimate Std. Error z value Pr(>|z|)  2.5 % 97.5 %    
@@ -177,7 +178,7 @@ install packages that are used.
 | Multinomial regression PS | [`"glm"`](https://ngreifer.github.io/WeightIt/reference/method_glm.html) |
 | Generalized boosted modeling PS | [`"gbm"`](https://ngreifer.github.io/WeightIt/reference/method_gbm.html) |
 | Covariate balancing PS | [`"cbps"`](https://ngreifer.github.io/WeightIt/reference/method_cbps.html) |
-| Non-Parametric covariate balancing PS | [`"npcbps"`](https://ngreifer.github.io/WeightIt/reference/method_npcbps.html) |
+| Non-parametric covariate balancing PS | [`"npcbps"`](https://ngreifer.github.io/WeightIt/reference/method_npcbps.html) |
 | Entropy balancing | [`"ebal"`](https://ngreifer.github.io/WeightIt/reference/method_ebal.html) |
 | Inverse probability tilting | [`"ipt"`](https://ngreifer.github.io/WeightIt/reference/method_ipt.html) |
 | Stable balancing weights | [`"optweight"`](https://ngreifer.github.io/WeightIt/reference/method_optweight.html) |
@@ -192,7 +193,7 @@ install packages that are used.
 | Generalized linear model GPS | [`"glm"`](https://ngreifer.github.io/WeightIt/reference/method_glm.html) |
 | Generalized boosted modeling GPS | [`"gbm"`](https://ngreifer.github.io/WeightIt/reference/method_gbm.html) |
 | Covariate balancing GPS | [`"cbps"`](https://ngreifer.github.io/WeightIt/reference/method_cbps.html) |
-| Non-Parametric covariate balancing GPS | [`"npcbps"`](https://ngreifer.github.io/WeightIt/reference/method_npcbps.html) |
+| Non-parametric covariate balancing GPS | [`"npcbps"`](https://ngreifer.github.io/WeightIt/reference/method_npcbps.html) |
 | Entropy balancing | [`"ebal"`](https://ngreifer.github.io/WeightIt/reference/method_ebal.html) |
 | Stable balancing weights | [`"optweight"`](https://ngreifer.github.io/WeightIt/reference/method_optweight.html) |
 | SuperLearner GPS | [`"super"`](https://ngreifer.github.io/WeightIt/reference/method_super.html) |
@@ -212,7 +213,7 @@ the uncertainty in estimating the weights. These include
 `multinom_weightit()` for multinomial regression models, and
 `coxph_weightit()` for Cox proportional hazards models. Several methods
 are available for computing the parameter variances, including
-asymptotically correct M-estimation-base variances, robust variances
+asymptotically correct M-estimation-based variances, robust variances
 that treat the weights as fixed, and traditional and fractional weighted
 bootstrap variances. Clustered variances are supported. See
 `vignette("estimating-effects")` for information on how to use these

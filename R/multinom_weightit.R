@@ -1,5 +1,6 @@
 # Multinomial logistic regression
-.multinom_weightit.fit <- function(x, y, weights = NULL, offset = NULL, start = NULL, hess = TRUE, ...) {
+.multinom_weightit.fit <- function(x, y, weights = NULL, offset = NULL, start = NULL,
+                                   hess = TRUE, control = list(), ...) {
   chk::chk_atomic(y)
   y <- as.factor(y)
   chk::chk_numeric(x)
@@ -9,20 +10,22 @@
     colnames(x) <- paste0("x", seq_col(x))
   }
 
-  nobs <- length(y)
+  N <- length(y)
 
-  if (is_null(weights)) weights <- rep.int(1, nobs)
+  if (is_null(weights)) weights <- rep.int(1, N)
   else chk::chk_numeric(weights)
 
-  if (is.null(offset)) offset <- rep.int(0, nobs)
+  if (is.null(offset)) offset <- rep.int(0, N)
   else chk::chk_numeric(offset)
 
   chk::chk_all_equal(c(length(y), nrow(x), length(weights), length(offset)))
 
-  aliased_X <- colnames(x) %nin% colnames(make_full_rank(x, with.intercept = FALSE))
-  aliased_B <- rep.int(aliased_X, nlevels(y) - 1)
+  K <- nlevels(y) - 1L
 
-  k0 <- (nlevels(y) - 1) * ncol(x)
+  aliased_X <- colnames(x) %nin% colnames(make_full_rank(x, with.intercept = FALSE))
+  aliased_B <- rep.int(aliased_X, K)
+
+  k0 <- K * ncol(x)
 
   if (is_null(start)) {
     start <- rep.int(0, k0)
@@ -32,13 +35,13 @@
     chk::chk_length(start, k0)
   }
 
-  nm <- unlist(lapply(levels(y)[-1], function(i) paste(i, colnames(x), sep = "~")))
+  nm <- unlist(lapply(levels(y)[-1L], function(i) paste(i, colnames(x), sep = "~")))
   names(start) <- nm
 
   x_ <- x[, !aliased_X, drop = FALSE]
 
   get_pp <- function(B, X, offset = NULL) {
-    if (length(offset) == 0) offset <- 0
+    if (length(offset) == 0L) offset <- 0
 
     qq <- exp(offset + X %*% matrix(B, nrow = ncol(X)))
 
@@ -54,8 +57,8 @@
   psi <- function(B, X, y, weights, offset = NULL) {
     pp <- get_pp(B, X, offset)
 
-    out <- do.call("cbind", lapply(levels(y)[-1], function(i) {
-      weights * ((y == i) - pp[,i]) * X
+    out <- do.call("cbind", lapply(levels(y)[-1L], function(i) {
+      weights * ((y == i) - pp[, i]) * X
     }))
 
     if (is_not_null(names(B)))
@@ -76,15 +79,12 @@
     sum(weights * log(p))
   }
 
-  dots <- list(...)
-
-  control <- list(fnscale = -1, #maximize likelihood; optim() minimizes by default
+  m_control <- list(fnscale = -1, #maximize likelihood; optim() minimizes by default
                   trace = 0,
-                  maxit = 1e3,
+                  maxit = 1e3L,
                   reltol = 1e-12)
 
-  control <- utils::modifyList(control,
-                               dots[intersect(names(dots), c("trace", "maxit", "reltol", "ndeps", "REPORT"))])
+  control <- utils::modifyList(m_control, control)
 
   out <- optim(par = start[!aliased_B],
                ll,
@@ -94,42 +94,60 @@
                offset = offset,
                gr = gr,
                method = "BFGS",
-               hessian = hess,
                control = control)
 
   grad <- psi(out$par, X = x_, y = y,
               weights = weights, offset = offset)
 
-  hessian <- NULL
-  if (hess) {
-    hessian <- out$hessian
-    colnames(hessian) <- rownames(hessian) <- nm[!aliased_B]
-  }
-
   pp <- get_pp(out$par, x_, offset)
 
   res <- setNames(1 - pp[ind_mat], rownames(x))
 
-  coefs <- setNames(rep.int(NA_real_, length(start)), names(start))
+  coefs <- rep_with(NA_real_, start)
   coefs[!aliased_B] <- out$par
 
-  list(coefficients = coefs,
-       residuals = res,
-       fitted.values = pp,
-       solve = out,
-       psi = psi,
-       f = gr,
-       get_p = get_pp,
-       df.residual = length(res) - sum(!is.na(coefs)),
-       x = x,
-       y = y,
-       weights = weights,
-       gradient = grad,
-       hessian = hessian)
+  fit <- list(coefficients = coefs,
+              residuals = res,
+              fitted.values = pp,
+              solve = out,
+              psi = psi,
+              f = gr,
+              get_p = get_pp,
+              df.residual = length(res) - sum(!is.na(coefs)),
+              x = x,
+              y = y,
+              weights = weights,
+              gradient = grad)
+
+  if (hess) {
+    hessian <- matrix(NA_real_, nrow = sum(!aliased_B), ncol = sum(!aliased_B))
+
+    for (i in seq_len(K)) {
+      i_ind <- (i - 1L) * ncol(x_) + seq_len(ncol(x_))
+      for (j in seq_len(i)) {
+        if (i == j) {
+          hessian[i_ind, i_ind] <- -crossprod(x_ * ((1 - pp[, i + 1L]) * pp[, i + 1L] * weights), x_)
+        }
+        else {
+          j_ind <- (j - 1L) * ncol(x_) + seq_len(ncol(x_))
+
+          hessian[i_ind, j_ind] <- -crossprod(x_ * (-pp[, i + 1L] * pp[, j + 1L] * weights), x_)
+          hessian[j_ind, i_ind] <- t(hessian[i_ind, j_ind])
+        }
+      }
+    }
+
+    colnames(hessian) <- rownames(hessian) <- nm[!aliased_B]
+
+    fit$hessian <- hessian
+  }
+
+  fit
 }
 
 .multinom_weightit <- function(formula, data, weights, subset, start = NULL, na.action,
-                             hess = TRUE, model = TRUE, x = FALSE, y = TRUE, contrasts = NULL, ...) {
+                               hess = TRUE, control = list(), model = TRUE,
+                               x = FALSE, y = TRUE, contrasts = NULL, ...) {
   cal <- match.call()
 
   chk::chk_flag(hess)
@@ -155,8 +173,8 @@
       names(Y) <- nm
   }
   X <- {
-    if (!is.empty.model(mt)) model.matrix(mt, mf, contrasts)
-    else matrix(NA_real_, NROW(Y), 0L)
+    if (is.empty.model(mt)) matrix(NA_real_, NROW(Y), 0L)
+    else model.matrix(mt, mf, contrasts)
   }
 
   weights <- as.vector(model.weights(mf))
@@ -167,8 +185,7 @@
     .err("negative weights not allowed")
 
   offset <- as.vector(model.offset(mf))
-  if (!is.null(offset)) {
-    if (length(offset) != NROW(Y))
+  if (is_not_null(offset) && length(offset) != NROW(Y)) {
       .err(gettextf("number of offsets is %d; should equal %d (number of observations)",
                     length(offset), NROW(Y)), domain = NA)
   }
@@ -176,7 +193,7 @@
   fit <- eval(call(".multinom_weightit.fit",
                    x = X, y = Y, weights = weights,
                    offset = offset, start = start,
-                   hess = hess))
+                   hess = hess, control = control))
 
   if (model) fit$model <- mf
   fit$na.action <- attr(mf, "na.action")
@@ -193,7 +210,6 @@
   x <- if_null_then(fit[["x"]], model.matrix(fit))
   y <- if_null_then(fit[["y"]], model.response(model.frame(fit)))
   weights <- weights(fit)
-  offset <- fit$offset
   coefs <- coef(fit)
 
   y <- as.factor(y)
@@ -202,76 +218,35 @@
     colnames(x) <- paste0("x", seq_col(x))
   }
 
-  nobs <- length(y)
+  if (is_null(weights)) {
+    weights <- rep.int(1, length(y))
+  }
 
-  if (is_null(weights)) weights <- rep.int(1, nobs)
-
-  if (is.null(offset)) offset <- rep.int(0, nobs)
-
+  K <- nlevels(y) - 1L
 
   aliased_X <- colnames(x) %nin% colnames(make_full_rank(x, with.intercept = FALSE))
 
   x_ <- x[, !aliased_X, drop = FALSE]
 
-  get_pp <- function(B, X, offset = NULL) {
-    if (length(offset) == 0) offset <- 0
-
-    qq <- exp(offset + X %*% matrix(B, nrow = ncol(X)))
-
-    pp <- cbind(1, qq) / (1 + rowSums(qq))
-
-    colnames(pp) <- levels(y)
-    rownames(pp) <- rownames(X)
-
-    pp
-  }
-
-  #Multinomial logistic regression score
-  psi <- function(B, X, y, weights, offset = NULL) {
-    pp <- get_pp(B, X, offset)
-
-    out <- do.call("cbind", lapply(levels(y)[-1], function(i) {
-      weights * ((y == i) - pp[,i]) * X
-    }))
-
-    if (is_not_null(names(B)))
-      colnames(out) <- names(B)
-
-    out
-  }
-
-  gr <- function(B, X, y, weights, offset) {
-    colSums(psi(B, X, y, weights, offset))
-  }
-
-  ind_mat <- cbind(seq_along(y), as.integer(y))
-
-  ll <- function(B, X, y, weights, offset) {
-    p <- get_pp(B, X, offset)[ind_mat]
-
-    sum(weights * log(p))
-  }
-
   theta0 <- na.rem(coefs)
 
-  # Estimate using natural parameterization to get hessian
-  hessian <- try(optimHess(par = theta0,
-                           ll,
-                           X = x_,
-                           y = y,
-                           weights = weights,
-                           offset = offset,
-                           gr = gr,
-                           control = list(fnscale = -1)),
-                 silent = TRUE)
+  pp <- fit$fitted.values
 
-  # If optimization fails, use numeric differentiation of gradient to get hessian
-  if (null_or_error(hessian)) {
-    hessian <- .gradient(gr, theta0,
-                         X = x_,
-                         y = y,
-                         weights = weights,
-                         offset = offset)
+  hessian <- matrix(NA_real_, nrow = length(theta0), ncol = length(theta0))
+
+  for (i in seq_len(K)) {
+    i_ind <- (i - 1L) * ncol(x_) + seq_len(ncol(x_))
+    for (j in seq_len(i)) {
+      if (i == j) {
+        hessian[i_ind, i_ind] <- -crossprod(x_ * ((1 - pp[, i + 1L]) * pp[, i + 1L] * weights), x_)
+      }
+      else {
+        j_ind <- (j - 1L) * ncol(x_) + seq_len(ncol(x_))
+
+        hessian[i_ind, j_ind] <- -crossprod(x_ * (-pp[, i + 1L] * pp[, j + 1L] * weights), x_)
+        hessian[j_ind, i_ind] <- t(hessian[i_ind, j_ind])
+      }
+    }
   }
 
   colnames(hessian) <- rownames(hessian) <- names(theta0)
