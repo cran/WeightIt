@@ -1,6 +1,7 @@
 #' Compute weights from propensity scores
 #'
-#' @description Given a vector or matrix of propensity scores, outputs a vector
+#' @description
+#' Given a vector or matrix of propensity scores, outputs a vector
 #' of weights that target the provided estimand.
 #'
 #' @param ps a vector, matrix, or data frame of propensity scores. See Details.
@@ -22,7 +23,7 @@
 #'   matters when `treat` has values other than 0 and 1 and when `ps` is given
 #'   as a vector or an unnamed single-column matrix or data frame.
 #' @param subclass `numeric`; the number of subclasses to use when computing
-#'   weights using marginal mean weighting through stratification (also known as
+#'   weights using marginal mean weighting through stratification (MMWS; also known as
 #'   fine stratification). If `NULL`, standard inverse probability weights (and
 #'   their extensions) will be computed; if a number greater than 1, subclasses
 #'   will be formed and weights will be computed based on subclass membership.
@@ -34,12 +35,14 @@
 #'   checking, this won't make a difference; otherwise, this can improve
 #'   performance.
 #'
-#' @returns A vector of weights. When `subclass` is not `NULL`, the subclasses
+#' @returns
+#' A vector of weights. When `subclass` is not `NULL`, the subclasses
 #' are returned as the `"subclass"` attribute. When `estimand = "ATOS"`, the
 #' chosen value of `alpha` (the smallest propensity score allowed to remain in
 #' the sample) is returned in the `"alpha"` attribute.
 #'
-#' @details `get_w_from_ps()` applies the formula for computing weights from
+#' @details
+#' `get_w_from_ps()` applies the formula for computing weights from
 #' propensity scores for the desired estimand. The formula for each estimand is
 #' below, with \eqn{A_i} the treatment value for unit \eqn{i} taking on values
 #' \eqn{\mathcal{A} = (1, \ldots, g)}, \eqn{p_{a, i}} the probability of
@@ -109,7 +112,8 @@
 #'
 #' @seealso [`method_glm`]
 #'
-#' @references ## Binary treatments
+#' @references
+#' ## Binary treatments
 #'
 #' - `estimand = "ATO"`
 #'
@@ -169,7 +173,7 @@
 #' Multiple Treatments Using Generalized Boosted Models. Statistics in Medicine,
 #' 32(19), 3388–3414. \doi{10.1002/sim.5753}
 #'
-#' - Marginal mean weighting through stratification
+#' - Marginal mean weighting through stratification (MMWS)
 #'
 #' Hong, G. (2012). Marginal mean weighting through stratification: A
 #' generalized method for evaluating multivalued and multiple treatments with
@@ -177,7 +181,6 @@
 #' \doi{10.1037/a0024918}
 #'
 #' @examples
-#'
 #' library("cobalt")
 #' data("lalonde", package = "cobalt")
 #'
@@ -223,7 +226,7 @@
 get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = NULL,
                           subclass = NULL, stabilize = FALSE) {
 
-  if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+  treat <- as.treat(treat)
   treat.type <- get_treat_type(treat)
 
   if (treat.type == "continuous") {
@@ -252,7 +255,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
   w <- rep.int(1, n)
 
   if (is.factor(treat)) {
-    treat <- as.integer(factor(treat, levels = colnames(ps_mat)))
+    treat <- unclass(factor(treat, levels = colnames(ps_mat)))
   }
   else {
     treat <- match(as.character(treat), colnames(ps_mat))
@@ -280,7 +283,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     min_ind <- max.col(-ps_mat, ties.method = "first")
     no_match <- which(ps_mat[cbind(seq_len(n), treat)] != ps_mat[cbind(seq_len(n), min_ind)])
 
-    if (length(no_match) > 0L) {
+    if (is_not_null(no_match)) {
       w[no_match] <- ps_mat[cbind(no_match, min_ind[no_match])] /
         ps_mat[cbind(no_match, treat[no_match])]
     }
@@ -305,12 +308,17 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     w[!between(ps_mat[, 2L], c(alpha.opt, 1 - alpha.opt))] <- 0
   }
 
-  if (stabilize) w <- stabilize_w(w, treat)
+  if (stabilize) {
+    w <- stabilize_w(w, treat)
+  }
 
-  names(w) <- if_null_then(rownames(ps_mat), names(treat), NULL)
+  names(w) <- if_null_then(rownames(ps_mat), names(treat))
 
-  attr(w, "subclass") <- attr(ps_mat, "sub_mat")
-  if (estimand == "ATOS") attr(w, "alpha") <- alpha.opt
+  attr(w, "subclass") <- .attr(ps_mat, "sub_mat")
+
+  if (estimand == "ATOS") {
+    attr(w, "alpha") <- alpha.opt
+  }
 
   w
 }
@@ -337,7 +345,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
       ps.names <- rownames(ps)
       ps <- as.matrix(ps)
     }
-    else if (is.numeric(ps) && is_null(dim(ps))) {
+    else if (is.numeric(ps) && length(dim(ps)) <= 1L) {
       ps.names <- names(ps)
       ps <- matrix(ps, ncol = 1L)
     }
@@ -380,7 +388,7 @@ get_w_from_ps <- function(ps, treat, estimand = "ATE", focal = NULL, treated = N
     }
 
   }
-  else if (treat.type == "multi-category") {
+  else if (treat.type %in% c("multinomial", "multi-category")) {
     if (is.matrix(ps)) {
       if (!is.numeric(ps)) {
         .err("`ps` must be numeric when supplied as a matrix")

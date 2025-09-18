@@ -83,13 +83,12 @@ generated predicted values to use as the propensity scores, which are then
 used to construct weights. The machine learning models used are supplied
 using the \code{SL.library} argument; the more models are supplied, the higher the
 chance of correctly modeling the propensity score. It is a good idea to
-include parameteric models, flexible and tree-based models, and regularized
+include parametric models, flexible and tree-based models, and regularized
 models among the models selected. The predicted values are combined using the
 method supplied in the \code{SL.method} argument (which is nonnegative least
 squares by default). A benefit of SuperLearner is that, asymptotically, it is
 guaranteed to perform as well as or better than the best-performing method
-included in the library. Using Balance SuperLearner by setting \code{SL.method = "method.balance"} works by selecting the combination of predicted values that
-minimizes an imbalance measure.
+included in the library. Using Balance SuperLearner by setting \code{SL.method = "method.balance"} works by selecting the combination of predicted values that minimizes an imbalance measure.
 }
 \note{
 Some methods formerly available in \pkg{SuperLearner} are now in
@@ -110,6 +109,7 @@ recover previous behavior, set \code{cvControl = list(stratifyCV = FALSE)}.
 }
 \section{Additional Arguments}{
 
+
 \describe{
 \item{\code{discrete}}{if \code{TRUE}, uses discrete SuperLearner, which simply selects the best performing method. Default \code{FALSE}, which finds the optimal combination of predictions for the libraries using \code{SL.method}.}
 }
@@ -124,7 +124,17 @@ All arguments to \pkgfun{SuperLearner}{SuperLearner} can be passed through
 \item \code{method} in \code{SuperLearner()} is replaced with the argument \code{SL.method} in \code{weightit()}.
 }
 
-For continuous treatments only, the following arguments may be supplied:
+For binary and multi-category treatments, the following arguments may be supplied:
+\describe{
+\item{\code{subclass}}{\code{integer}; the number of subclasses to use for computing
+weights using marginal mean weighting through stratification (MMWS). If \code{NULL},
+standard inverse probability weights (and their extensions) will be
+computed; if a number greater than 1, subclasses will be formed and weights
+will be computed based on subclass membership. See \code{\link[=get_w_from_ps]{get_w_from_ps()}} for
+details and references.}
+}
+
+For continuous treatments, the following arguments may be supplied:
 \describe{
 \item{\code{density}}{A function corresponding to the conditional density of the treatment. The standardized residuals of the treatment model will be fed through this function to produce the numerator and denominator of the generalized propensity score weights. If blank, \code{\link[=dnorm]{dnorm()}} is used as recommended by Robins et al. (2000). This can also be supplied as a string containing the name of the function to be called. If the string contains underscores, the call will be split by the underscores and the latter splits will be supplied as arguments to the second argument and beyond. For example, if \code{density = "dt_2"} is specified, the density used will be that of a t-distribution with 2 degrees of freedom. Using a t-distribution can be useful when extreme outcome values are observed (Naimi et al., 2014).
 
@@ -143,7 +153,7 @@ prediction method) so that the weights generated from the weighted
 combination of the predictions optimize a balance criterion, which must be
 set with the \code{criterion} argument, described below.
 \describe{
-\item{\code{criterion}}{A string describing the balance criterion used to select the best weights. See \pkgfun{cobalt}{bal.compute} for allowable options for each treatment type. For binary and multi-category treatments, the default is \code{"smd.mean"}, which minimizes the average absolute standard mean difference among the covariates between treatment groups. For continuous treatments, the default is \code{"p.mean"}, which minimizes the average absolute Pearson correlation between the treatment and covariates.
+\item{\code{criterion}}{a string describing the balance criterion used to select the best weights. See \pkgfun{cobalt}{bal.compute} for allowable options for each treatment type. For binary and multi-category treatments, the default is \code{"smd.mean"}, which minimizes the average absolute standard mean difference among the covariates between treatment groups. For continuous treatments, the default is \code{"p.mean"}, which minimizes the average absolute Pearson correlation between the treatment and covariates.
 }
 }
 Note that this implementation differs from that of Pirracchio and Carone
@@ -177,45 +187,50 @@ When \code{include.obj = TRUE}, the SuperLearner fit(s) used to generate the pre
 }
 
 \examples{
-\dontshow{if (all(sapply(c("SuperLearner", "MASS"), requireNamespace, quietly = TRUE))) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
-\donttest{library("cobalt")
-data("lalonde", package = "cobalt")
+\dontshow{if (rlang::is_installed(c("SuperLearner", "MASS"))) withAutoprint(\{ # examplesIf}
+\donttest{data("lalonde", package = "cobalt")
 
 #Note: for time, all exmaples use a small set of
 #      learners. Many more should be added if
 #      possible, including a variety of model
 #      types (e.g., parametric, flexible, tree-
-#.     based, regularized, etc.)
+#      based, regularized, etc.)
 
-#Balancing covariates between treatment groups (binary)
+# Balancing covariates between treatment groups (binary)
 (W1 <- weightit(treat ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "super", estimand = "ATT",
                 SL.library = c("SL.glm", "SL.stepAIC",
                                "SL.glm.interaction")))
-summary(W1)
-bal.tab(W1)
 
-#Balancing covariates with respect to race (multi-category)
+summary(W1)
+
+cobalt::bal.tab(W1)
+
+# Balancing covariates with respect to race (multi-category)
 (W2 <- weightit(race ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "super", estimand = "ATE",
                 SL.library = c("SL.glm", "SL.stepAIC",
                                "SL.glm.interaction")))
-summary(W2)
-bal.tab(W2)
 
-#Balancing covariates with respect to re75 (continuous)
-#assuming t(8) conditional density for treatment
+summary(W2)
+
+cobalt::bal.tab(W2)
+
+# Balancing covariates with respect to re75 (continuous)
+# assuming t(8) conditional density for treatment
 (W3 <- weightit(re75 ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "super", density = "dt_8",
                 SL.library = c("SL.glm", "SL.ridge",
                                "SL.glm.interaction")))
-summary(W3)
-bal.tab(W3)
 
-#Balancing covariates between treatment groups (binary)
+summary(W3)
+
+cobalt::bal.tab(W3)
+
+# Balancing covariates between treatment groups (binary)
 # using balance SuperLearner to minimize the maximum
 # KS statistic
 (W4 <- weightit(treat ~ age + educ + married +
@@ -225,8 +240,10 @@ bal.tab(W3)
                                "SL.lda"),
                 SL.method = "method.balance",
                 criterion = "ks.max"))
+
 summary(W4)
-bal.tab(W4, stats = c("m", "ks"))}
+
+cobalt::bal.tab(W4, stats = c("m", "ks"))}
 \dontshow{\}) # examplesIf}
 }
 \references{

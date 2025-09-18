@@ -1,6 +1,7 @@
 #' Predictions for `glm_weightit` objects
 #'
-#' @description `predict()` generates predictions for models fit using
+#' @description
+#' `predict()` generates predictions for models fit using
 #' `glm_weightit()`, `ordinal_weightit()`, `multinom_weightit()`, or
 #' `coxph_weightit()`. This page only details the `predict()` methods after
 #' using `glm_weightit()`, `ordinal_weightit()`, or `multinom_weightit()`. See
@@ -12,13 +13,11 @@
 #'   which to predict. If omitted, the fitted values applied to the original
 #'   dataset are used.
 #' @param type the type of prediction desired. Allowable options include
-#'   `"response"`, predictions on the scale of the original response variable
-#'   (also `"probs"`); `"link"`, predictions on the scale of the linear
-#'   predictor (also `"lp"`); `"class"`, the modal predicted category for
-#'   ordinal and multinomial models; and `"mean"`, the expected value of the
-#'   outcome for ordinal and multinomial models. See Details for more
-#'   information. The default is `"response"` for all models, which differs from
-#'   [stats::predict.glm()].
+#'   `"response"`, for predictions on the scale of the original response variable
+#'   (also `"probs"`); `"link"`, for predictions on the scale of the linear
+#'   predictor (also `"lp"`); `"class"`, for the modal predicted category for
+#'   ordinal and multinomial models; `"mean"`, for the expected value of the
+#'   outcome for ordinal and multinomial models; and `"stdlv"`, for the standardized latent variable values for ordinal models. See Details for more information. The default is `"response"` for all models, which differs from [stats::predict.glm()].
 #' @param na.action function determining what should be done with missing values
 #'   in `newdata`. The default is to predict `NA`.
 #' @param values when `type = "mean"`, the numeric values each level corresponds
@@ -27,15 +26,17 @@
 #'   used. See Details.
 #' @param \dots further arguments passed to or from other methods.
 #'
-#' @returns A numeric vector containing the desired predictions, except for the
+#' @returns
+#' A numeric vector containing the desired predictions, except for the
 #' following circumstances when an ordinal or multinomial model was fit:
 #' * when `type = "response"`, a numeric matrix with a row for each unit and
 #'   a column for each level of the outcome with the predicted probability of
 #'   the corresponding outcome in the cells
-#' * when `type = "class"`, a factor with the model predicted class for each
+#' * when `type = "class"`, a factor with the modal predicted class for each
 #'   unit; for ordinal models, this will be an ordered factor.
 #'
-#' @details For generalized linear models other than ordinal and multinomial
+#' @details
+#' For generalized linear models other than ordinal and multinomial
 #' models, see [stats::predict.glm()] for more information on how predictions
 #' are computed and which arguments can be specified. Note that standard errors
 #' cannot be computed for the predictions using `predict.glm_weightit()`.
@@ -45,18 +46,19 @@
 #' the values supplied in `values` weighted by the predicted probability of
 #' those values. If `values` is omitted, `predict()` will attempt to convert the
 #' outcome levels to numeric values, and if this cannot be done, an error will
-#' be thrown. `values` should be specified as a named vector, e.g., `values =
-#' c(one = 1, two = 2, three = 3)`, where `"one"`, `"two"`, and `"three"` are
-#' the original outcome levels and 1, 2, and 3 are the numeric values they
+#' be thrown. `values` should be specified as a named vector, e.g.,
+#' `values = c(one = 1, two = 2, three = 3)`, where `"one"`, `"two"`, and `"three"` are
+#' the original outcome levels, and 1, 2, and 3 are the numeric values they
 #' correspond to. This method only makes sense to use if the outcome levels
 #' meaningfully correspond to numeric values.
 #'
 #' For ordinal models, setting `type = "link"` (also `"lp"`) computes the linear
 #' predictor without including the thresholds. This can be interpreted as the
 #' prediction of the latent variable underlying the ordinal response. This
-#' cannot be used with multinomial models.
+#' cannot be used with multinomial models. Setting `type = "stdlv"` standardizes these predictions by the implied standard deviation of the ordinal responses, which is a function of the link function, the original covariates, and the coefficient estimates.
 #'
-#' @seealso [stats::predict.glm()] for predictions from generalized linear
+#' @seealso
+#' [stats::predict.glm()] for predictions from generalized linear
 #' models. [glm_weightit()] for the fitting function.
 #' [survival::predict.coxph()] for predictions from Cox proportional hazards
 #' models.
@@ -138,7 +140,7 @@
 predict.glm_weightit <- function(object, newdata = NULL, type = "response",
                                  na.action = na.pass, ...) {
   chk::chk_string(type)
-  type <- switch(type, "probs" = "response", "lp" = "link", type)
+  type <- switch(type, probs = "response", lp = "link", type)
   type <- match_arg(type, c("response", "link"))
 
   stats::predict.glm(object, newdata = newdata, type = type,
@@ -152,8 +154,13 @@ predict.ordinal_weightit <- function(object, newdata = NULL, type = "response",
                                      na.action = na.pass, values = NULL, ...) {
 
   chk::chk_string(type)
-  type <- switch(type, "probs" = "response", "lp" = "link", type)
-  type <- match_arg(type, c("response", "link", "class", "mean"))
+  type <- switch(type, probs = "response", lp = "link", lv = "link", type)
+  type <- match_arg(type, c("response", "link", "class", "mean", "stdlv"))
+
+  if (type == "stdlv" && !object$family$link %in% c("probit", "logit", "cloglog", "loglog")) {
+    .err(sprintf('`type = "stdlv"` cannot be used with `link = %s`',
+                 add_quotes(object$family$link)))
+  }
 
   na.act <- object$na.action
   object$na.action <- NULL
@@ -164,6 +171,25 @@ predict.ordinal_weightit <- function(object, newdata = NULL, type = "response",
     }
     else if (type == "link") {
       out <- object$linear.predictors
+    }
+    else if (type == "stdlv") {
+      sigma2 <- switch(object$family$link,
+                       probit = 1,
+                       logit = pi^2 / 3,
+                       cloglog = pi^2 / 6,
+                       loglog = pi^2 / 6)
+
+      mu <- switch(object$family$link,
+                   probit = 0,
+                   logit = 0,
+                   cloglog = -digamma(1),
+                   loglog = digamma(1))
+
+      varY <- drop(object$coefficients[seq_col(object$varx)] %*%
+                     object$varx %*%
+                     object$coefficients[seq_col(object$varx)]) + sigma2
+
+      out <- (mu + object$linear.predictors) / sqrt(varY)
     }
     else if (type == "class") {
       out <- factor(max.col(object$fitted.values, ties.method = "first"),
@@ -190,8 +216,9 @@ predict.ordinal_weightit <- function(object, newdata = NULL, type = "response",
       out <- drop(object$fitted.values %*% values[colnames(object$fitted.values)])
     }
 
-    if (is_not_null(na.act))
+    if (is_not_null(na.act)) {
       out <- napredict(na.act, out)
+    }
 
     return(out)
   }
@@ -199,13 +226,15 @@ predict.ordinal_weightit <- function(object, newdata = NULL, type = "response",
   tt <- terms(object)
 
   Terms <- delete.response(tt)
+
   m <- model.frame(Terms, newdata, na.action = na.action,
                    xlev = object$xlevels)
 
-  cl <- attr(Terms, "dataClasses")
+  cl <- .attr(Terms, "dataClasses")
   if (is_not_null(cl)) {
     .checkMFClasses(cl, m)
   }
+
   x <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
 
   offset <- model.offset(m)
@@ -218,12 +247,35 @@ predict.ordinal_weightit <- function(object, newdata = NULL, type = "response",
       else offset + addO
     }
   }
-  if (is_null(offset)) offset <- rep.int(0, nrow(x))
+
+  if (is_null(offset)) {
+    offset <- rep.int(0, nrow(x))
+  }
 
   x <- x[, colnames(x) != "(Intercept)", drop = FALSE]
 
   if (type == "link") {
     return(offset + drop(x %*% object$coefficients[seq_col(x)]))
+  }
+
+  if (type == "stdlv") {
+    sigma2 <- switch(object$family$link,
+                     probit = 1,
+                     logit = pi^2 / 3,
+                     cloglog = pi^2 / 6,
+                     loglog = pi^2 / 6)
+
+    mu <- switch(object$family$link,
+                 probit = 0,
+                 logit = 0,
+                 cloglog = -digamma(1),
+                 loglog = digamma(1))
+
+    varY <- drop(object$coefficients[seq_col(object$varx)] %*%
+                   object$varx %*%
+                   object$coefficients[seq_col(object$varx)]) + sigma2
+
+    return((mu + offset + drop(x %*% object$coefficients[seq_col(x)])) / sqrt(varY))
   }
 
   p <- object$get_p(object$coefficients, x, offset)
@@ -265,7 +317,7 @@ predict.multinom_weightit <- function(object, newdata = NULL, type = "response",
                                       na.action = na.pass, values = NULL, ...) {
 
   chk::chk_string(type)
-  type <- switch(type, "probs" = "response", type)
+  type <- switch(type, probs = "response", type)
   type <- match_arg(type, c("response", "class", "mean"))
 
   na.act <- object$na.action
@@ -302,8 +354,9 @@ predict.multinom_weightit <- function(object, newdata = NULL, type = "response",
       out <- drop(object$fitted.values %*% values[colnames(object$fitted.values)])
     }
 
-    if (is_not_null(na.act))
+    if (is_not_null(na.act)) {
       out <- napredict(na.act, out)
+    }
 
     return(out)
   }
@@ -311,17 +364,20 @@ predict.multinom_weightit <- function(object, newdata = NULL, type = "response",
   tt <- terms(object)
 
   Terms <- delete.response(tt)
+
   m <- model.frame(Terms, newdata, na.action = na.action,
                    xlev = object$xlevels)
 
-  cl <- attr(Terms, "dataClasses")
+  cl <- .attr(Terms, "dataClasses")
   if (is_not_null(cl)) {
     .checkMFClasses(cl, m)
   }
+
   x <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
 
   offset <- model.offset(m)
   addO <- object$call$offset
+
   if (is_not_null(addO)) {
     addO <- eval(addO, newdata, environment(tt))
     offset <- {
@@ -330,7 +386,9 @@ predict.multinom_weightit <- function(object, newdata = NULL, type = "response",
     }
   }
 
-  if (is_null(offset)) offset <- rep.int(0, nrow(x))
+  if (is_null(offset)) {
+    offset <- rep.int(0, nrow(x))
+  }
 
   p <- object$get_p(object$coefficients, x, offset)
 

@@ -1,12 +1,10 @@
 #' Nonparametric Covariate Balancing Propensity Score Weighting
 #' @name method_npcbps
-#' @aliases method_npcbps
 #' @usage NULL
 #'
-#' @description This page explains the details of estimating weights from
-#' nonparametric covariate balancing propensity scores by setting `method =
-#' "npcbps"` in the call to [weightit()] or [weightitMSM()]. This method can be
-#' used with binary, multi-category, and continuous treatments.
+#' @description
+#' This page explains the details of estimating weights from
+#' nonparametric covariate balancing propensity scores by setting `method = "npcbps"` in the call to [weightit()] or [weightitMSM()]. This method can be used with binary, multi-category, and continuous treatments.
 #'
 #' In general, this method relies on estimating weights by maximizing the
 #' empirical likelihood of the data subject to balance constraints. This method
@@ -33,8 +31,7 @@
 #' ## Longitudinal Treatments
 #'
 #' For longitudinal treatments, the weights are the product of the weights
-#' estimated at each time point. This is not how \pkgfun{CBPS}{CBMSM} estimates
-#' weights for longitudinal treatments.
+#' estimated at each time point. **NOTE: the use of npCBPS with longitudinal treatments has not been validated!**
 #'
 #' ## Sampling Weights
 #'
@@ -53,19 +50,20 @@
 #'
 #' M-estimation is not supported.
 #'
-#' @section Additional Arguments: `moments` and `int` are accepted. See
-#'   [weightit()] for details.
+#' @section Additional Arguments:
 #'
 #' \describe{
-#'   \item{`quantile`}{
-#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75)` to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
-#'   }
+#'   \item{`moments`}{`integer`; the highest power of each covariate to be balanced. For example, if `moments = 3`, each covariate, its square, and its cube will be balanced. Can also be a named vector with a value for each covariate (e.g., `moments = c(x1 = 2, x2 = 4)`). Values greater than 1 for categorical covariates are ignored. Default is 1 to balance covariate means.
+#'     }
+#'     \item{`int`}{`logical`; whether first-order interactions of the covariates are to be balanced. Default is `FALSE`.
+#'     }
+#'     \item{`quantile`}{a named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or a vector (e.g., `c(.25, .5, .75)`) to request the same quantile(s) for all continuous covariates. Only allowed with binary and multi-category treatments.
+#'     }
 #' }
 #'
-#'   All arguments to `npCBPS()` can be passed through `weightit()` or
-#'   `weightitMSM()`.
+#' All arguments to `npCBPS()` can be passed through `weightit()` or `weightitMSM()`.
 #'
-#'   All arguments take on the defaults of those in `npCBPS()`.
+#' All arguments take on the defaults of those in `npCBPS()`.
 #'
 #' @section Additional Outputs:
 #' \describe{
@@ -73,47 +71,53 @@
 #'   }
 #' }
 #'
-#' @details Nonparametric CBPS involves the specification of a constrained
+#' @details
+#' Nonparametric CBPS involves the specification of a constrained
 #' optimization problem over the weights. The constraints correspond to
 #' covariate balance, and the loss function is the empirical likelihood of the
-#' data given the weights. npCBPS is similar to \link[=method_ebal]{entropy
-#' balancing} and will generally produce similar results. Because the
-#' optimization problem of npCBPS is not convex it can be slow to converge or
+#' data given the weights. npCBPS is similar to \link[=method_ebal]{entropy balancing} and will generally produce similar results. Because the optimization problem of npCBPS is not convex it can be slow to converge or
 #' not converge at all, so approximate balance is allowed instead using the
 #' `cor.prior` argument, which controls the average deviation from zero
 #' correlation between the treatment and covariates allowed.
 #'
-#' @seealso [weightit()], [weightitMSM()], [`method_cbps`]
+#' @seealso
+#' [weightit()], [weightitMSM()], [`method_cbps`]
+#'
+#' [`method_optweight`], which can also be used to perform npCBPS by setting `norm = "log"`. In generally, this `"optweight"` implementation is more stable and flexible.
 #'
 #' \pkgfun{CBPS}{npCBPS} for the fitting function
 #'
-#' @references Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing
+#' @references
+#' Fong, C., Hazlett, C., & Imai, K. (2018). Covariate balancing
 #' propensity score for a continuous treatment: Application to the efficacy of
 #' political advertisements. *The Annals of Applied Statistics*, 12(1), 156–177.
 #' \doi{10.1214/17-AOAS1101}
 #'
-#' @examplesIf requireNamespace("CBPS", quietly = TRUE)
+#' @examplesIf rlang::is_installed("CBPS")
 #' # Examples take a long time to run
-#' library("cobalt")
 #' data("lalonde", package = "cobalt")
 #' \donttest{
 #'   #Balancing covariates between treatment groups (binary)
 #'   (W1 <- weightit(treat ~ age + educ + married +
 #'                     nodegree + re74, data = lalonde,
 #'                   method = "npcbps", estimand = "ATE"))
+#'
 #'   summary(W1)
-#'   bal.tab(W1)
+#'
+#'   cobalt::bal.tab(W1)
 #'
 #'   #Balancing covariates with respect to race (multi-category)
 #'   (W2 <- weightit(race ~ age + educ + married +
 #'                     nodegree + re74, data = lalonde,
 #'                   method = "npcbps", estimand = "ATE"))
+#'
 #'   summary(W2)
-#'   bal.tab(W2)
+#'
+#'   cobalt::bal.tab(W2)
 #' }
 NULL
 
-weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, int, verbose, ...) {
+weightit2npcbps <- function(covs, treat, s.weights, subset, missing, verbose, ...) {
 
   covs <- covs[subset, , drop = FALSE]
   treat <- factor(treat[subset])
@@ -124,15 +128,18 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
-                .quantile_f(covs, qu = ...get("quantile"), s.weights = s.weights,
-                            treat = treat))
+  covs <- .apply_moments_int_quantile(covs,
+                                      moments = ...get("moments"),
+                                      int = ...get("int"),
+                                      quantile = ...get("quantile"),
+                                      s.weights = s.weights,
+                                      treat = treat)
 
   for (i in seq_col(covs)) {
     covs[, i] <- .make_closer_to_1(covs[, i])
   }
 
-  colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
+  colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
   new.data <- data.frame(treat = treat, covs)
@@ -146,8 +153,9 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
                         print.level = 1)
   }, verbose = verbose)},
   error = function(e) {
-    e. <- conditionMessage(e)
-    .err("(from `CBPS::npCBPS()`) ", e., tidy = FALSE)
+    .err(sprintf("(from `CBPS::npCBPS()`): %s",
+                 conditionMessage(e)),
+         tidy = FALSE)
   })
 
   w <- fit$weights
@@ -161,7 +169,7 @@ weightit2npcbps <- function(covs, treat, s.weights, subset, missing, moments, in
 
 weightit2npcbps.multi <- weightit2npcbps
 
-weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, moments, int, verbose, ...) {
+weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, verbose, ...) {
 
   covs <- covs[subset, , drop = FALSE]
   treat <- treat[subset]
@@ -176,9 +184,11 @@ weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, moment
     covs[, i] <- .make_closer_to_1(covs[, i])
   }
 
-  covs <- .int_poly_f(covs, poly = moments, int = int)
+  covs <- .apply_moments_int_quantile(covs,
+                                      moments = ...get("moments"),
+                                      int = ...get("int"))
 
-  colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
+  colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
   covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
 
   new.data <- data.frame(treat = treat, covs)
@@ -192,8 +202,9 @@ weightit2npcbps.cont <- function(covs, treat, s.weights, subset, missing, moment
                         print.level = 1)
   }, verbose = verbose)},
   error = function(e) {
-    e. <- conditionMessage(e)
-    .err("(from `CBPS::npCBPS()`) ", e., tidy = FALSE)
+    .err(sprintf("(from `CBPS::npCBPS()`): %s",
+                 conditionMessage(e)),
+         tidy = FALSE)
   })
 
   w <- fit$weights

@@ -40,7 +40,7 @@
   if (is_null(weights)) weights <- rep.int(1, n)
   else chk::chk_numeric(weights)
 
-  if (is.null(offset)) offset <- rep.int(0, n)
+  if (is_null(offset)) offset <- rep.int(0, n)
   else chk::chk_numeric(offset)
 
   chk::chk_all_equal(c(length(y), nrow(x), length(weights), length(offset)))
@@ -175,7 +175,9 @@
 
   # Psi function and gradient using natural parameterization
   psi <- function(B, X, y, weights, offset = NULL) {
-    if (is_null(offset)) offset <- rep.int(0, length(y))
+    if (is_null(offset)) {
+      offset <- rep_with(0, y)
+    }
 
     if (no_x) {
       a <- B
@@ -248,7 +250,7 @@
   # Get predicted probabilities for all units for all categories,
   # natural parameterization of `a`
   get_pp <- function(B, X, offset = NULL) {
-    if (length(offset) == 0L) {
+    if (is_null(offset)) {
       offset <- rep.int(0, n)
     }
 
@@ -301,7 +303,8 @@
        y = y,
        weights = weights,
        gradient = grad,
-       hessian = hessian)
+       hessian = hessian,
+       varx = cov(x))
 }
 
 .ordinal_weightit <- function(formula, data, link = "logit", weights, subset, start = NULL, na.action,
@@ -324,27 +327,30 @@
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
 
-  mt <- attr(mf, "terms")
+  mt <- .attr(mf, "terms")
+
   Y <- model.response(mf, "any")
   if (length(dim(Y)) == 1L) {
     nm <- rownames(Y)
     dim(Y) <- NULL
-    if (!is.null(nm))
+    if (is_not_null(nm)) {
       names(Y) <- nm
+    }
   }
+
   X <- {
-    if (is.empty.model(mt)) matrix(NA_real_, NROW(Y), 0L)
+    if (is.empty.model(mt)) matrix(NA_real_, nrow = NROW(Y), ncol = 0L)
     else model.matrix(mt, mf, contrasts)
   }
 
   weights <- as.vector(model.weights(mf))
-  if (!is.null(weights)) {
+  if (is_not_null(weights)) {
     chk::chk_numeric(weights)
     chk::chk_gte(weights)
   }
 
   offset <- as.vector(model.offset(mf))
-  if (!is.null(offset)) {
+  if (is_not_null(offset)) {
     chk::chk_numeric(offset)
     if (length(offset) != NROW(Y))
       .err(gettextf("number of offsets is %d; should equal %d (number of observations)",
@@ -357,14 +363,15 @@
                    hess = hess, control = control))
 
   if (model) fit$model <- mf
-  fit$na.action <- attr(mf, "na.action")
+  fit$na.action <- .attr(mf, "na.action")
   if (!x) fit$x <- NULL
   if (!y) fit$y <- NULL
 
   c(fit,
     list(call = cal, formula = formula, terms = mt,
          data = data, offset = offset,
-         contrasts = attr(X, "contrasts"), xlevels = .getXlevels(mt, mf)))
+         contrasts = .attr(X, "contrasts"),
+         xlevels = .getXlevels(mt, mf)))
 }
 
 .get_hess_ordinal <- function(fit) {
@@ -383,7 +390,7 @@
 
   if (is_null(weights)) weights <- rep.int(1, n)
 
-  if (is.null(offset)) offset <- rep.int(0, n)
+  if (is_null(offset)) offset <- rep.int(0, n)
 
   m <- nlevels(y) #num. thresholds
 
@@ -436,7 +443,9 @@
 
   # Psi function and gradient using natural parameterization
   psi <- function(B, X, y, weights, offset = NULL) {
-    if (is_null(offset)) offset <- rep.int(0, length(y))
+    if (is_null(offset)) {
+      offset <- rep_with(0, y)
+    }
 
     if (no_x) {
       a <- B

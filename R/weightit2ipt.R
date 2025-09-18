@@ -1,9 +1,9 @@
 #' Inverse Probability Tilting
 #' @name method_ipt
-#' @aliases method_ipt
 #' @usage NULL
 #'
-#' @description This page explains the details of estimating weights using
+#' @description
+#' This page explains the details of estimating weights using
 #' inverse probability tilting by setting `method = "ipt"` in the call to
 #' [weightit()] or [weightitMSM()]. This method can be used with binary and
 #' multi-category treatments.
@@ -38,8 +38,7 @@
 #'
 #' For longitudinal treatments, the weights are the product of the weights
 #' estimated at each time point. This method is not guaranteed to yield exact
-#' balance at each time point. NOTE: the use of inverse probability tilting with
-#' longitudinal treatments has not been validated!
+#' balance at each time point. **NOTE: the use of inverse probability tilting with longitudinal treatments has not been validated!**
 #'
 #' ## Sampling Weights
 #'
@@ -47,8 +46,7 @@
 #'
 #' ## Missing Data
 #'
-#' In the presence of missing data, the following value(s) for `missing` are
-#' allowed:
+#' In the presence of missing data, the following value(s) for `missing` are allowed:
 #'     \describe{
 #'       \item{`"ind"` (default)}{
 #'         First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is `NA` and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with the covariate medians (this value is arbitrary and does not affect estimation). The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting `weightit` object will be the original covariates with the `NA`s.
@@ -60,18 +58,20 @@
 #' M-estimation is supported for all scenarios. See [glm_weightit()] and
 #' `vignette("estimating-effects")` for details.
 #'
-#' @section Additional Arguments: `moments` and `int` are accepted. See
-#'   [weightit()] for details.
+#' @section Additional Arguments:
 #'
 #' \describe{
-#'   \item{`quantile`}{
-#'     A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or an unnamed list of length 1 (e.g., `list(c(.25, .5, .75))`) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., `c(x1 = .5, x2 = .75)` to request one quantile for each covariate.
-#'   }
+#'   \item{`moments`}{`integer`; the highest power of each covariate to be balanced. For example, if `moments = 3`, each covariate, its square, and its cube will be balanced. Can also be a named vector with a value for each covariate (e.g., `moments = c(x1 = 2, x2 = 4)`). Values greater than 1 for categorical covariates are ignored. Default is 1 to balance covariate means.
+#'     }
+#'     \item{`int`}{`logical`; whether first-order interactions of the covariates are to be balanced. Default is `FALSE`.
+#'     }
+#'     \item{`quantile`}{a named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting `quantile = list(x1 = c(.25, .5. , .75))` ensures the 25th, 50th, and 75th percentiles of `x1` in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., `.5`) or a vector (e.g., `c(.25, .5, .75)`) to request the same quantile(s) for all continuous covariates.
+#'     }
 #'   \item{`link`}{the link used to determine the inverse link for computing the (generalized) propensity scores. Default is `"logit"`, which is used in the original description of the method by Graham, Pinto, and Egel (2012), but `"probit"`, `"cauchit"`, `"cloglog"`, `"loglog"`, `"log"`, and `"clog"` are also allowed. Note that negative weights are possible with these last two and they should be used with caution. An object of class `"link-glm"` can also be supplied. The argument is passed to [quasibinomial()].
 #'   }
 #' }
 #'
-#'   The `stabilize` argument is ignored.
+#' The `stabilize` argument is ignored.
 #'
 #' @section Additional Outputs:
 #' \describe{
@@ -79,7 +79,8 @@
 #'   }
 #' }
 #'
-#' @details Inverse probability tilting (IPT) involves specifying estimating
+#' @details
+#' Inverse probability tilting (IPT) involves specifying estimating
 #' equations that fit the parameters of two or more generalized linear models
 #' with a modification that ensures exact balance on the covariate means. These
 #' estimating equations are solved, and the estimated parameters are used in the
@@ -102,39 +103,40 @@
 #' [method_ebal] and [method_cbps] for entropy balancing and CBPS, which work
 #' similarly.
 #'
-#' @references ## `estimand = "ATE"`
+#' @references
+#' ## `estimand = "ATE"`
 #'
 #' Graham, B. S., De Xavier Pinto, C. C., & Egel, D. (2012). Inverse Probability
-#' Tilting for Moment Condition Models with Missing Data. *The Review of
-#' Economic Studies*, 79(3), 1053–1079. \doi{10.1093/restud/rdr047}
+#' Tilting for Moment Condition Models with Missing Data. *The Review of Economic Studies*, 79(3), 1053–1079. \doi{10.1093/restud/rdr047}
 #'
 #' ## `estimand = "ATT"`
 #'
-#' Sant'Anna, P. H. C., & Zhao, J. (2020). Doubly robust
-#' difference-in-differences estimators. *Journal of Econometrics*, 219(1),
-#' 101–122. \doi{10.1016/j.jeconom.2020.06.003}
+#' Sant'Anna, P. H. C., & Zhao, J. (2020). Doubly robust difference-in-differences estimators. *Journal of Econometrics*, 219(1), 101–122. \doi{10.1016/j.jeconom.2020.06.003}
 #'
-#' @examplesIf requireNamespace("rootSolve", quietly = TRUE)
+#' @examplesIf rlang::is_installed("rootSolve")
 #' data("lalonde", package = "cobalt")
 #'
 #' #Balancing covariates between treatment groups (binary)
 #' (W1 <- weightit(treat ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
 #'                 method = "ipt", estimand = "ATT"))
+#'
 #' summary(W1)
+#'
 #' cobalt::bal.tab(W1)
 #'
 #' #Balancing covariates with respect to race (multi-category)
 #' (W2 <- weightit(race ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
 #'                 method = "ipt", estimand = "ATE"))
-#' summary(W2)
-#' cobalt::bal.tab(W2)
 #'
+#' summary(W2)
+#'
+#' cobalt::bal.tab(W2)
 NULL
 
 weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
-                         stabilize, missing, moments, int, verbose, ...) {
+                         stabilize, missing, verbose, ...) {
 
   covs <- covs[subset, , drop = FALSE]
   treat <- treat[subset]
@@ -146,9 +148,12 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
-                .quantile_f(covs, qu = ...get("quantile"), s.weights = s.weights,
-                            focal = focal, treat = treat))
+  covs <- .apply_moments_int_quantile(covs,
+                                      moments = ...get("moments"),
+                                      int = ...get("int"),
+                                      quantile = ...get("quantile"),
+                                      s.weights = s.weights, focal = focal,
+                                      treat = treat)
 
   for (i in seq_col(covs)) {
     covs[, i] <- .make_closer_to_1(covs[, i])
@@ -186,12 +191,11 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
   .fam <- quasibinomial(link)
 
   groups_to_weight <- switch(estimand,
-                             "ATT" = 0,
-                             "ATC" = 1,
+                             ATT = 0,
+                             ATC = 1,
                              0:1)
 
-  fit.list <- make_list(groups_to_weight)
-  par.list <- make_list(groups_to_weight)
+  fit.list <- par.list <- make_list(groups_to_weight)
 
   n <- length(treat)
   k <- ncol(C)
@@ -239,24 +243,24 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
   }
   else {
     psi <- switch(estimand,
-                  "ATT" = function(B, X, A, SW) {
+                  ATT = function(B, X, A, SW) {
                     p <- .fam$linkinv(drop(X %*% B))
                     SW * (A - (1 - A) * p / (1 - p)) * X
                   },
-                  "ATC" = function(B, X, A, SW) {
+                  ATC = function(B, X, A, SW) {
                     p <- .fam$linkinv(drop(X %*% B))
                     SW * (A * (1 - p) / p - (1 - A)) * X
                   })
 
     verbosely({
       fit.list[[1L]] <- rootSolve::multiroot(f,
-                                            start = start,
-                                            A = treat,
-                                            X = C,
-                                            SW = s.weights,
-                                            .psi = psi,
-                                            rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
-                                            verbose = TRUE)
+                                             start = start,
+                                             A = treat,
+                                             X = C,
+                                             SW = s.weights,
+                                             .psi = psi,
+                                             rtol = 1e-10, atol = 1e-10, ctol = 1e-10,
+                                             verbose = TRUE)
     }, verbose = verbose)
 
     par.list[[1L]] <- fit.list[[1L]]$root
@@ -273,7 +277,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
   Mparts <- list(
     psi_treat = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A, SW) {
+      ATE = function(Btreat, Xtreat, A, SW) {
         p0 <- seq_len(length(Btreat) / 2)
         cbind(psi.list[["0"]](Btreat[p0], Xtreat, A, SW),
               psi.list[["1"]](Btreat[-p0], Xtreat, A, SW))
@@ -283,7 +287,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
       }),
     wfun = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A) {
+      ATE = function(Btreat, Xtreat, A) {
         p0 <- seq_len(length(Btreat) / 2)
         A0 <- A == 0
 
@@ -299,7 +303,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
       }),
     dw_dBtreat = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A, SW) {
+      ATE = function(Btreat, Xtreat, A, SW) {
         p0 <- seq_len(length(Btreat) / 2)
         A0 <- A == 0
 
@@ -320,7 +324,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
       }),
     hess_treat = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A, SW) {
+      ATE = function(Btreat, Xtreat, A, SW) {
         p0 <- seq_len(length(Btreat) / 2)
         A0 <- A == 0
 
@@ -334,7 +338,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
         dw <- .dw_dp_bin(ps, A, estimand = estimand) * .fam$mu.eta(XB) * SW
 
         .block_diag(list(crossprod(Xtreat[A0, , drop = FALSE],
-                              dw[A0] * Xtreat[A0, , drop = FALSE]),
+                                   dw[A0] * Xtreat[A0, , drop = FALSE]),
                          crossprod(Xtreat[!A0, , drop = FALSE],
                                    dw[!A0] * Xtreat[!A0, , drop = FALSE])))
       },
@@ -356,7 +360,7 @@ weightit2ipt <- function(covs, treat, s.weights, subset, estimand, focal,
 }
 
 weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
-                               stabilize, missing, moments, int, verbose, ...) {
+                               stabilize, missing, verbose, ...) {
 
   covs <- covs[subset, , drop = FALSE]
   treat <- factor(treat[subset])
@@ -368,9 +372,12 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- cbind(.int_poly_f(covs, poly = moments, int = int, center = TRUE),
-                .quantile_f(covs, qu = ...get("quantile"), s.weights = s.weights,
-                            focal = focal, treat = treat))
+  covs <- .apply_moments_int_quantile(covs,
+                                      moments = ...get("moments"),
+                                      int = ...get("int"),
+                                      quantile = ...get("quantile"),
+                                      s.weights = s.weights, focal = focal,
+                                      treat = treat)
 
   for (i in seq_col(covs)) {
     covs[, i] <- .make_closer_to_1(covs[, i])
@@ -405,13 +412,12 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   .fam <- quasibinomial(link)
 
   groups_to_weight <- switch(estimand,
-                             "ATE" = levels(treat),
+                             ATE = levels(treat),
                              setdiff(levels(treat), focal))
 
-  w <- rep.int(1, length(treat))
+  w <- rep_with(1, treat)
 
-  fit.list <- make_list(groups_to_weight)
-  par.list <- make_list(groups_to_weight)
+  fit.list <- par.list <- make_list(groups_to_weight)
 
   k <- ncol(C)
 
@@ -491,7 +497,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
   Mparts <- list(
     psi_treat = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A, SW) {
+      ATE = function(Btreat, Xtreat, A, SW) {
         Bmat <- matrix(Btreat, nrow = ncol(Xtreat),
                        dimnames = list(colnames(Xtreat), groups_to_weight))
 
@@ -507,19 +513,19 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
           m <- matrix(0, nrow = length(A), ncol = length(Bmat[, i]))
 
           m[A %in% c(i, focal), ] <- psi(Bmat[, i],
-                                        Xtreat[A %in% c(i, focal), , drop = FALSE],
-                                        as.numeric(A[A %in% c(i, focal)] == focal),
-                                        SW[A %in% c(i, focal)])
+                                         Xtreat[A %in% c(i, focal), , drop = FALSE],
+                                         as.numeric(A[A %in% c(i, focal)] == focal),
+                                         SW[A %in% c(i, focal)])
           m
         }))
       }),
     wfun = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A) {
+      ATE = function(Btreat, Xtreat, A) {
         Bmat <- matrix(Btreat, nrow = ncol(Xtreat),
                        dimnames = list(colnames(Xtreat), groups_to_weight))
 
-        w <- rep.int(1, length(A))
+        w <- rep_with(1, A)
 
         for (i in groups_to_weight) {
           ps_i <- .fam$linkinv(drop(Xtreat[A == i, , drop = FALSE] %*% Bmat[, i]))
@@ -532,7 +538,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
         Bmat <- matrix(Btreat, nrow = ncol(Xtreat),
                        dimnames = list(colnames(Xtreat), groups_to_weight))
 
-        w <- rep.int(1, length(A))
+        w <- rep_with(1, A)
 
         for (i in groups_to_weight) {
           ps_i <- .fam$linkinv(drop(Xtreat[A == i, , drop = FALSE] %*% Bmat[, i]))
@@ -543,7 +549,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       }),
     dw_dBtreat = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A, SW) {
+      ATE = function(Btreat, Xtreat, A, SW) {
         Bmat <- matrix(Btreat, nrow = ncol(Xtreat),
                        dimnames = list(colnames(Xtreat),
                                        levels(A)))
@@ -567,7 +573,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
         ps <- .fam$linkinv(XB)
 
         do.call("cbind", lapply(setdiff(levels(A), focal), function(i) {
-          dw2 <- rep(0, length(A))
+          dw2 <- rep_with(0, A)
           in_fi <- A %in% c(i, focal)
           dw2[in_fi] <- .dw_dp_bin(ps[in_fi, i], as.numeric(A[in_fi] == focal), "ATT")
 
@@ -576,7 +582,7 @@ weightit2ipt.multi <- function(covs, treat, s.weights, subset, estimand, focal,
       }),
     hess_treat = switch(
       estimand,
-      "ATE" = function(Btreat, Xtreat, A, SW) {
+      ATE = function(Btreat, Xtreat, A, SW) {
         Bmat <- matrix(Btreat, nrow = ncol(Xtreat),
                        dimnames = list(colnames(Xtreat),
                                        levels(A)))

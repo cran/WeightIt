@@ -5,8 +5,7 @@
 \title{Nonparametric Covariate Balancing Propensity Score Weighting}
 \description{
 This page explains the details of estimating weights from
-nonparametric covariate balancing propensity scores by setting \code{method = "npcbps"} in the call to \code{\link[=weightit]{weightit()}} or \code{\link[=weightitMSM]{weightitMSM()}}. This method can be
-used with binary, multi-category, and continuous treatments.
+nonparametric covariate balancing propensity scores by setting \code{method = "npcbps"} in the call to \code{\link[=weightit]{weightit()}} or \code{\link[=weightitMSM]{weightitMSM()}}. This method can be used with binary, multi-category, and continuous treatments.
 
 In general, this method relies on estimating weights by maximizing the
 empirical likelihood of the data subject to balance constraints. This method
@@ -35,8 +34,7 @@ fit object.
 \subsection{Longitudinal Treatments}{
 
 For longitudinal treatments, the weights are the product of the weights
-estimated at each time point. This is not how \pkgfun{CBPS}{CBMSM} estimates
-weights for longitudinal treatments.
+estimated at each time point. \strong{NOTE: the use of npCBPS with longitudinal treatments has not been validated!}
 }
 
 \subsection{Sampling Weights}{
@@ -63,25 +61,24 @@ M-estimation is not supported.
 Nonparametric CBPS involves the specification of a constrained
 optimization problem over the weights. The constraints correspond to
 covariate balance, and the loss function is the empirical likelihood of the
-data given the weights. npCBPS is similar to \link[=method_ebal]{entropy
-balancing} and will generally produce similar results. Because the
-optimization problem of npCBPS is not convex it can be slow to converge or
+data given the weights. npCBPS is similar to \link[=method_ebal]{entropy balancing} and will generally produce similar results. Because the optimization problem of npCBPS is not convex it can be slow to converge or
 not converge at all, so approximate balance is allowed instead using the
 \code{cor.prior} argument, which controls the average deviation from zero
 correlation between the treatment and covariates allowed.
 }
 \section{Additional Arguments}{
- \code{moments} and \code{int} are accepted. See
-\code{\link[=weightit]{weightit()}} for details.
+
 
 \describe{
-\item{\code{quantile}}{
-A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting \verb{quantile = list(x1 = c(.25, .5. , .75))} ensures the 25th, 50th, and 75th percentiles of \code{x1} in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., \code{.5}) or an unnamed list of length 1 (e.g., \code{list(c(.25, .5, .75))}) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., \code{c(x1 = .5, x2 = .75)} to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
+\item{\code{moments}}{\code{integer}; the highest power of each covariate to be balanced. For example, if \code{moments = 3}, each covariate, its square, and its cube will be balanced. Can also be a named vector with a value for each covariate (e.g., \code{moments = c(x1 = 2, x2 = 4)}). Values greater than 1 for categorical covariates are ignored. Default is 1 to balance covariate means.
+}
+\item{\code{int}}{\code{logical}; whether first-order interactions of the covariates are to be balanced. Default is \code{FALSE}.
+}
+\item{\code{quantile}}{a named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting \verb{quantile = list(x1 = c(.25, .5. , .75))} ensures the 25th, 50th, and 75th percentiles of \code{x1} in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., \code{.5}) or a vector (e.g., \code{c(.25, .5, .75)}) to request the same quantile(s) for all continuous covariates. Only allowed with binary and multi-category treatments.
 }
 }
 
-All arguments to \code{npCBPS()} can be passed through \code{weightit()} or
-\code{weightitMSM()}.
+All arguments to \code{npCBPS()} can be passed through \code{weightit()} or \code{weightitMSM()}.
 
 All arguments take on the defaults of those in \code{npCBPS()}.
 }
@@ -95,24 +92,27 @@ All arguments take on the defaults of those in \code{npCBPS()}.
 }
 
 \examples{
-\dontshow{if (requireNamespace("CBPS", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (rlang::is_installed("CBPS")) withAutoprint(\{ # examplesIf}
 # Examples take a long time to run
-library("cobalt")
 data("lalonde", package = "cobalt")
 \donttest{
   #Balancing covariates between treatment groups (binary)
   (W1 <- weightit(treat ~ age + educ + married +
                     nodegree + re74, data = lalonde,
                   method = "npcbps", estimand = "ATE"))
+
   summary(W1)
-  bal.tab(W1)
+
+  cobalt::bal.tab(W1)
 
   #Balancing covariates with respect to race (multi-category)
   (W2 <- weightit(race ~ age + educ + married +
                     nodegree + re74, data = lalonde,
                   method = "npcbps", estimand = "ATE"))
+
   summary(W2)
-  bal.tab(W2)
+
+  cobalt::bal.tab(W2)
 }
 \dontshow{\}) # examplesIf}
 }
@@ -124,6 +124,8 @@ political advertisements. \emph{The Annals of Applied Statistics}, 12(1), 156–
 }
 \seealso{
 \code{\link[=weightit]{weightit()}}, \code{\link[=weightitMSM]{weightitMSM()}}, \code{\link{method_cbps}}
+
+\code{\link{method_optweight}}, which can also be used to perform npCBPS by setting \code{norm = "log"}. In generally, this \code{"optweight"} implementation is more stable and flexible.
 
 \pkgfun{CBPS}{npCBPS} for the fitting function
 }

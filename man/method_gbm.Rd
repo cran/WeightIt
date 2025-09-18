@@ -63,8 +63,7 @@ Sampling weights are supported through \code{s.weights} in all scenarios.
 
 \subsection{Missing Data}{
 
-In the presence of missing data, the following value(s) for \code{missing} are
-allowed:
+In the presence of missing data, the following value(s) for \code{missing} are allowed:
 \describe{
 \item{\code{"ind"} (default)}{First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is \code{NA} and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with the covariate medians (this value is arbitrary and does not affect estimation). The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting \code{weightit} object will be the original covariates with the \code{NA}s.}
 \item{\code{"surr"}}{Surrogate splitting is used to process \code{NA}s. No missingness indicators are created. Nodes are split using only the non-missing values of each variable. To generate predicted values for each unit, a non-missing variable that operates similarly to the variable with missingness is used as a surrogate. Missing values are ignored when calculating balance statistics to choose the optimal tree.}
@@ -118,12 +117,15 @@ backward compatibility.
 Estimated propensity scores are trimmed to \eqn{10^{-8}} and \eqn{1 - 10^{-8}} to ensure balance statistics can be computed.
 }
 \section{Additional Arguments}{
- The following additional arguments can be
-specified:
+
+
+The following additional arguments can be specified:
 \describe{
 \item{\code{criterion}}{A string describing the balance criterion used to select the best weights. See \pkgfun{cobalt}{bal.compute} for allowable options for each treatment type. In addition, to optimize the cross-validation error instead of balance, \code{criterion} can be set as \verb{"cv\{#\}}", where \verb{\{#\}} is replaced by a number representing the number of cross-validation folds used (e.g., \code{"cv5"} for 5-fold cross-validation). For binary and multi-category treatments, the default is \code{"smd.mean"}, which minimizes the average absolute standard mean difference among the covariates between treatment groups. For continuous treatments, the default is \code{"p.mean"}, which minimizes the average absolute Pearson correlation between the treatment and covariates.
 }
 \item{\code{trim.at}}{A number supplied to \code{at} in \code{\link[=trim]{trim()}} which trims the weights from all the trees before choosing the best tree. This can be valuable when some weights are extreme, which occurs especially with continuous treatments. The default is 0 (i.e., no trimming).
+}
+\item{\code{subclass}}{\code{integer}; the number of subclasses to use for computing weights using marginal mean weighting through stratification (MMWS). If \code{NULL}, standard inverse probability weights (and their extensions) will be computed; if a number greater than 1, subclasses will be formed and weights will be computed based on subclass membership. Only allowed for binary and multi-category treatments. See \code{\link[=get_w_from_ps]{get_w_from_ps()}} for details and references.
 }
 \item{\code{distribution}}{A string with the distribution used in the loss function of the boosted model. This is supplied to the \code{distribution} argument in \pkgfun{gbm}{gbm.fit}. For binary treatments, \code{"bernoulli"} and \code{"adaboost"} are available, with \code{"bernoulli"} the default. For multi-category treatments, only \code{"multinomial"} is allowed. For continuous treatments \code{"gaussian"}, \code{"laplace"}, and \code{"tdist"} are available, with \code{"gaussian"} the default. This argument is tunable.
 }
@@ -173,6 +175,7 @@ no random components in the model.
 
 \section{Additional Outputs}{
 
+
 \describe{
 \item{\code{info}}{
 A list with the following entries:
@@ -180,7 +183,7 @@ A list with the following entries:
 \item{\code{best.tree}}{
 The number of trees at the optimum. If this is close to \code{n.trees}, \code{weightit()} should be rerun with a larger value for \code{n.trees}, and \code{start.tree} can be set to just below \code{best.tree}. When other parameters are tuned, this is the best tree value in the best combination of tuned parameters. See example.}
 \item{\code{tree.val}}{
-A data frame with two columns: the first is the number of trees and the second is the value of the criterion corresponding to that tree. Running \code{\link[=plot]{plot()}} on this object will plot the criterion by the number of trees and is a good way to see patterns in the relationship between them and to determine if more trees are needed. When other parameters are tuned, these are the number of trees and the criterion values in the best combination of tuned parameters. See example.}
+A data frame with two columns: the first is the number of trees and the second is the value of the criterion corresponding to that tree. When other parameters are tuned, these are the number of trees and the criterion values in the best combination of tuned parameters. See example.}
 }
 If any arguments are to be tuned (i.e., they have been supplied more than one value), the following two additional components are included in \code{info}:
 \describe{
@@ -197,8 +200,7 @@ When \code{include.obj = TRUE}, the \code{gbm} fit used to generate the predicte
 }
 
 \examples{
-\dontshow{if (requireNamespace("gbm", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
-library("cobalt")
+\dontshow{if (rlang::is_installed("gbm")) withAutoprint(\{ # examplesIf}
 data("lalonde", package = "cobalt")
 
 #Balancing covariates between treatment groups (binary)
@@ -207,92 +209,93 @@ data("lalonde", package = "cobalt")
                 method = "gbm", estimand = "ATE",
                 criterion = "smd.max",
                 use.offset = TRUE))
+
 summary(W1)
-bal.tab(W1)
+
+cobalt::bal.tab(W1)
 
 # View information about the fitting process
 W1$info$best.tree #best tree
+
 plot(W1) #plot of criterion value against number of trees
 
-\donttest{
-  #Balancing covariates with respect to race (multi-category)
-  (W2 <- weightit(race ~ age + educ + married +
-                    nodegree + re74, data = lalonde,
-                  method = "gbm", estimand = "ATT",
-                  focal = "hispan", criterion = "ks.mean"))
-  summary(W2)
-  bal.tab(W2, stats = c("m", "ks"))
+\donttest{#Balancing covariates with respect to race (multi-category)
+(W2 <- weightit(race ~ age + educ + married +
+                  nodegree + re74, data = lalonde,
+                method = "gbm", estimand = "ATT",
+                focal = "hispan", criterion = "ks.mean"))
 
-  #Balancing covariates with respect to re75 (continuous)
-  (W3 <- weightit(re75 ~ age + educ + married +
-                    nodegree + re74, data = lalonde,
-                  method = "gbm", density = "kernel",
-                  criterion = "p.rms", trim.at = .97))
-  summary(W3)
-  bal.tab(W3)
+summary(W2)
 
-  #Using a t(3) density and illustrating the search for
-  #more trees.
-  W4a <- weightit(re75 ~ age + educ + married +
-                    nodegree + re74, data = lalonde,
-                  method = "gbm", density = "dt_3",
-                  criterion = "p.max",
-                  n.trees = 10000)
+cobalt::bal.tab(W2, stats = c("m", "ks"))
 
-  W4a$info$best.tree #10000; optimum hasn't been found
-  plot(W4a) #decreasing at right edge
+#Balancing covariates with respect to re75 (continuous)
+(W3 <- weightit(re75 ~ age + educ + married +
+                  nodegree + re74, data = lalonde,
+                method = "gbm", density = "kernel",
+                criterion = "p.rms", trim.at = .97))
 
-  W4b <- weightit(re75 ~ age + educ + married +
-                    nodegree + re74, data = lalonde,
-                  method = "gbm", density = "dt_3",
-                  criterion = "p.max",
-                  start.tree = 10000,
-                  n.trees = 20000)
+summary(W3)
 
-  W4b$info$best.tree #13417; optimum has been found
-  plot(W4b) #increasing at right edge
+cobalt::bal.tab(W3)
 
-  bal.tab(W4b)
+#Using a t(3) density and illustrating the search for
+#more trees.
+W4a <- weightit(re75 ~ age + educ + married +
+                  nodegree + re74, data = lalonde,
+                method = "gbm", density = "dt_3",
+                criterion = "p.max",
+                n.trees = 10000)
 
-  #Tuning hyperparameters
-  (W5 <- weightit(treat ~ age + educ + married +
-                    nodegree + re74, data = lalonde,
-                  method = "gbm", estimand = "ATT",
-                  criterion = "ks.max",
-                  interaction.depth = 2:4,
-                  distribution = c("bernoulli", "adaboost")))
+W4a$info$best.tree #10000; optimum hasn't been found
 
-  W5$info$tune
+plot(W4a) #decreasing at right edge
 
-  W5$info$best.tune #Best values of tuned parameters
-  plot(W5) #plot criterion values against number of trees
+W4b <- weightit(re75 ~ age + educ + married +
+                  nodegree + re74, data = lalonde,
+                method = "gbm", density = "dt_3",
+                criterion = "p.max",
+                start.tree = 10000,
+                n.trees = 20000)
 
-  bal.tab(W5, stats = c("m", "ks"))
+W4b$info$best.tree #13417; optimum has been found
+
+plot(W4b) #increasing at right edge
+
+cobalt::bal.tab(W4b)
+
+#Tuning hyperparameters
+(W5 <- weightit(treat ~ age + educ + married +
+                  nodegree + re74, data = lalonde,
+                method = "gbm", estimand = "ATT",
+                criterion = "ks.max",
+                interaction.depth = 2:4,
+                distribution = c("bernoulli", "adaboost")))
+
+W5$info$tune
+
+W5$info$best.tune #Best values of tuned parameters
+
+plot(W5) #plot criterion values against number of trees
+
+cobalt::bal.tab(W5, stats = c("m", "ks"))
 }
 \dontshow{\}) # examplesIf}
 }
 \references{
 \subsection{Binary treatments}{
 
-McCaffrey, D. F., Ridgeway, G., & Morral, A. R. (2004). Propensity Score
-Estimation With Boosted Regression for Evaluating Causal Effects in
-Observational Studies. \emph{Psychological Methods}, 9(4), 403–425.
-\doi{10.1037/1082-989X.9.4.403}
+McCaffrey, D. F., Ridgeway, G., & Morral, A. R. (2004). Propensity Score Estimation With Boosted Regression for Evaluating Causal Effects in Observational Studies. \emph{Psychological Methods}, 9(4), 403–425. \doi{10.1037/1082-989X.9.4.403}
 }
 
 \subsection{Multi-Category Treatments}{
 
-McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand,
-R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for
-Multiple Treatments Using Generalized Boosted Models. \emph{Statistics in
-Medicine}, 32(19), 3388–3414. \doi{10.1002/sim.5753}
+McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand, R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for Multiple Treatments Using Generalized Boosted Models. \emph{Statistics in Medicine}, 32(19), 3388–3414. \doi{10.1002/sim.5753}
 }
 
 \subsection{Continuous treatments}{
 
-Zhu, Y., Coffman, D. L., & Ghosh, D. (2015). A Boosting Algorithm for
-Estimating Generalized Propensity Scores with Continuous Treatments. \emph{Journal
-of Causal Inference}, 3(1). \doi{10.1515/jci-2014-0022}
+Zhu, Y., Coffman, D. L., & Ghosh, D. (2015). A Boosting Algorithm for Estimating Generalized Propensity Scores with Continuous Treatments. \emph{Journal of Causal Inference}, 3(1). \doi{10.1515/jci-2014-0022}
 }
 }
 \seealso{

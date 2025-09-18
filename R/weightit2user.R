@@ -1,6 +1,5 @@
 #' User-Defined Functions for Estimating Weights
 #' @name method_user
-#' @aliases method_user
 #' @usage NULL
 #'
 #' @description
@@ -20,12 +19,11 @@
 #' \item{`estimand`: a character vector of length 1 containing the desired estimand. The characters will have been converted to uppercase. If "ATC" was supplied to estimand, `weightit()` sets `focal` to the control level (usually 0 or the lowest level of `treat`) and sets `estimand` to "ATT".}
 #' \item{`focal`: a character vector of length 1 containing the focal level of the treatment when the estimand is the ATT (or the ATC as detailed above). `weightit()` ensures the value of focal is a level of `treat`.}
 #' \item{`stabilize`: a logical vector of length 1. It is not processed by `weightit()` before it reaches the fitting function.}
-#' \item{`moments`: a numeric vector of length 1. It is not processed by `weightit()` before it reaches the fitting function except that `as.integer()` is applied to it. This is used in other methods to determine whether polynomials of the entered covariates are to be used in the weight estimation.}
-#' \item{`int`: a logical vector of length 1. It is not processed by `weightit()` before it reaches the fitting function. This is used in other methods to determine whether interactions of the entered covariates are to be used in the weight estimation.}
 #' }
+#'
 #' None of these parameters are required to be in the fitting function. These are simply those that are automatically available.
 #'
-#' In addition, any additional arguments supplied to `weightit()` will be passed on to the fitting function. `weightit()` ensures the arguments correspond to the parameters of the fitting function and throws an error if an incorrectly named argument is supplied and the fitting function doesn't include `\dots` as a parameter.
+#' In addition, any additional arguments supplied to `weightit()` will be passed on to the fitting function. `weightit()` ensures the arguments correspond to the parameters of the fitting function and throws an error if an incorrectly named argument is supplied and the fitting function doesn't include `...` as a parameter.
 #'
 #' The fitting function must output either a numeric vector of weights or a list (or list-like object) with an entry named wither "w" or "weights". If a list, the list can contain other named entries, but only entries named "w", "weights", "ps", and "fit.obj" will be processed. "ps" is a vector of propensity scores and "fit.obj" should be an object used in the fitting process that a user may want to examine and that is included in the `weightit` output object as "obj" when `include.obj = TRUE`. The "ps" and "fit.obj" components are optional, but "weights" or "w" is required.
 #'
@@ -33,16 +31,16 @@
 #'
 #' Longitudinal treatments can be handled either by running the fitting function for point treatments for each time point and multiplying the resulting weights together or by running a method that accommodates multiple time points and outputs a single set of weights. For the former, `weightitMSM()` can be used with the user-defined function just as it is with `weightit()`. The latter method is not yet accommodated by `weightitMSM()`, but will be someday, maybe.
 #'
+#' @details NULL
+#'
 #' @seealso
 #' [weightit()], [weightitMSM()]
 #'
 #' @examples
-#'
-#' library("cobalt")
 #' data("lalonde", package = "cobalt")
 #'
 #' #A user-defined version of method = "ps"
-#' my.ps <- function(treat, covs, estimand, focal = NULL) {
+#' my.ps <- function(treat, covs, estimand, focal = NULL, ...) {
 #'   covs <- make_full_rank(covs)
 #'   d <- data.frame(treat, covs)
 #'   f <- formula(d)
@@ -58,7 +56,7 @@
 #'                   nodegree + re74, data = lalonde,
 #'                 method = my.ps, estimand = "ATT"))
 #' summary(W1)
-#' bal.tab(W1)
+#' cobalt::bal.tab(W1)
 #'
 #' data("msmdata")
 #' (W2 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
@@ -71,7 +69,7 @@
 #'                    method = my.ps))
 #'
 #' summary(W2)
-#' bal.tab(W2)
+#' cobalt::bal.tab(W2)
 #'
 #' # Kernel balancing using the `kbal` package, available
 #' # using `pak::pak_install("chadhazlett/KBAL")`.
@@ -81,8 +79,9 @@
 #'   kbal.fun <- function(treat, covs, estimand, focal, verbose, ...) {
 #'     args <- list(...)
 #'
-#'     if (!estimand %in% c("ATT", "ATC"))
+#'     if (!estimand %in% c("ATT", "ATC")) {
 #'       stop('`estimand` must be "ATT" or "ATC".', call. = FALSE)
+#'     }
 #'
 #'     treat <- as.numeric(treat == focal)
 #'
@@ -91,7 +90,7 @@
 #'     args$treatment <- treat
 #'     args$printprogress <- verbose
 #'
-#'     cat_cols <- apply(covs, 2, function(x) length(unique(x)) <= 2)
+#'     cat_cols <- apply(covs, 2L, function(x) length(unique(x)) <= 2)
 #'
 #'     if (all(cat_cols)) {
 #'       args$cat_data <- TRUE
@@ -123,13 +122,13 @@
 #'                   method = kbal.fun, estimand = "ATT",
 #'                   include.obj = TRUE))
 #'   summary(Wk)
-#'   bal.tab(Wk, stats = c("m", "ks"))
+#'   cobalt::bal.tab(Wk, stats = c("m", "ks"))
 #' }
 #'
 NULL
 
 weightit2user <- function(Fun, covs, treat, s.weights, subset, estimand, focal,
-                          stabilize, subclass, missing, ps, moments, int, verbose, ...) {
+                          stabilize, missing, ps, verbose, ...) {
   A <- list(...)
 
   if (is_not_null(covs)) {
@@ -167,7 +166,9 @@ weightit2user <- function(Fun, covs, treat, s.weights, subset, estimand, focal,
     #else just use Fun default
   }
 
-  if (has_dots) fun_args <- c(fun_args, A)
+  if (has_dots) {
+    fun_args <- c(fun_args, A)
+  }
 
   obj <- do.call(Fun, fun_args)
 
@@ -185,7 +186,7 @@ weightit2user <- function(Fun, covs, treat, s.weights, subset, estimand, focal,
     .err("no weights were estimated")
   }
 
-  if (!is.numeric(obj[["w"]]) || is_not_null(dim(obj[["w"]]))) {
+  if (!is.numeric(obj[["w"]]) || length(dim(obj[["w"]])) > 1L) {
     .err('the "w" or "weights" entry of the output of the user-provided function must be a numeric vector of weights')
   }
 
@@ -202,7 +203,7 @@ weightit2user <- function(Fun, covs, treat, s.weights, subset, estimand, focal,
 }
 
 weightitMSM2user <- function(Fun, covs.list, treat.list, s.weights, subset, stabilize,
-                             missing, moments, int, verbose, ...) {
+                             missing, verbose, ...) {
   A <- list(...)
 
   if (is_not_null(covs.list)) {
@@ -244,7 +245,9 @@ weightitMSM2user <- function(Fun, covs.list, treat.list, s.weights, subset, stab
     #else just use Fun default
   }
 
-  if (has_dots) fun_args <- c(fun_args, A)
+  if (has_dots) {
+    fun_args <- c(fun_args, A)
+  }
 
   obj <- do.call(Fun, fun_args)
 
@@ -262,7 +265,7 @@ weightitMSM2user <- function(Fun, covs.list, treat.list, s.weights, subset, stab
     .err("no weights were estimated")
   }
 
-  if (!is.numeric(obj[["w"]]) || is_not_null(dim(obj[["w"]]))) {
+  if (!is.numeric(obj[["w"]]) || length(dim(obj[["w"]])) > 1L) {
     .err('the "w" or "weights" entry of the output of the user-provided function must be a numeric vector of weights')
   }
 

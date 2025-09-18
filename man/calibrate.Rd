@@ -13,18 +13,18 @@ calibrate(x, ...)
 \method{calibrate}{weightit}(x, ...)
 }
 \arguments{
-\item{x}{A \code{weightit} object or a vector of propensity scores. Only binary
+\item{x}{a \code{weightit} object or a vector of propensity scores. Only binary
 treatments are supported.}
 
-\item{\dots}{Not used.}
+\item{\dots}{not used.}
 
-\item{treat}{A vector of treatment status for each unit. Only binary
+\item{treat}{a vector of treatment status for each unit. Only binary
 treatments are supported.}
 
-\item{s.weights}{A vector of sampling weights or the name of a variable in
+\item{s.weights}{a vector of sampling weights or the name of a variable in
 \code{data} that contains sampling weights.}
 
-\item{data}{An optional data frame containing the variable named in
+\item{data}{an optional data frame containing the variable named in
 \code{s.weights} when supplied as a string.}
 
 \item{method}{\code{character}; the method of calibration used. Allowable options
@@ -48,7 +48,7 @@ regression with the previously estimated propensity score as the sole
 predictor. Weights are computed using this new propensity score.
 }
 \examples{
-\dontshow{if (requireNamespace("gbm", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (rlang::is_installed("gbm")) withAutoprint(\{ # examplesIf}
 library("cobalt")
 data("lalonde", package = "cobalt")
 
@@ -72,8 +72,8 @@ Probability Weighting by Post-calibrating Its Propensity Scores.
 \emph{Epidemiology}, 35(4). \doi{10.1097/EDE.0000000000001733}
 
 van der Laan, L., Lin, Z., Carone, M., & Luedtke, A. (2024). Stabilized
-Inverse Probability Weighting via Isotonic Calibration (arXiv:2411.06342).
-arXiv. \url{http://arxiv.org/abs/2411.06342}
+Inverse Probability Weighting via Isotonic Calibration.
+arXiv. \url{https://arxiv.org/abs/2411.06342}
 }
 \seealso{
 \code{\link[=weightit]{weightit()}}, \code{\link[=weightitMSM]{weightitMSM()}}

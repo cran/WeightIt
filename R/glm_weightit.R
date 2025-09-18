@@ -1,6 +1,7 @@
 #' Fitting Weighted Generalized Linear Models
 #'
-#' @description `glm_weightit()` is used to fit generalized linear models with a
+#' @description
+#' `glm_weightit()` is used to fit generalized linear models with a
 #' covariance matrix that accounts for estimation of weights, if supplied.
 #' `lm_weightit()` is a wrapper for `glm_weightit()` with the Gaussian family
 #' and identity link (i.e., a linear model). `ordinal_weightit()` fits
@@ -22,7 +23,7 @@
 #'   used in the model. This can be a character string naming a family function,
 #'   a family function or the result of a call to a family function. See
 #'   [family] for details of family functions.
-#' @param link for `plor_weightit()` and `multinom_weightit()`, a string
+#' @param link for `ordinal_weightit()` and `multinom_weightit()`, a string
 #'   corresponding to the desired link function. For `ordinal_weightit()`, any
 #'   allowed by [binomial()] are accepted; for `multinom_weightit()`, only
 #'   `"logit"` is allowed. Default is `"logit"` for ordinal or multinomial
@@ -72,9 +73,10 @@
 #' @param \dots arguments to be used to form the default control argument if it
 #'   is not supplied directly.
 #'
-#' @returns For `lm_weightit()` and `glm_weightit()`, a `glm_weightit` object,
+#' @returns
+#' For `lm_weightit()` and `glm_weightit()`, a `glm_weightit` object,
 #' which inherits from `glm`. For `ordinal_weightit()` and
-#' `multinom_weightit()`, an `ordinal_weightit` or `multinom_weightit`,
+#' `multinom_weightit()`, an `ordinal_weightit` or `multinom_weightit` object,
 #' respectively. For `coxph_weightit()`, a `coxph_weightit` object, which
 #' inherits from `coxph`. See [survival::coxph()] for details.
 #'
@@ -91,7 +93,8 @@
 #' sampling weights, which will be 1 if `s.weights` is not supplied in the
 #' original `weightit()` call.
 #'
-#' @details [glm_weightit()] is essentially a wrapper for [glm()] that
+#' @details
+#' [glm_weightit()] is essentially a wrapper for [glm()] that
 #' optionally computes a coefficient variance matrix that can be adjusted to
 #' account for estimation of the weights if a `weightit` or `weightitMSM` object
 #' is supplied to the `weightit` argument. When no argument is supplied to
@@ -116,8 +119,8 @@
 #' important to set a seed using `set.seed()` to ensure replicability of the
 #' results. The fractional weighted bootstrap is more reliable but requires the
 #' weighting method to accept sampling weights (which most do, and you'll get an
-#' error if it doesn't). Setting `vcov = "FWB"` and supplying `fwb.args =
-#' list(wtype = "multinom")` also performs the resampling-based bootstrap but
+#' error if it doesn't). Setting `vcov = "FWB"` and supplying `fwb.args = list(wtype = "multinom")`
+#' also performs the resampling-based bootstrap but
 #' with the additional features \pkg{fwb} provides (e.g., a progress bar and
 #' parallelization) at the expense of needing to have \pkg{fwb} installed.
 #'
@@ -147,17 +150,17 @@
 #' estimation of the weights (i.e., because no `weightit` argument was supplied
 #' or there was no `"Mparts"` component in the supplied object), the default
 #' variance matrix produced by `glm_weightit()` should align with that from
-#' `sandwich::vcovHC(. type = "HC0")` or `sandwich::vcovCL(., type = "HC0",
-#' cluster = cluster)` when `cluster` is supplied. Not all types are available
+#' `sandwich::vcovHC(. type = "HC0")` or `sandwich::vcovCL(., type = "HC0", cluster = cluster)`
+#' when `cluster` is supplied. Not all types are available
 #' for all models.
 #'
-#' @seealso [lm()] and [glm()] for fitting generalized linear models without
+#' @seealso
+#' [lm()] and [glm()] for fitting generalized linear models without
 #' adjusting standard errors for estimation of the weights. [survival::coxph()]
 #' for fitting Cox proportional hazards models without adjusting standard errors
 #' for estimation of the weights.
 #'
 #' @examples
-#'
 #' data("lalonde", package = "cobalt")
 #'
 #' # Logistic regression ATT weights
@@ -175,12 +178,14 @@
 #' # Linear regression outcome model that treats weights
 #' # as fixed
 #' fit2 <- lm_weightit(re78 ~ treat, data = lalonde,
-#'                     weightit = w.out, vcov = "HC0")
+#'                     weightit = w.out,
+#'                     vcov = "HC0")
 #'
 #' summary(fit2)
-#' @examplesIf requireNamespace("fwb", quietly = TRUE)
-#' # example code
 #'
+#' # Can also just call summary() with `vcov` option
+#' summary(fit1, vcov = "HC0")
+#' @examplesIf rlang::is_installed("fwb")
 #' # Linear regression outcome model that bootstraps
 #' # estimation of weights and outcome model fitting
 #' # using fractional weighted bootstrap with "Mammen"

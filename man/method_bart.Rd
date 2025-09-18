@@ -33,8 +33,9 @@ Weights can also be computed using marginal mean weighting through
 stratification for the ATE, ATT, and ATC. See \code{\link[=get_w_from_ps]{get_w_from_ps()}} for details.
 }
 
-\subsection{Continuous Treatments For continuous treatments, weights are estimated as}{
+\subsection{Continuous Treatments}{
 
+For continuous treatments, weights are estimated as
 \eqn{w_i = f_A(a_i) / f_{A|X}(a_i)}, where \eqn{f_A(a_i)} (known as the
 stabilization factor) is the unconditional density of treatment evaluated the
 observed treatment value and \eqn{f_{A|X}(a_i)} (known as the generalized
@@ -98,13 +99,14 @@ functional form and without overfitting.
 BART has a random component, so some work must be done to ensure
 reproducibility across runs. See the \emph{Reproducibility} section at
 \pkgfun{dbarts}{bart2} for more details. To ensure reproducibility, one can
-do one of two things: 1) supply an argument to \code{seed}, which is passed to
-\code{dbarts::bart2()} and sets the seed for single- and multi-threaded uses, or
-2) call \code{\link[=set.seed]{set.seed()}}, though this only ensures reproducibility when using
-single-threading, which can be requested by setting \code{n.threads = 1}. Note
-that to ensure reproducibility on any machine, regardless of the number of
-cores available, one should use single-threading and either supply \code{seed} or
+do one of two things:
+\enumerate{
+\item supply an argument to \code{seed}, which is passed to \code{dbarts::bart2()} and sets the seed for single- and multi-threaded uses, or
+\item call \code{\link[=set.seed]{set.seed()}} and set \code{n.threads = 1} to use single-threading.
+Note that to ensure reproducibility on any machine, regardless of the number of
+cores available, one should use single-threading by setting \code{n.threads = 1} and either supply \code{seed} or
 call \code{set.seed()}.
+}
 }
 }
 \section{Additional Arguments}{
@@ -118,7 +120,17 @@ or \code{weightitMSM()}, with the following exceptions:
 \item \code{sampleronly} is always set to \code{FALSE}
 }
 
-For continuous treatments only, the following arguments may be supplied:
+For binary and multi-category treatments, the following arguments may be supplied:
+\describe{
+\item{\code{subclass}}{\code{integer}; the number of subclasses to use for computing
+weights using marginal mean weighting through stratification (MMWS). If \code{NULL},
+standard inverse probability weights (and their extensions) will be
+computed; if a number greater than 1, subclasses will be formed and weights
+will be computed based on subclass membership. See \code{\link[=get_w_from_ps]{get_w_from_ps()}} for
+details and references.}
+}
+
+For continuous treatments, the following arguments may be supplied:
 \describe{
 \item{\code{density}}{A function corresponding to the conditional density of the treatment. The standardized residuals of the treatment model will be fed through this function to produce the numerator and denominator of the generalized propensity score weights. If blank, \code{\link[=dnorm]{dnorm()}} is used as recommended by Robins et al. (2000). This can also be supplied as a string containing the name of the function to be called. If the string contains underscores, the call will be split by the underscores and the latter splits will be supplied as arguments to the second argument and beyond. For example, if \code{density = "dt_2"} is specified, the density used will be that of a t-distribution with 2 degrees of freedom. Using a t-distribution can be useful when extreme outcome values are observed (Naimi et al., 2014).
 
@@ -138,32 +150,36 @@ When \code{include.obj = TRUE}, the \code{bart2} fit(s) used to generate the pre
 }
 
 \examples{
-\dontshow{if (requireNamespace("dbarts", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
-\donttest{library("cobalt")
-data("lalonde", package = "cobalt")
+\dontshow{if (rlang::is_installed("dbarts")) withAutoprint(\{ # examplesIf}
+\donttest{data("lalonde", package = "cobalt")
 
 #Balancing covariates between treatment groups (binary)
 (W1 <- weightit(treat ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "bart", estimand = "ATT"))
+
 summary(W1)
-bal.tab(W1)
+
+cobalt::bal.tab(W1)
 
 #Balancing covariates with respect to race (multi-category)
 (W2 <- weightit(race ~ age + educ + married +
                 nodegree + re74, data = lalonde,
                 method = "bart", estimand = "ATE"))
+
 summary(W2)
-bal.tab(W2)
+
+cobalt::bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
 #assuming t(3) conditional density for treatment
 (W3 <- weightit(re75 ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "bart", density = "dt_3"))
- summary(W3)
- bal.tab(W3)
-}
+
+summary(W3)
+
+cobalt::bal.tab(W3)}
 \dontshow{\}) # examplesIf}
 }
 \references{

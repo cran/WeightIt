@@ -39,7 +39,7 @@ matters when \code{treat} has values other than 0 and 1 and when \code{ps} is gi
 as a vector or an unnamed single-column matrix or data frame.}
 
 \item{subclass}{\code{numeric}; the number of subclasses to use when computing
-weights using marginal mean weighting through stratification (also known as
+weights using marginal mean weighting through stratification (MMWS; also known as
 fine stratification). If \code{NULL}, standard inverse probability weights (and
 their extensions) will be computed; if a number greater than 1, subclasses
 will be formed and weights will be computed based on subclass membership.
@@ -135,7 +135,6 @@ known as fine stratification weights and described by Desai et al. (2017).
 }
 }
 \examples{
-
 library("cobalt")
 data("lalonde", package = "cobalt")
 
@@ -247,7 +246,7 @@ R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for
 Multiple Treatments Using Generalized Boosted Models. Statistics in Medicine,
 32(19), 3388–3414. \doi{10.1002/sim.5753}
 \itemize{
-\item Marginal mean weighting through stratification
+\item Marginal mean weighting through stratification (MMWS)
 }
 
 Hong, G. (2012). Marginal mean weighting through stratification: A

@@ -19,12 +19,11 @@ The following arguments are automatically passed to the user-defined function, w
 \item{\code{estimand}: a character vector of length 1 containing the desired estimand. The characters will have been converted to uppercase. If "ATC" was supplied to estimand, \code{weightit()} sets \code{focal} to the control level (usually 0 or the lowest level of \code{treat}) and sets \code{estimand} to "ATT".}
 \item{\code{focal}: a character vector of length 1 containing the focal level of the treatment when the estimand is the ATT (or the ATC as detailed above). \code{weightit()} ensures the value of focal is a level of \code{treat}.}
 \item{\code{stabilize}: a logical vector of length 1. It is not processed by \code{weightit()} before it reaches the fitting function.}
-\item{\code{moments}: a numeric vector of length 1. It is not processed by \code{weightit()} before it reaches the fitting function except that \code{as.integer()} is applied to it. This is used in other methods to determine whether polynomials of the entered covariates are to be used in the weight estimation.}
-\item{\code{int}: a logical vector of length 1. It is not processed by \code{weightit()} before it reaches the fitting function. This is used in other methods to determine whether interactions of the entered covariates are to be used in the weight estimation.}
 }
+
 None of these parameters are required to be in the fitting function. These are simply those that are automatically available.
 
-In addition, any additional arguments supplied to \code{weightit()} will be passed on to the fitting function. \code{weightit()} ensures the arguments correspond to the parameters of the fitting function and throws an error if an incorrectly named argument is supplied and the fitting function doesn't include \verb{\\dots} as a parameter.
+In addition, any additional arguments supplied to \code{weightit()} will be passed on to the fitting function. \code{weightit()} ensures the arguments correspond to the parameters of the fitting function and throws an error if an incorrectly named argument is supplied and the fitting function doesn't include \code{...} as a parameter.
 
 The fitting function must output either a numeric vector of weights or a list (or list-like object) with an entry named wither "w" or "weights". If a list, the list can contain other named entries, but only entries named "w", "weights", "ps", and "fit.obj" will be processed. "ps" is a vector of propensity scores and "fit.obj" should be an object used in the fitting process that a user may want to examine and that is included in the \code{weightit} output object as "obj" when \code{include.obj = TRUE}. The "ps" and "fit.obj" components are optional, but "weights" or "w" is required.
 }
@@ -35,12 +34,10 @@ Longitudinal treatments can be handled either by running the fitting function fo
 }
 }
 \examples{
-
-library("cobalt")
 data("lalonde", package = "cobalt")
 
 #A user-defined version of method = "ps"
-my.ps <- function(treat, covs, estimand, focal = NULL) {
+my.ps <- function(treat, covs, estimand, focal = NULL, ...) {
   covs <- make_full_rank(covs)
   d <- data.frame(treat, covs)
   f <- formula(d)
@@ -56,7 +53,7 @@ my.ps <- function(treat, covs, estimand, focal = NULL) {
                   nodegree + re74, data = lalonde,
                 method = my.ps, estimand = "ATT"))
 summary(W1)
-bal.tab(W1)
+cobalt::bal.tab(W1)
 
 data("msmdata")
 (W2 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
@@ -69,7 +66,7 @@ data("msmdata")
                    method = my.ps))
 
 summary(W2)
-bal.tab(W2)
+cobalt::bal.tab(W2)
 
 # Kernel balancing using the `kbal` package, available
 # using `pak::pak_install("chadhazlett/KBAL")`.
@@ -79,8 +76,9 @@ bal.tab(W2)
   kbal.fun <- function(treat, covs, estimand, focal, verbose, ...) {
     args <- list(...)
 
-    if (!estimand \%in\% c("ATT", "ATC"))
+    if (!estimand \%in\% c("ATT", "ATC")) {
       stop('`estimand` must be "ATT" or "ATC".', call. = FALSE)
+    }
 
     treat <- as.numeric(treat == focal)
 
@@ -89,7 +87,7 @@ bal.tab(W2)
     args$treatment <- treat
     args$printprogress <- verbose
 
-    cat_cols <- apply(covs, 2, function(x) length(unique(x)) <= 2)
+    cat_cols <- apply(covs, 2L, function(x) length(unique(x)) <= 2)
 
     if (all(cat_cols)) {
       args$cat_data <- TRUE
@@ -121,7 +119,7 @@ bal.tab(W2)
                   method = kbal.fun, estimand = "ATT",
                   include.obj = TRUE))
   summary(Wk)
-  bal.tab(Wk, stats = c("m", "ks"))
+  cobalt::bal.tab(Wk, stats = c("m", "ks"))
 }
 
 }

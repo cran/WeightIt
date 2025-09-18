@@ -1,6 +1,7 @@
 #' Generate Balancing Weights for Longitudinal Treatments
 #'
-#' @description `weightitMSM()` allows for the easy generation of balancing
+#' @description
+#' `weightitMSM()` allows for the easy generation of balancing
 #' weights for marginal structural models for time-varying treatments using a
 #' variety of available methods for binary, continuous, and multi-category
 #' treatments. Many of these methods exist in other packages, which [weightit()]
@@ -40,42 +41,43 @@
 #'   also be a list of one-sided formulas, one for each time point. Unless you
 #'   know what you are doing, we recommend setting `stabilize = TRUE` and
 #'   ignoring `num.formula`.
-#' @param include.obj whether to include in the output a list of the fit objects
+#' @param include.obj `logical`; whether to include in the output a list of the fit objects
 #'   created in the process of estimating the weights at each time point. For
 #'   example, with `method = "glm"`, a list of the `glm` objects containing the
 #'   propensity score models at each time point will be included. See the help
 #'   pages for each method for information on what object will be included if
 #'   `TRUE`.
-#' @param is.MSM.method whether the method estimates weights for multiple time
+#' @param is.MSM.method `logical`; whether the method estimates weights for multiple time
 #'   points all at once (`TRUE`) or by estimating weights at each time point and
 #'   then multiplying them together (`FALSE`). This is only relevant for
 #'   user-specified functions.
-#' @param weightit.force several methods are not valid for estimating weights
+#' @param weightit.force `logical`; several methods are not valid for estimating weights
 #'   with longitudinal treatments, and will produce an error message if
 #'   attempted. Set to `TRUE` to bypass this error message.
-#' @param ...  other arguments for functions called by `weightit()` that control
+#' @param ... other arguments for functions called by `weightit()` that control
 #'   aspects of fitting that are not covered by the above arguments. See Details
 #'   at [weightit()].
 #'
-#' @returns A `weightitMSM` object with the following elements:
-#' \item{weights}{The estimated weights, one for each unit.} \item{treat.list}{A
-#' list of the values of the time-varying treatment variables.}
-#' \item{covs.list}{A list of the covariates used in the fitting at each time
-#' point. Only includes the raw covariates, which may have been altered in the
-#' fitting process.} \item{data}{The data.frame originally entered to
-#' `weightitMSM()`.} \item{estimand}{"ATE", currently the only estimand for MSMs
-#' with binary or multi-category treatments.} \item{method}{The weight
-#' estimation method specified.} \item{ps.list}{A list of the estimated
-#' propensity scores (if any) at each time point.} \item{s.weights}{The provided
-#' sampling weights.} \item{by}{A data.frame containing the `by` variable when
-#' specified.} \item{stabilization}{The stabilization factors, if any.}
+#' @returns
+#' A `weightitMSM` object with the following elements:
+#' \item{weights}{The estimated weights, one for each unit.}
+#' \item{treat.list}{A list of the values of the time-varying treatment variables.}
+#' \item{covs.list}{A list of the covariates used in the fitting at each time point. Only includes the raw covariates, which may have been altered in the fitting process.}
+#' \item{data}{The data.frame originally entered to `weightitMSM()`.}
+#' \item{estimand}{"ATE", currently the only estimand for MSMs with binary or multi-category treatments.}
+#' \item{method}{The weight estimation method specified.}
+#' \item{ps.list}{A list of the estimated propensity scores (if any) at each time point.}
+#' \item{s.weights}{The provided sampling weights.}
+#' \item{by}{A data.frame containing the `by` variable when specified.}
+#' \item{stabilization}{The stabilization factors, if any.}
 #'
 #' When `keep.mparts` is `TRUE` (the default) and the chosen method is
 #' compatible with M-estimation, the components related to M-estimation for use
 #' in [glm_weightit()] are stored in the `"Mparts.list"` attribute. When `by` is
 #' specified, `keep.mparts` is set to `FALSE`.
 #'
-#' @details Currently only "wide" data sets, where each row corresponds to a
+#' @details
+#' Currently only "wide" data sets, where each row corresponds to a
 #' unit's entire variable history, are supported. You can use [reshape()] or
 #' other functions to transform your data into this format; see example below.
 #'
@@ -98,18 +100,15 @@
 #' approach to generating weights than simply estimating several time-specific
 #' models.
 #'
-#' @seealso [weightit()] for information on the allowable methods
+#' @seealso
+#' [weightit()] for information on the allowable methods
 #'
 #' [summary.weightitMSM()] for summarizing the weights
 #'
-#' @references Cole, S. R., & Hernán, M. A. (2008). Constructing Inverse
-#' Probability Weights for Marginal Structural Models. American Journal of
-#' Epidemiology, 168(6), 656–664. \doi{10.1093/aje/kwn164}
+#' @references
+#' Cole, S. R., & Hernán, M. A. (2008). Constructing Inverse Probability Weights for Marginal Structural Models. *American Journal of Epidemiology*, 168(6), 656–664. \doi{10.1093/aje/kwn164}
 #'
 #' @examples
-#'
-#' library("cobalt")
-#'
 #' data("msmdata")
 #' (W1 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
 #'                         A_2 ~ X1_1 + X2_1 +
@@ -120,9 +119,9 @@
 #'                    data = msmdata,
 #'                    method = "glm"))
 #' summary(W1)
-#' bal.tab(W1)
+#' cobalt::bal.tab(W1)
 #'
-#' #Using stabilization factors
+#' # Using stabilization factors
 #' W2 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
 #'                         A_2 ~ X1_1 + X2_1 +
 #'                           A_1 + X1_0 + X2_0,
@@ -136,8 +135,8 @@
 #'                                       ~ A_1,
 #'                                       ~ A_1 + A_2))
 #'
-#' #Same as above but with fully saturated stabilization factors
-#' #(i.e., making the last entry in 'num.formula' A_1*A_2)
+#' # Same as above but with fully saturated stabilization factors
+#' # (i.e., making the last entry in 'num.formula' A_1*A_2)
 #' W3 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
 #'                         A_2 ~ X1_1 + X2_1 +
 #'                           A_1 + X1_0 + X2_0,
@@ -151,8 +150,7 @@
 #' @export
 weightitMSM <- function(formula.list, data = NULL, method = "glm",
                         stabilize = FALSE, by = NULL,
-                        s.weights = NULL, num.formula = NULL, moments = NULL,
-                        int = FALSE, missing = NULL, verbose = FALSE,
+                        s.weights = NULL, num.formula = NULL, missing = NULL, verbose = FALSE,
                         include.obj = FALSE, keep.mparts = TRUE,
                         is.MSM.method, weightit.force = FALSE, ...) {
 
@@ -195,7 +193,7 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
     by.arg <- "by"
   }
 
-  reported.covs.list <- covs.list <- treat.list <- w.list <- ps.list <-
+  reported.covs.list <- simple.covs.list <- covs.list <- treat.list <- w.list <- ps.list <-
     stabout <- sw.list <- Mparts.list <- stab.Mparts.list <- make_list(length(formula.list))
 
   if (is_null(formula.list) || !is.list(formula.list) ||
@@ -206,13 +204,12 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
   for (i in seq_along(formula.list)) {
 
     #Process treat and covs from formula and data
-    t.c <- get_covs_and_treat_from_formula(formula.list[[i]], data)
+    t.c <- get_covs_and_treat_from_formula2(formula.list[[i]], data)
+    simple.covs.list[[i]] <- t.c[["simple.covs"]]
     reported.covs.list[[i]] <- t.c[["reported.covs"]]
+
     covs.list[[i]] <- t.c[["model.covs"]]
     treat.list[[i]] <- t.c[["treat"]]
-    treat.name <- t.c[["treat.name"]]
-    names(treat.list)[i] <- treat.name
-    names(reported.covs.list)[i] <- treat.name
 
     if (is_null(covs.list[[i]])) {
       .err(sprintf("no covariates were specified in the %s formula", ordinal(i)))
@@ -228,11 +225,17 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
       .err("treatment and covariates must have the same number of units")
     }
 
-    if (anyNA(treat.list[[i]])) {
-      .err(sprintf("no missing values are allowed in the treatment variable. Missing values found in %s", treat.name))
+    treat.list[[i]] <- as.treat(treat.list[[i]], process = TRUE)
+
+    treat.name <- .attr(treat.list[[i]], "treat.name")
+
+    if (anyNA(treat.list[[i]]) || !all(is.finite(treat.list[[i]]))) {
+      .err(sprintf("no missing or non-finite values are allowed in the treatment variable. Missing or non-finite values found in %s",
+                   treat.name))
     }
 
-    treat.list[[i]] <- assign_treat_type(treat.list[[i]])
+    names(treat.list)[i] <- treat.name
+    names(reported.covs.list)[i] <- treat.name
 
     if (!is.MSM.method) {
       .check_method_treat.type(method, get_treat_type(treat.list[[i]]))
@@ -275,59 +278,17 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
       stabilize <- FALSE
       num.formula <- NULL
     }
-
-    if (is_not_null(num.formula)) {
-      if (rlang::is_formula(num.formula)) {
-        if (!rlang::is_formula(num.formula, lhs = FALSE)) {
-          .err("the argument to `num.formula` must have right hand side variables but not a response variable (e.g., ~ V1 + V2)")
-        }
-
-        rhs.vars.mentioned.lang <- attr(terms(num.formula), "variables")[-1L]
-        rhs.vars.mentioned <- vapply(rhs.vars.mentioned.lang, deparse1, character(1L))
-        rhs.vars.failed <- vapply(rhs.vars.mentioned.lang, function(v) {
-          null_or_error(try(eval(v, c(data, .GlobalEnv)), silent = TRUE))
-        }, logical(1L))
-
-        if (any(rhs.vars.failed)) {
-          .err(paste0(c("All variables in `num.formula` must be variables in `data` or objects in the global environment.\nMissing variables: ",
-                        word_list(rhs.vars.mentioned[rhs.vars.failed], and.or = FALSE))), tidy = FALSE)
-        }
-      }
-      else if (is.list(num.formula)) {
-        if (length(num.formula) != length(formula.list)) {
-          .err("when supplied as a list, `num.formula` must have as many entries as `formula.list`")
-        }
-
-        if (!all_apply(num.formula, rlang::is_formula, lhs = FALSE)) {
-          .err("`num.formula` must be a single formula with no response variable and with the stabilization factors on the right hand side or a list thereof")
-        }
-
-        rhs.vars.mentioned.lang.list <- lapply(num.formula, function(nf) attr(terms(nf), "variables")[-1L])
-        rhs.vars.mentioned <- unique(unlist(lapply(rhs.vars.mentioned.lang.list,
-                                                   function(r) vapply(r, deparse1, character(1L)))))
-        rhs.vars.failed <- vapply(rhs.vars.mentioned, function(v) {
-          null_or_error(try(eval(parse(text = v), c(data, .GlobalEnv)), silent = TRUE))
-        }, logical(1L))
-
-        if (any(rhs.vars.failed)) {
-          .err(paste0(c("All variables in `num.formula` must be variables in `data` or objects in the global environment.\nMissing variables: ",
-                        word_list(rhs.vars.mentioned[rhs.vars.failed], and.or = FALSE))), tidy = FALSE)
-        }
-      }
-      else {
-        .err("`num.formula` must be a single formula with no response variable and with the stabilization factors on the right hand side or a list thereof")
-      }
+    else if (is_not_null(num.formula)) {
+      .check_num.formula(num.formula, data, env = parent.frame(),
+                         formula.list = formula.list)
     }
   }
 
   #Process moments and int
-  m.i.q <- .process_moments_int_quantile(moments = moments,
-                                         int = int,
-                                         quantile = A[["quantile"]],
-                                         method = method)
+  m.i.q <- .process_moments_int_quantile(method = method, ...)
 
   A["s.weights"] <- list(s.weights)
-  A["by.factor"] <- list(attr(processed.by, "by.factor"))
+  A["by.factor"] <- list(.attr(processed.by, "by.factor"))
   A["method"] <- list(method)
   A[c("moments", "int", "quantile")] <- m.i.q[c("moments", "int", "quantile")]
   A["subclass"] <- list(numeric())
@@ -337,7 +298,6 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
 
   if (is.MSM.method) {
     #Returns weights (w)
-
     A["covs.list"] <- list(covs.list)
     A["treat.list"] <- list(treat.list)
     A["stabilize"] <- list(stabilize)
@@ -347,10 +307,9 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
     w <- obj[["weights"]]
     stabout <- NULL
     obj.list <- obj[["fit.obj"]]
-    Mparts.list <- attr(obj, "Mparts")
+    Mparts.list <- .attr(obj, "Mparts")
   }
   else {
-
     if (is_not_null(A[["link"]])) {
       if (length(A[["link"]]) == 1L) {
         A[["link"]] <- rep.int(A[["link"]], length(formula.list))
@@ -382,20 +341,21 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
 
       ## Running models ----
 
-      #Returns weights (w) and propensty score (ps)
+      #Returns weights (w) and propensity score (ps)
       obj <- do.call("weightit.fit", A_i)
 
       w.list[i] <- list(obj[["weights"]])
       ps.list[i] <- list(obj[["ps"]])
       obj.list[i] <- list(obj[["fit.obj"]])
-      Mparts.list[i] <- list(attr(obj, "Mparts"))
+      Mparts.list[i] <- list(.attr(obj, "Mparts"))
 
       if (stabilize) {
         #Process stabilization formulas and get stab weights
         if (rlang::is_formula(num.formula)) {
           if (i == 1L) {
-            stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")),
-                                     as.formula(paste(paste(num.formula, collapse = ""), "+ .")))
+            stab.f <- update(formula.list[[i]], num.formula)
+            # stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")),
+            #                          as.formula(paste(paste(num.formula, collapse = ""), "+ .")))
           }
           else {
             stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~",
@@ -405,23 +365,24 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
           }
         }
         else if (is.list(num.formula)) {
-          stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")),
-                                   as.formula(paste(paste(num.formula[[i]], collapse = ""), "+ .")))
+          stab.f <- update(formula.list[[i]], num.formula[[i]])
+          # stab.f <- update.formula(as.formula(paste(names(treat.list)[i], "~ 1")),
+          #                          as.formula(paste(paste(num.formula[[i]], collapse = ""), "+ .")))
         }
         else {
           if (i == 1L) {
-            stab.f <- as.formula(paste(names(treat.list)[i], "~ 1"))
+            stab.f <- update(formula.list[[i]], ". ~ 1")
           }
           else {
-            stab.f <- as.formula(paste(names(treat.list)[i], "~",
-                                       paste(names(treat.list)[seq_along(names(treat.list)) < i],
-                                             collapse = " * ")))
+            stab.f <- update(formula.list[[i]],
+                             sprintf(". ~ %s", paste(names(treat.list)[seq_along(treat.list) < i],
+                                                     collapse = " * ")))
           }
         }
 
-        stab.t.c_i <- get_covs_and_treat_from_formula(stab.f, data)
+        stab.t.c_i <- get_covs_and_treat_from_formula2(stab.f, data)
 
-        A_i["covs"] <- list(stab.t.c_i[["model.covs"]])
+        A_i["covs"] <- stab.t.c_i["model.covs"]
         A_i["method"] <- list("glm")
         A_i["moments"] <- list(integer())
         A_i["int"] <- list(FALSE)
@@ -432,7 +393,7 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
         sw.list[[i]] <- 1 / sw_obj[["weights"]]
         stabout[[i]] <- stab.f[-2L]
 
-        stab.Mparts.list[i] <- list(attr(sw_obj, "Mparts"))
+        stab.Mparts.list[i] <- list(.attr(sw_obj, "Mparts"))
 
         if (is_not_null(stab.Mparts.list[[i]])) {
           #Invert wfun and compute derivative of inverted wfun
@@ -456,13 +417,17 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
 
       unique.stabout <- unique(stabout)
 
-      if (length(unique.stabout) <= 1L) stabout <- unique.stabout
+      if (length(unique.stabout) <= 1L) {
+        stabout <- unique.stabout
+      }
     }
     else {
       stabout <- NULL
     }
 
-    if (include.obj) names(obj.list) <- names(treat.list)
+    if (include.obj) {
+      names(obj.list) <- names(treat.list)
+    }
   }
 
   if (is_not_null(method) && all_the_same(w)) {
@@ -472,7 +437,7 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
   ## Assemble output object----
   out <- list(weights = w,
               treat.list = treat.list,
-              covs.list = reported.covs.list,
+              covs.list = simple.covs.list,
               estimand = "ATE",
               method = method,
               s.weights = s.weights,
@@ -500,12 +465,27 @@ weightitMSM <- function(formula.list, data = NULL, method = "glm",
 print.weightitMSM <- function(x, ...) {
   treat.types <- vapply(x[["treat.list"]], get_treat_type, character(1L))
 
-  cat(sprintf("A %s object\n", italic(class(x)[1L])))
+  cat(sprintf("A %s object\n", .it(class(x)[1L])))
 
   if (is_not_null(x[["method"]])) {
-    cat(sprintf(" - method: %s (%s)\n",
-                add_quotes(attr(x[["method"]], "name")),
-                .method_to_phrase(x[["method"]])))
+    method_name <- {
+      if (is_not_null(.attr(x[["method"]], "name"))) add_quotes(.attr(x[["method"]], "name"))
+      else if (is.character(x[["method"]])) add_quotes(x[["method"]])
+      else "user-defined"
+    }
+
+    method_note <- {
+      if (is_not_null(.attr(x[["method"]], "package")))
+        sprintf(" (converted from %s)", .it(.attr(x[["method"]], "package")))
+      else if (is_not_null(x[["method"]]))
+        sprintf(" (%s)", .method_to_phrase(x[["method"]]))
+      else
+        ""
+    }
+
+    cat(sprintf(" - method: %s%s\n",
+                method_name,
+                method_note))
   }
   else if (all_the_same(x[["weights"]])) {
     cat(" - method: no weighting\n")
@@ -526,11 +506,12 @@ print.weightitMSM <- function(x, ...) {
     cat(sprintf("    + time %s: %s\n",
                 i,
                 switch(treat.types[i],
-                       "continuous" = "continuous",
-                       "multi-category" = sprintf("%s-category (%s)",
+                       continuous = "continuous",
+                       `multi-category` =,
+                       multinomial = sprintf("%s-category (%s)",
                                                   nunique(x[["treat.list"]][[i]]),
                                                   word_list(levels(x[["treat.list"]][[i]]), and.or = FALSE)),
-                       "binary" = "2-category")))
+                       binary = "2-category")))
   }
 
   if (is_not_null(x[["covs.list"]])) {
@@ -555,7 +536,8 @@ print.weightitMSM <- function(x, ...) {
   }
 
   if (is_not_null(x[["by"]])) {
-    cat(sprintf(" - by: %s\n", word_list(names(x[["by"]]), and.or = FALSE)))
+    cat(sprintf(" - by: %s\n",
+                word_list(names(x[["by"]]), and.or = FALSE)))
   }
 
   if (is_not_null(x$stabilization)) {
@@ -563,35 +545,39 @@ print.weightitMSM <- function(x, ...) {
     if (any_apply(x$stabilization, function(s) is_not_null(all.vars(s)))) {
       cat(paste0("; stabilization factors:\n",
                  if (length(x$stabilization) == 1L) {
-                   sprintf("      %s", word_list(attr(terms(x[["stabilization"]][[1L]]), "term.labels"),
+                   sprintf("      %s", word_list(.attr(terms(x[["stabilization"]][[1L]]), "term.labels"),
                                                  and.or = FALSE))
                  }
                  else {
                    paste(vapply(seq_along(x$stabilization), function(i) {
                      if (i == 1L) {
                        sprintf("    + baseline: %s",
-                               if (is_null(attr(terms(x[["stabilization"]][[i]]), "term.labels"))) "(none)"
-                               else word_list(attr(terms(x[["stabilization"]][[i]]), "term.labels"), and.or = FALSE))
+                               if (is_null(.attr(terms(x[["stabilization"]][[i]]), "term.labels"))) "(none)"
+                               else word_list(.attr(terms(x[["stabilization"]][[i]]), "term.labels"), and.or = FALSE))
                      }
                      else {
                        sprintf("    + after time %s: %s",
                                i - 1L,
-                               word_list(attr(terms(x[["stabilization"]][[i]]), "term.labels"), and.or = FALSE))
+                               word_list(.attr(terms(x[["stabilization"]][[i]]), "term.labels"), and.or = FALSE))
                      }
                    }, character(1L)), collapse = "\n")
                  }))
     }
   }
 
-  trim <- attr(x[["weights"]], "trim")
+  trim <- .attr(x[["weights"]], "trim")
   if (is_not_null(trim)) {
     if (trim < 1) {
-      if (attr(x[["weights"]], "trim.lower")) trim <- c(1 - trim, trim)
-      cat(sprintf(" - weights trimmed at %s\n", word_list(paste0(round(100 * trim, 2L), "%"))))
+      if (.attr(x[["weights"]], "trim.lower")) {
+        trim <- c(1 - trim, trim)
+      }
+
+      cat(sprintf(" - weights trimmed at %s\n",
+                  word_list(paste0(round(100 * trim, 2L), "%"))))
     }
     else {
       cat(sprintf(" - weights trimmed at the %s %s\n",
-                  if (attr(x[["weights"]], "trim.lower")) "top and bottom"
+                  if (.attr(x[["weights"]], "trim.lower")) "top and bottom"
                   else "top",
                   trim))
     }

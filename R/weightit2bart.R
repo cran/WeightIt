@@ -1,9 +1,9 @@
 #' Propensity Score Weighting Using BART
 #' @name method_bart
-#' @aliases method_bart
 #' @usage NULL
 #'
-#' @description This page explains the details of estimating weights from
+#' @description
+#' This page explains the details of estimating weights from
 #' Bayesian additive regression trees (BART)-based propensity scores by setting
 #' `method = "bart"` in the call to [weightit()] or [weightitMSM()]. This method
 #' can be used with binary, multi-category, and continuous treatments.
@@ -31,7 +31,9 @@
 #' Weights can also be computed using marginal mean weighting through
 #' stratification for the ATE, ATT, and ATC. See [get_w_from_ps()] for details.
 #'
-#' ## Continuous Treatments For continuous treatments, weights are estimated as
+#' ## Continuous Treatments
+#'
+#' For continuous treatments, weights are estimated as
 #' \eqn{w_i = f_A(a_i) / f_{A|X}(a_i)}, where \eqn{f_A(a_i)} (known as the
 #' stabilization factor) is the unconditional density of treatment evaluated the
 #' observed treatment value and \eqn{f_{A|X}(a_i)} (known as the generalized
@@ -63,20 +65,31 @@
 #'         First, for each variable with missingness, a new missingness indicator variable is created which takes the value 1 if the original covariate is `NA` and 0 otherwise. The missingness indicators are added to the model formula as main effects. The missing values in the covariates are then replaced with the covariate medians. The weight estimation then proceeds with this new formula and set of covariates. The covariates output in the resulting `weightit` object will be the original covariates with the `NA`s.
 #'       }
 #'     }
+#'
 #' ## M-estimation
 #'
 #' M-estimation is not supported.
 #'
 #' @section Additional Arguments:
 #'
-#'   All arguments to \pkgfun{dbarts}{bart2} can be passed through `weightit()`
-#'   or `weightitMSM()`, with the following exceptions:
+#' All arguments to \pkgfun{dbarts}{bart2} can be passed through `weightit()`
+#' or `weightitMSM()`, with the following exceptions:
 #'
-#'  * `test`, `weights`,`subset`, `offset.test` are ignored
-#'  * `combine.chains` is always set to `TRUE`
-#'  * `sampleronly` is always set to `FALSE`
+#' * `test`, `weights`,`subset`, `offset.test` are ignored
+#' * `combine.chains` is always set to `TRUE`
+#' * `sampleronly` is always set to `FALSE`
 #'
-#'   For continuous treatments only, the following arguments may be supplied:
+#' For binary and multi-category treatments, the following arguments may be supplied:
+#' \describe{
+#'   \item{`subclass`}{`integer`; the number of subclasses to use for computing
+#'   weights using marginal mean weighting through stratification (MMWS). If `NULL`,
+#'   standard inverse probability weights (and their extensions) will be
+#'   computed; if a number greater than 1, subclasses will be formed and weights
+#'   will be computed based on subclass membership. See [get_w_from_ps()] for
+#'   details and references.}
+#' }
+#'
+#' For continuous treatments, the following arguments may be supplied:
 #'   \describe{
 #'     \item{`density`}{A function corresponding to the conditional density of the treatment. The standardized residuals of the treatment model will be fed through this function to produce the numerator and denominator of the generalized propensity score weights. If blank, [dnorm()] is used as recommended by Robins et al. (2000). This can also be supplied as a string containing the name of the function to be called. If the string contains underscores, the call will be split by the underscores and the latter splits will be supplied as arguments to the second argument and beyond. For example, if `density = "dt_2"` is specified, the density used will be that of a t-distribution with 2 degrees of freedom. Using a t-distribution can be useful when extreme outcome values are observed (Naimi et al., 2014).
 #'
@@ -92,7 +105,8 @@
 #'   }
 #' }
 #'
-#' @details BART works by fitting a sum-of-trees model for the treatment or
+#' @details
+#' BART works by fitting a sum-of-trees model for the treatment or
 #' probability of treatment. The number of trees is determined by the `n.trees`
 #' argument. Bayesian priors are used for the hyperparameters, so the result is
 #' a posterior distribution of predicted values for each unit. The mean of these
@@ -114,12 +128,11 @@
 #' BART has a random component, so some work must be done to ensure
 #' reproducibility across runs. See the *Reproducibility* section at
 #' \pkgfun{dbarts}{bart2} for more details. To ensure reproducibility, one can
-#' do one of two things: 1) supply an argument to `seed`, which is passed to
-#' `dbarts::bart2()` and sets the seed for single- and multi-threaded uses, or
-#' 2) call [set.seed()], though this only ensures reproducibility when using
-#' single-threading, which can be requested by setting `n.threads = 1`. Note
-#' that to ensure reproducibility on any machine, regardless of the number of
-#' cores available, one should use single-threading and either supply `seed` or
+#' do one of two things:
+#' 1. supply an argument to `seed`, which is passed to `dbarts::bart2()` and sets the seed for single- and multi-threaded uses, or
+#' 2. call [set.seed()] and set `n.threads = 1` to use single-threading.
+#' Note that to ensure reproducibility on any machine, regardless of the number of
+#' cores available, one should use single-threading by setting `n.threads = 1` and either supply `seed` or
 #' call `set.seed()`.
 #'
 #' @seealso [weightit()], [weightitMSM()], [get_w_from_ps()]
@@ -127,7 +140,8 @@
 #' [`method_super`] for stacking predictions from several machine learning
 #' methods, including BART.
 #'
-#' @references Hill, J., Weiss, C., & Zhai, F. (2011). Challenges With
+#' @references
+#' Hill, J., Weiss, C., & Zhai, F. (2011). Challenges With
 #' Propensity Score Strategies in a High-Dimensional Setting and a Potential
 #' Alternative. *Multivariate Behavioral Research*, 46(3), 477–513.
 #' \doi{10.1080/00273171.2011.570161}
@@ -144,39 +158,40 @@
 #' See [`method_glm`] for additional references on propensity score weighting
 #' more generally.
 #'
-#' @examplesIf requireNamespace("dbarts", quietly = TRUE)
-#' \donttest{library("cobalt")
-#' data("lalonde", package = "cobalt")
+#' @examplesIf rlang::is_installed("dbarts")
+#' \donttest{data("lalonde", package = "cobalt")
 #'
 #' #Balancing covariates between treatment groups (binary)
 #' (W1 <- weightit(treat ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
 #'                 method = "bart", estimand = "ATT"))
+#'
 #' summary(W1)
-#' bal.tab(W1)
+#'
+#' cobalt::bal.tab(W1)
 #'
 #' #Balancing covariates with respect to race (multi-category)
 #' (W2 <- weightit(race ~ age + educ + married +
 #'                 nodegree + re74, data = lalonde,
 #'                 method = "bart", estimand = "ATE"))
+#'
 #' summary(W2)
-#' bal.tab(W2)
+#'
+#' cobalt::bal.tab(W2)
 #'
 #' #Balancing covariates with respect to re75 (continuous)
 #' #assuming t(3) conditional density for treatment
 #' (W3 <- weightit(re75 ~ age + educ + married +
 #'                   nodegree + re74, data = lalonde,
 #'                 method = "bart", density = "dt_3"))
-#'  summary(W3)
-#'  bal.tab(W3)
-#' }
+#'
+#' summary(W3)
+#'
+#' cobalt::bal.tab(W3)}
 NULL
 
 weightit2bart <- function(covs, treat, s.weights, subset, estimand, focal, stabilize,
-                          subclass, missing, verbose, ...) {
-
-  rlang::check_installed("dbarts", version = "0.9-23")
-
+                          missing, verbose, ...) {
   covs <- covs[subset, , drop = FALSE]
   treat <- treat[subset]
   s.weights <- s.weights[subset]
@@ -188,7 +203,7 @@ weightit2bart <- function(covs, treat, s.weights, subset, estimand, focal, stabi
   }
 
   if (ncol(covs) > 1L) {
-    colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
+    colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
     covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
   }
 
@@ -215,22 +230,21 @@ weightit2bart <- function(covs, treat, s.weights, subset, estimand, focal, stabi
     fit <- eval(bart.call)
   }, verbose = verbose)},
   error = function(e) {
-    e. <- conditionMessage(e)
-    .err("(from `dbarts::bart2()`) ", e., tidy = FALSE)
+    .err(sprintf("(from `dbarts::bart2()`): %s",
+                 conditionMessage(e)),
+                 tidy = FALSE)
   })
 
   p.score <- fitted(fit)
 
   w <- .get_w_from_ps_internal_bin(ps = p.score, treat = treat, estimand,
-                                   stabilize = stabilize, subclass = subclass)
+                                   stabilize = stabilize, subclass = ...get("subclass"))
 
   list(w = w, ps = p.score, fit.obj = fit)
 }
 
 weightit2bart.multi <-  function(covs, treat, s.weights, subset, estimand, focal, stabilize,
-                                 subclass, missing, verbose, ...) {
-  rlang::check_installed("dbarts", version = "0.9-23")
-
+                                 missing, verbose, ...) {
   covs <- covs[subset, , drop = FALSE]
   treat <- factor(treat[subset])
   s.weights <- s.weights[subset]
@@ -242,7 +256,7 @@ weightit2bart.multi <-  function(covs, treat, s.weights, subset, estimand, focal
   }
 
   if (ncol(covs) > 1L) {
-    colinear.covs.to.remove <- colnames(covs)[colnames(covs) %nin% colnames(make_full_rank(covs))]
+    colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
     covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
   }
 
@@ -271,8 +285,9 @@ weightit2bart.multi <-  function(covs, treat, s.weights, subset, estimand, focal
       fit.list[[i]] <- eval(bart.call)
     }, verbose = verbose)},
     error = function(e) {
-      e. <- conditionMessage(e)
-      .err("(from `dbarts::bart2()`) ", e., tidy = FALSE)
+      .err(sprintf("(from `dbarts::bart2()`): %s",
+                   conditionMessage(e)),
+           tidy = FALSE)
     })
 
     ps[[i]] <- fitted(fit.list[[i]])
@@ -281,7 +296,7 @@ weightit2bart.multi <-  function(covs, treat, s.weights, subset, estimand, focal
   #ps should be matrix of probs for each treat
   #Computing weights
   w <- .get_w_from_ps_internal_multi(ps = ps, treat = treat, estimand, focal,
-                                     stabilize = stabilize, subclass = subclass)
+                                     stabilize = stabilize, subclass = ...get("subclass"))
 
   list(w = w, fit.obj = fit.list)
 }
@@ -329,8 +344,9 @@ weightit2bart.cont <- function(covs, treat, s.weights, subset, stabilize, missin
     fit <- eval(bart.call)
   }, verbose = verbose)},
   error = function(e) {
-    e. <- conditionMessage(e)
-    .err("(from `dbarts::bart2()`) ", e., tidy = FALSE)
+    .err(sprintf("(from `dbarts::bart2()`): %s",
+                 conditionMessage(e)),
+         tidy = FALSE)
   })
 
   r <- residuals(fit)
@@ -342,8 +358,8 @@ weightit2bart.cont <- function(covs, treat, s.weights, subset, stabilize, missin
   w <- exp(log.dens.num - log.dens.denom)
 
   if (isTRUE(...get("plot"))) {
-    d.n <- attr(log.dens.num, "density")
-    d.d <- attr(log.dens.denom, "density")
+    d.n <- .attr(log.dens.num, "density")
+    d.d <- .attr(log.dens.denom, "density")
     plot_density(d.n, d.d, log = TRUE)
   }
 

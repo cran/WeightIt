@@ -15,7 +15,7 @@
   if (is_null(weights)) weights <- rep.int(1, N)
   else chk::chk_numeric(weights)
 
-  if (is.null(offset)) offset <- rep.int(0, N)
+  if (is_null(offset)) offset <- rep.int(0, N)
   else chk::chk_numeric(offset)
 
   chk::chk_all_equal(c(length(y), nrow(x), length(weights), length(offset)))
@@ -41,7 +41,9 @@
   x_ <- x[, !aliased_X, drop = FALSE]
 
   get_pp <- function(B, X, offset = NULL) {
-    if (length(offset) == 0L) offset <- 0
+    if (is_null(offset)) {
+      offset <- 0
+    }
 
     qq <- exp(offset + X %*% matrix(B, nrow = ncol(X)))
 
@@ -61,8 +63,9 @@
       weights * ((y == i) - pp[, i]) * X
     }))
 
-    if (is_not_null(names(B)))
+    if (is_not_null(names(B))) {
       colnames(out) <- names(B)
+    }
 
     out
   }
@@ -80,9 +83,9 @@
   }
 
   m_control <- list(fnscale = -1, #maximize likelihood; optim() minimizes by default
-                  trace = 0,
-                  maxit = 1e3L,
-                  reltol = 1e-12)
+                    trace = 0,
+                    maxit = 1e3L,
+                    reltol = 1e-12)
 
   control <- utils::modifyList(m_control, control)
 
@@ -120,7 +123,8 @@
               gradient = grad)
 
   if (hess) {
-    hessian <- matrix(NA_real_, nrow = sum(!aliased_B), ncol = sum(!aliased_B))
+    hessian <- sq_matrix(NA_real_, n = sum(!aliased_B),
+                         names = nm[!aliased_B])
 
     for (i in seq_len(K)) {
       i_ind <- (i - 1L) * ncol(x_) + seq_len(ncol(x_))
@@ -136,8 +140,6 @@
         }
       }
     }
-
-    colnames(hessian) <- rownames(hessian) <- nm[!aliased_B]
 
     fit$hessian <- hessian
   }
@@ -164,30 +166,36 @@
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
 
-  mt <- attr(mf, "terms")
+  mt <- .attr(mf, "terms")
+
   Y <- model.response(mf, "any")
   if (length(dim(Y)) == 1L) {
     nm <- rownames(Y)
     dim(Y) <- NULL
-    if (!is.null(nm))
+
+    if (is_not_null(nm)) {
       names(Y) <- nm
+    }
   }
+
   X <- {
-    if (is.empty.model(mt)) matrix(NA_real_, NROW(Y), 0L)
+    if (is.empty.model(mt)) matrix(NA_real_, nrow = NROW(Y), ncol = 0L)
     else model.matrix(mt, mf, contrasts)
   }
 
   weights <- as.vector(model.weights(mf))
-  if (!is.null(weights) && !is.numeric(weights))
+  if (is_not_null(weights) && !is.numeric(weights)) {
     .err("`weights` must be a numeric vector")
+  }
 
-  if (!is.null(weights) && any(weights < 0))
+  if (is_not_null(weights) && any(weights < 0)) {
     .err("negative weights not allowed")
+  }
 
   offset <- as.vector(model.offset(mf))
   if (is_not_null(offset) && length(offset) != NROW(Y)) {
-      .err(gettextf("number of offsets is %d; should equal %d (number of observations)",
-                    length(offset), NROW(Y)), domain = NA)
+    .err(gettextf("number of offsets is %d; should equal %d (number of observations)",
+                  length(offset), NROW(Y)), domain = NA)
   }
 
   fit <- eval(call(".multinom_weightit.fit",
@@ -196,14 +204,15 @@
                    hess = hess, control = control))
 
   if (model) fit$model <- mf
-  fit$na.action <- attr(mf, "na.action")
+  fit$na.action <- .attr(mf, "na.action")
   if (!x) fit$x <- NULL
   if (!y) fit$y <- NULL
 
   c(fit,
     list(call = cal, formula = formula, terms = mt,
          data = data, offset = offset,
-         contrasts = attr(X, "contrasts"), xlevels = .getXlevels(mt, mf)))
+         contrasts = .attr(X, "contrasts"),
+         xlevels = .getXlevels(mt, mf)))
 }
 
 .get_hess_multinom <- function(fit) {
@@ -219,7 +228,7 @@
   }
 
   if (is_null(weights)) {
-    weights <- rep.int(1, length(y))
+    weights <- rep_with(1, y)
   }
 
   K <- nlevels(y) - 1L
@@ -232,7 +241,8 @@
 
   pp <- fit$fitted.values
 
-  hessian <- matrix(NA_real_, nrow = length(theta0), ncol = length(theta0))
+  hessian <- sq_matrix(NA_real_, n = length(theta0),
+                       names = names(theta0))
 
   for (i in seq_len(K)) {
     i_ind <- (i - 1L) * ncol(x_) + seq_len(ncol(x_))
@@ -248,8 +258,6 @@
       }
     }
   }
-
-  colnames(hessian) <- rownames(hessian) <- names(theta0)
 
   hessian
 }

@@ -83,11 +83,11 @@ binary treatments), multinomial logistic regression model (for multi-category
 treatments), or linear regression model (for continuous treatments) that is
 used to compute (generalized) propensity scores, from which the weights are
 computed. It involves replacing (or augmenting, in the case of the
-over-identified version) the standard regression score equations with the
+over-identified version) the standard maximum likelihood score equations with the
 balance constraints in a generalized method of moments estimation. The idea
 is to nudge the estimation of the coefficients toward those that produce
-balance in the weighted sample. The just-identified version (with \code{exact = FALSE}) does away with the score equations for the coefficients so that only
-the balance constraints are used. The just-identified version will therefore
+balance in the weighted sample. The just-identified version (with \code{over = FALSE}) does away with the maximum likelihood score equations for the coefficients so that only
+the balance constraints are used, which will therefore
 produce superior balance on the means (i.e., corresponding to the balance
 constraints) for binary and multi-category treatments and linear terms for
 continuous treatments than will the over-identified version.
@@ -133,8 +133,7 @@ an initial call to \pkgfun{rootSolve}{multiroot}. However, the package is not
 required.
 }
 \section{Additional Arguments}{
- \code{moments} and \code{int} are accepted. See
-\code{\link[=weightit]{weightit()}} for details.
+
 
 The following additional arguments can be specified:
 \describe{
@@ -150,9 +149,13 @@ The following additional arguments can be specified:
 }
 \item{\code{solver}}{the solver to use to estimate the parameters of the just-identified CBPS. Allowable options include \code{"multiroot"} to use \pkgfun{rootSolve}{multiroot} and \code{"optim"} to use \code{\link[stats:optim]{stats::optim()}}. \code{"multiroot"} is the default when \pkg{rootSolve} is installed, as it tends to be much faster and more accurate; otherwise, \code{"optim"} is the default and requires no dependencies. Regardless of \code{solver}, the output of \code{optim()} is returned when \code{include.obj = TRUE} (see below). When \code{over = TRUE}, the parameter estimates of the just-identified CBPS are used as starting values for the over-identified CBPS.
 }
-\item{\code{quantile}}{
-A named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting \verb{quantile = list(x1 = c(.25, .5. , .75))} ensures the 25th, 50th, and 75th percentiles of \code{x1} in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., \code{.5}) or an unnamed list of length 1 (e.g., \code{list(c(.25, .5, .75))}) to request the same quantile(s) for all continuous covariates, or a named vector (e.g., \code{c(x1 = .5, x2 = .75)} to request one quantile for each covariate. Only allowed with binary and multi-category treatments.
+\item{\code{moments}}{\code{integer}; the highest power of each covariate to be balanced. For example, if \code{moments = 3}, each covariate, its square, and its cube will be balanced. Can also be a named vector with a value for each covariate (e.g., \code{moments = c(x1 = 2, x2 = 4)}). Values greater than 1 for categorical covariates are ignored. Default is 1 to balance covariate means.
 }
+\item{\code{int}}{\code{logical}; whether first-order interactions of the covariates are to be balanced. Default is \code{FALSE}.
+}
+\item{\code{quantile}}{a named list of quantiles (values between 0 and 1) for each continuous covariate, which are used to create additional variables that when balanced ensure balance on the corresponding quantile of the variable. For example, setting \verb{quantile = list(x1 = c(.25, .5. , .75))} ensures the 25th, 50th, and 75th percentiles of \code{x1} in each treatment group will be balanced in the weighted sample. Can also be a single number (e.g., \code{.5}) or a vector (e.g., \code{c(.25, .5, .75)}) to request the same quantile(s) for all continuous covariates. Only allowed with binary and multi-category treatments.
+}
+
 }
 }
 
@@ -171,7 +174,9 @@ data("lalonde", package = "cobalt")
 (W1a <- weightit(treat ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "cbps", estimand = "ATT"))
+
 summary(W1a)
+
 cobalt::bal.tab(W1a)
 
 #Balancing covariates between treatment groups (binary)
@@ -180,21 +185,27 @@ cobalt::bal.tab(W1a)
                   nodegree + re74, data = lalonde,
                 method = "cbps", estimand = "ATT",
                 over = TRUE, link = "probit"))
+
 summary(W1b)
+
 cobalt::bal.tab(W1b)
 
 #Balancing covariates with respect to race (multi-category)
 (W2 <- weightit(race ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "cbps", estimand = "ATE"))
+
 summary(W2)
+
 cobalt::bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
 (W3 <- weightit(re75 ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "cbps"))
+
 summary(W3)
+
 cobalt::bal.tab(W3)
 \donttest{
 #Longitudinal treatments
@@ -204,7 +215,9 @@ data("msmdata")
                           A_1 + X1_0 + X2_0),
                    data = msmdata,
                    method = "cbps"))
+
 summary(W4)
+
 cobalt::bal.tab(W4)
 }
 }
@@ -212,15 +225,13 @@ cobalt::bal.tab(W4)
 \subsection{Binary treatments}{
 
 Imai, K., & Ratkovic, M. (2014). Covariate balancing propensity score.
-\emph{Journal of the Royal Statistical Society: Series B (Statistical
-Methodology)}, 76(1), 243–263.
+\emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}, 76(1), 243–263.
 }
 
 \subsection{Multi-Category treatments}{
 
 Imai, K., & Ratkovic, M. (2014). Covariate balancing propensity score.
-\emph{Journal of the Royal Statistical Society: Series B (Statistical
-Methodology)}, 76(1), 243–263.
+\emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}, 76(1), 243–263.
 }
 
 \subsection{Continuous treatments}{
@@ -234,8 +245,7 @@ advertisements. \emph{The Annals of Applied Statistics}, 12(1), 156–177.
 \subsection{Longitudinal treatments}{
 
 Huffman, C., & van Gameren, E. (2018). Covariate Balancing Inverse
-Probability Weights for Time-Varying Continuous Interventions. \emph{Journal of
-Causal Inference}, 6(2). \doi{10.1515/jci-2017-0002}
+Probability Weights for Time-Varying Continuous Interventions. \emph{Journal of Causal Inference}, 6(2). \doi{10.1515/jci-2017-0002}
 
 Note: one should not cite Imai & Ratkovic (2015) when using CBPS for
 longitudinal treatments.

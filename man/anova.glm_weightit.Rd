@@ -80,14 +80,15 @@ anova(fit1, fit2, vcov = "const")
 # Using a bootstrapped variance matrix
 anova(fit1, fit2, vcov = "BS", R = 100)
 
-\dontshow{if (requireNamespace("splines", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+\dontshow{if (rlang::is_installed("splines")) withAutoprint(\{ # examplesIf}
 # Model comparison between spline model and linear
 # model; note they are nested but not symbolically
 # nested
 fit_s <- glm_weightit(re78 ~ splines::ns(age, df =4),
-                      data = lalonde )
+                      data = lalonde)
 
-fit_l <- glm_weightit( re78 ~ age, data = lalonde )
+fit_l <- glm_weightit(re78 ~ age,
+                      data = lalonde)
 
 anova(fit_s, fit_l)
 \dontshow{\}) # examplesIf}

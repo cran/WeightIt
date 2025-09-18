@@ -48,8 +48,7 @@ generalized propensity score (e.g., ordinal logistic regression).
 
 For continuous treatments, weights are estimated as
 \eqn{w_i = f_A(a_i) / f_{A|X}(a_i)}, where \eqn{f_A(a_i)} (known as the
-stabilization factor) is
-the unconditional density of treatment evaluated the observed treatment value
+stabilization factor) is the unconditional density of treatment evaluated the observed treatment value
 and \eqn{f_{A|X}(a_i)} (known as the generalized propensity score) is the
 conditional density of treatment given the covariates evaluated at the
 observed value of treatment. The shape of \eqn{f_A(.)} and \eqn{f_{A|X}(.)}
@@ -70,7 +69,7 @@ estimated at each time point.
 \subsection{Sampling Weights}{
 
 Sampling weights are supported through \code{s.weights} in all scenarios except
-for multi-category treatments with \code{link = "bayes.probit"} and for binary and
+for multi-category treatments with \code{multi.method = "mnp"} and for binary and
 continuous treatments with \code{missing = "saem"} (see below). Warning messages
 may appear otherwise about non-integer successes, and these can be ignored.
 }
@@ -92,7 +91,7 @@ allowed:
 For binary treatments, M-estimation is supported when \code{link} is neither
 \code{"flic"} nor \code{"flac"} (see below). For multi-category treatments,
 M-estimation is supported when \code{multi.method} is \code{"weightit"} (the default)
-or \code{"glm"}. For continuous treatments, M-estimation is supported when
+or \code{"glm"}. M-estimation is not supported when \code{subclass} is specified. For continuous treatments, M-estimation is supported when
 \code{density} is not \code{"kernel"}. The conditional treatment variance and
 unconditional treatment mean and variance are included as parameters to
 estimate, as these all go into calculation of the weights. For all treatment
@@ -103,17 +102,19 @@ methods are.
 }
 }
 \section{Additional Arguments}{
- For binary treatments, the following
-additional argument can be specified:
+
+
+For binary treatments, the following additional argument can be specified:
 \describe{
 \item{\code{link}}{the link used in the generalized linear model for the propensity scores. \code{link} can be any of those allowed by \code{\link[=binomial]{binomial()}} as well as \code{"loglog"} and \code{"clog"}. A \code{br.} prefix can be added (e.g., \code{"br.logit"}); this changes the fitting method to the bias-corrected generalized linear models implemented in the \CRANpkg{brglm2} package. \code{link} can also be either \code{"flic"} or \code{"flac"} to fit the corresponding Firth corrected logistic regression models implemented in the \CRANpkg{logistf} package.}
+\item{\code{subclass}}{\code{integer}; the number of subclasses to use for computing weights using marginal mean weighting through stratification (MMWS). If \code{NULL}, standard inverse probability weights (and their extensions) will be computed; if a number greater than 1, subclasses will be formed and weights will be computed based on subclass membership. See \code{\link[=get_w_from_ps]{get_w_from_ps()}} for details and references.}
 }
 
-For multi-category treatments, the following additional arguments can be
-specified:
+For multi-category treatments, the following additional arguments can be specified:
 \describe{
 \item{\code{multi.method}}{the method used to estimate the generalized propensity scores. Allowable options include \code{"weightit"} (the default) to use multinomial logistic regression implemented in \pkg{WeightIt}, \code{"glm"} to use a series of binomial models using \code{\link[=glm]{glm()}}, \code{"mclogit"} to use multinomial logistic regression as implemented in \pkgfun{mclogit}{mblogit}, \code{"mnp"} to use Bayesian multinomial probit regression as implemented in \pkgfun{MNP}{MNP}, and \code{"brmultinom"} to use bias-reduced multinomial logistic regression as implemented in \pkgfun{brglm2}{brmultinom}. \code{"weightit"} and \code{"mclogit"} should give near-identical results, the main difference being increased robustness and customizability when using \code{"mclogit"} at the expense of not being able to use M-estimation to compute standard errors after weighting. For ordered treatments, allowable options include \code{"weightit"} (the default) to use ordinal regression implemented in \pkg{WeightIt} or \code{"polr"} to use ordinal regression implemented in \pkgfun{MASS}{polr}, unless \code{link} is \code{"br.logit"}, in which case bias-reduce ordinal logistic regression as implemented in \pkgfun{brglm2}{bracl} is used. Ignored when \code{missing = "saem"}. Using the defaults allows for the use of M-estimation and requires no additional dependencies, but other packages may provide benefits such as speed and flexibility.}
 \item{\code{link}}{The link used in the multinomial, binomial, or ordered regression model for the generalized propensity scores depending on the argument supplied to \code{multi.method}. When \code{multi.method = "glm"}, \code{link} can be any of those allowed by \code{\link[=binomial]{binomial()}}. When treatment is ordered and \code{multi.method} is \code{"weightit"} or \code{"polr"}, \code{link} can be any of those allowed by \code{MASS::polr()} or \code{"br.logit"}. Otherwise, \code{link} should be \code{"logit"} or not specified.}
+\item{\code{subclass}}{\code{integer}; the number of subclasses to use for computing weights using marginal mean weighting through stratification (MMWS). If \code{NULL}, standard inverse probability weights (and their extensions) will be computed; if a number greater than 1, subclasses will be formed and weights will be computed based on subclass membership. See \code{\link[=get_w_from_ps]{get_w_from_ps()}} for details and references.}
 }
 
 For continuous treatments, the following additional arguments may be
@@ -158,14 +159,18 @@ data("lalonde", package = "cobalt")
                   nodegree + re74, data = lalonde,
                 method = "glm", estimand = "ATT",
                 link = "probit"))
+
 summary(W1)
+
 bal.tab(W1)
 
 #Balancing covariates with respect to race (multi-category)
 (W2 <- weightit(race ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "glm", estimand = "ATE"))
+
 summary(W2)
+
 bal.tab(W2)
 
 #Balancing covariates with respect to re75 (continuous)
@@ -173,7 +178,9 @@ bal.tab(W2)
 (W3 <- weightit(re75 ~ age + educ + married +
                   nodegree + re74, data = lalonde,
                 method = "glm", density = "kernel"))
+
 summary(W3)
+
 bal.tab(W3)
 }
 \references{
@@ -182,37 +189,27 @@ bal.tab(W3)
 \item \code{estimand = "ATO"}
 }
 
-Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via
-propensity score weighting. \emph{Journal of the American Statistical
-Association}, 113(521), 390–400. \doi{10.1080/01621459.2016.1260466}
+Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via propensity score weighting. \emph{Journal of the American Statistical Association}, 113(521), 390–400. \doi{10.1080/01621459.2016.1260466}
 \itemize{
 \item \code{estimand = "ATM"}
 }
 
-Li, L., & Greene, T. (2013). A Weighting Analogue to Pair Matching in
-Propensity Score Analysis. \emph{The International Journal of Biostatistics},
-9(2). \doi{10.1515/ijb-2012-0030}
+Li, L., & Greene, T. (2013). A Weighting Analogue to Pair Matching in Propensity Score Analysis. \emph{The International Journal of Biostatistics}, 9(2). \doi{10.1515/ijb-2012-0030}
 \itemize{
 \item \code{estimand = "ATOS"}
 }
 
-Crump, R. K., Hotz, V. J., Imbens, G. W., & Mitnik, O. A. (2009). Dealing
-with limited overlap in estimation of average treatment effects.
-\emph{Biometrika}, 96(1), 187–199. \doi{10.1093/biomet/asn055}
+Crump, R. K., Hotz, V. J., Imbens, G. W., & Mitnik, O. A. (2009). Dealing with limited overlap in estimation of average treatment effects. \emph{Biometrika}, 96(1), 187–199. \doi{10.1093/biomet/asn055}
 \itemize{
 \item Other estimands
 }
 
-Austin, P. C. (2011). An Introduction to Propensity Score Methods for
-Reducing the Effects of Confounding in Observational Studies. \emph{Multivariate
-Behavioral Research}, 46(3), 399–424. \doi{10.1080/00273171.2011.568786}
+Austin, P. C. (2011). An Introduction to Propensity Score Methods for Reducing the Effects of Confounding in Observational Studies. \emph{Multivariate Behavioral Research}, 46(3), 399–424. \doi{10.1080/00273171.2011.568786}
 \itemize{
 \item Marginal mean weighting through stratification
 }
 
-Hong, G. (2010). Marginal mean weighting through stratification: Adjustment
-for selection bias in multilevel data. \emph{Journal of Educational and Behavioral
-Statistics}, 35(5), 499–531. \doi{10.3102/1076998609359785}
+Hong, G. (2010). Marginal mean weighting through stratification: Adjustment for selection bias in multilevel data. \emph{Journal of Educational and Behavioral Statistics}, 35(5), 499–531. \doi{10.3102/1076998609359785}
 \itemize{
 \item Bias-reduced logistic regression
 }
@@ -222,18 +219,12 @@ See references for the \CRANpkg{brglm2} package.
 \item Firth corrected logistic regression
 }
 
-Puhr, R., Heinze, G., Nold, M., Lusa, L., & Geroldinger, A. (2017). Firth’s
-logistic regression with rare events: Accurate effect estimates and
-predictions? \emph{Statistics in Medicine}, 36(14), 2302–2317.
-\doi{10.1002/sim.7273}
+Puhr, R., Heinze, G., Nold, M., Lusa, L., & Geroldinger, A. (2017). Firth’s logistic regression with rare events: Accurate effect estimates and predictions? \emph{Statistics in Medicine}, 36(14), 2302–2317. \doi{10.1002/sim.7273}
 \itemize{
 \item SAEM logistic regression for missing data
 }
 
-Jiang, W., Josse, J., & Lavielle, M. (2019). Logistic regression with missing
-covariates — Parameter estimation, model selection and prediction within a
-joint-modeling framework. \emph{Computational Statistics & Data Analysis}, 106907.
-\doi{10.1016/j.csda.2019.106907}
+Jiang, W., Josse, J., & Lavielle, M. (2019). Logistic regression with missing covariates — Parameter estimation, model selection and prediction within a joint-modeling framework. \emph{Computational Statistics & Data Analysis}, 106907. \doi{10.1016/j.csda.2019.106907}
 }
 
 \subsection{Multi-Category Treatments}{
@@ -241,9 +232,7 @@ joint-modeling framework. \emph{Computational Statistics & Data Analysis}, 10690
 \item \code{estimand = "ATO"}
 }
 
-Li, F., & Li, F. (2019). Propensity score weighting for causal inference with
-multiple treatments. \emph{The Annals of Applied Statistics}, 13(4), 2389–2415.
-\doi{10.1214/19-AOAS1282}
+Li, F., & Li, F. (2019). Propensity score weighting for causal inference with  multiple treatments. \emph{The Annals of Applied Statistics}, 13(4), 2389–2415. \doi{10.1214/19-AOAS1282}
 \itemize{
 \item \code{estimand = "ATM"}
 }
@@ -257,10 +246,7 @@ matching. \emph{Epidemiology} (Cambridge, Mass.), 28(3), 387–395.
 \item Other estimands
 }
 
-McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand,
-R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for
-Multiple Treatments Using Generalized Boosted Models. \emph{Statistics in
-Medicine}, 32(19), 3388–3414. \doi{10.1002/sim.5753}
+McCaffrey, D. F., Griffin, B. A., Almirall, D., Slaughter, M. E., Ramchand, R., & Burgette, L. F. (2013). A Tutorial on Propensity Score Estimation for Multiple Treatments Using Generalized Boosted Models. \emph{Statistics in Medicine}, 32(19), 3388–3414. \doi{10.1002/sim.5753}
 \itemize{
 \item Marginal mean weighting through stratification
 }

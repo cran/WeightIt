@@ -1,15 +1,17 @@
 #' Plot information about the weight estimation process
 #' @name plot.weightit
 #'
-#' @description `plot.weightit()` plots information about the weights depending
+#' @description
+#' `plot.weightit()` plots information about the weights depending
 #' on how they were estimated. Currently, only weighting using `method = "gbm"`
-#' or `"optweight"` is supported. To plot the distribution of weights, see
+#' or `"optweight"` are supported. To plot the distribution of weights, see
 #' [plot.summary.weightit()].
 #'
 #' @param x a `weightit` object; the output of a call to [weightit()].
-#' @param ... Unused.
+#' @param ... unused.
 #'
-#' @returns A `ggplot` object.
+#' @returns
+#' A `ggplot` object.
 #'
 #' @details
 #'
@@ -19,7 +21,7 @@
 #' results of the tuning process used to find the optimal number of trees (and
 #' tuning parameter values, if modified) that are used in the final weights. The
 #' plot produced has the number of trees on the x-axis and the value of the
-#' criterion on the y axis with a diamond at the optimal point. When multiple
+#' criterion on the y-axis with a diamond at the optimal point. When multiple
 #' parameters are selected by tuning, a separate line is displayed on the plot
 #' for each combination of tuning parameters. When `by` is used in the call to
 #' `weightit()`, the plot is faceted by the `by` variable. See [`method_gbm`]
@@ -42,9 +44,7 @@
 #' @seealso [weightit()], [plot.summary.weightit()]
 #'
 #' @examples
-#'
 #' # See example at the corresponding methods page
-#'
 
 #' @exportS3Method plot weightit
 plot.weightit <- function(x, ...) {
@@ -59,6 +59,5 @@ plot.weightit <- function(x, ...) {
 
   switch(x$method,
          gbm = .plot_tune_gbm(x$info, x$by),
-         optweight = .plot_duals_optweight(x$info, x$by)
-  )
+         optweight = .plot_duals_optweight(x$info, x$by))
 }

@@ -12,8 +12,6 @@ weightitMSM(
   by = NULL,
   s.weights = NULL,
   num.formula = NULL,
-  moments = NULL,
-  int = FALSE,
   missing = NULL,
   verbose = FALSE,
   include.obj = FALSE,
@@ -54,13 +52,14 @@ models may be time-consuming or impossible to fit.}
 
 \item{by}{a string containing the name of the variable in \code{data} for which
 weighting is to be done within categories or a one-sided formula with the
-stratifying variable on the right-hand side. For example, if \code{by = "gender"} or \code{by = ~gender}, a separate propensity score model or
+stratifying variable on the right-hand side. For example, if \code{by = "gender"} or \code{by = ~gender},
+a separate propensity score model or
 optimization will occur within each level of the variable \code{"gender"}. Only
 one \code{by} variable is allowed; to stratify by multiply variables
 simultaneously, create a new variable that is a full cross of those
 variables using \code{\link[=interaction]{interaction()}}.}
 
-\item{s.weights}{A vector of sampling weights or the name of a variable in
+\item{s.weights}{a vector of sampling weights or the name of a variable in
 \code{data} that contains sampling weights. These can also be matching weights
 if weighting is to be used on matched data. See the individual pages for
 each method for information on whether sampling weights can be supplied.}
@@ -75,20 +74,6 @@ also be a list of one-sided formulas, one for each time point. Unless you
 know what you are doing, we recommend setting \code{stabilize = TRUE} and
 ignoring \code{num.formula}.}
 
-\item{moments}{\code{numeric}; for some methods, the greatest power of each
-covariate to be balanced. For example, if \code{moments = 3}, for each
-non-categorical covariate, the covariate, its square, and its cube will be
-balanced. This argument is ignored for other methods; to balance powers of
-the covariates, appropriate functions must be entered in \code{formula}. See the
-individual pages for each method for information on whether they accept
-\code{moments}.}
-
-\item{int}{\code{logical}; for some methods, whether first-order interactions of
-the covariates are to be balanced. This argument is ignored for other
-methods; to balance interactions between the variables, appropriate
-functions must be entered in \code{formula}. See the individual pages for each
-method for information on whether they accept \code{int}.}
-
 \item{missing}{\code{character}; how missing data should be handled. The options
 and defaults depend on the \code{method} used. Ignored if no missing data is
 present. It should be noted that multiple imputation outperforms all
@@ -99,7 +84,7 @@ be used instead. Consider the \CRANpkg{MatchThem} package for the use of
 \item{verbose}{\code{logical}; whether to print additional information output by
 the fitting function.}
 
-\item{include.obj}{whether to include in the output a list of the fit objects
+\item{include.obj}{\code{logical}; whether to include in the output a list of the fit objects
 created in the process of estimating the weights at each time point. For
 example, with \code{method = "glm"}, a list of the \code{glm} objects containing the
 propensity score models at each time point will be included. See the help
@@ -113,12 +98,12 @@ See the individual pages for each method for whether these components are
 produced. Set to \code{FALSE} to keep the output object smaller, e.g., if
 standard errors will not be computed using \code{glm_weightit()}.}
 
-\item{is.MSM.method}{whether the method estimates weights for multiple time
+\item{is.MSM.method}{\code{logical}; whether the method estimates weights for multiple time
 points all at once (\code{TRUE}) or by estimating weights at each time point and
 then multiplying them together (\code{FALSE}). This is only relevant for
 user-specified functions.}
 
-\item{weightit.force}{several methods are not valid for estimating weights
+\item{weightit.force}{\code{logical}; several methods are not valid for estimating weights
 with longitudinal treatments, and will produce an error message if
 attempted. Set to \code{TRUE} to bypass this error message.}
 
@@ -128,17 +113,16 @@ at \code{\link[=weightit]{weightit()}}.}
 }
 \value{
 A \code{weightitMSM} object with the following elements:
-\item{weights}{The estimated weights, one for each unit.} \item{treat.list}{A
-list of the values of the time-varying treatment variables.}
-\item{covs.list}{A list of the covariates used in the fitting at each time
-point. Only includes the raw covariates, which may have been altered in the
-fitting process.} \item{data}{The data.frame originally entered to
-\code{weightitMSM()}.} \item{estimand}{"ATE", currently the only estimand for MSMs
-with binary or multi-category treatments.} \item{method}{The weight
-estimation method specified.} \item{ps.list}{A list of the estimated
-propensity scores (if any) at each time point.} \item{s.weights}{The provided
-sampling weights.} \item{by}{A data.frame containing the \code{by} variable when
-specified.} \item{stabilization}{The stabilization factors, if any.}
+\item{weights}{The estimated weights, one for each unit.}
+\item{treat.list}{A list of the values of the time-varying treatment variables.}
+\item{covs.list}{A list of the covariates used in the fitting at each time point. Only includes the raw covariates, which may have been altered in the fitting process.}
+\item{data}{The data.frame originally entered to \code{weightitMSM()}.}
+\item{estimand}{"ATE", currently the only estimand for MSMs with binary or multi-category treatments.}
+\item{method}{The weight estimation method specified.}
+\item{ps.list}{A list of the estimated propensity scores (if any) at each time point.}
+\item{s.weights}{The provided sampling weights.}
+\item{by}{A data.frame containing the \code{by} variable when specified.}
+\item{stabilization}{The stabilization factors, if any.}
 
 When \code{keep.mparts} is \code{TRUE} (the default) and the chosen method is
 compatible with M-estimation, the components related to M-estimation for use
@@ -177,9 +161,6 @@ approach to generating weights than simply estimating several time-specific
 models.
 }
 \examples{
-
-library("cobalt")
-
 data("msmdata")
 (W1 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
                         A_2 ~ X1_1 + X2_1 +
@@ -190,9 +171,9 @@ data("msmdata")
                    data = msmdata,
                    method = "glm"))
 summary(W1)
-bal.tab(W1)
+cobalt::bal.tab(W1)
 
-#Using stabilization factors
+# Using stabilization factors
 W2 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
                         A_2 ~ X1_1 + X2_1 +
                           A_1 + X1_0 + X2_0,
@@ -206,8 +187,8 @@ W2 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
                                       ~ A_1,
                                       ~ A_1 + A_2))
 
-#Same as above but with fully saturated stabilization factors
-#(i.e., making the last entry in 'num.formula' A_1*A_2)
+# Same as above but with fully saturated stabilization factors
+# (i.e., making the last entry in 'num.formula' A_1*A_2)
 W3 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
                         A_2 ~ X1_1 + X2_1 +
                           A_1 + X1_0 + X2_0,
@@ -219,9 +200,7 @@ W3 <- weightitMSM(list(A_1 ~ X1_0 + X2_0,
                    stabilize = TRUE)
 }
 \references{
-Cole, S. R., & Hernán, M. A. (2008). Constructing Inverse
-Probability Weights for Marginal Structural Models. American Journal of
-Epidemiology, 168(6), 656–664. \doi{10.1093/aje/kwn164}
+Cole, S. R., & Hernán, M. A. (2008). Constructing Inverse Probability Weights for Marginal Structural Models. \emph{American Journal of Epidemiology}, 168(6), 656–664. \doi{10.1093/aje/kwn164}
 }
 \seealso{
 \code{\link[=weightit]{weightit()}} for information on the allowable methods

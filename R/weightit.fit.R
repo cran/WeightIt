@@ -1,12 +1,13 @@
 #' Generate Balancing Weights with Minimal Input Processing
 #'
-#' @description `weightit.fit()` dispatches one of the weight estimation methods
+#' @description
+#' `weightit.fit()` dispatches one of the weight estimation methods
 #' determined by `method`. It is an internal function called by [weightit()] and
 #' should probably not be used except in special cases. Unlike `weightit()`,
 #' `weightit.fit()` does not accept a formula and data frame interface and
 #' instead requires the covariates and treatment to be supplied as a numeric
 #' matrix and atomic vector, respectively. In this way, `weightit.fit()` is to
-#' `weightit()` what [lm.fit()] is to [lm()] - a thinner, slightly faster
+#' `weightit()` what [lm.fit()] is to [lm()]: a thinner, slightly faster
 #' interface that performs minimal argument checking.
 #'
 #' @inheritParams weightit
@@ -30,12 +31,9 @@
 #'   consider the "treated" or "control" group. This group will not be weighted,
 #'   and the other groups will be weighted to resemble the focal group. If
 #'   specified, `estimand` will automatically be set to `"ATT"` (with a warning
-#'   if `estimand` is not `"ATT"` or `"ATC"`). See section *`estimand` and
-#'   `focal`* in Details at [weightit()].
+#'   if `estimand` is not `"ATT"` or `"ATC"`). See section *`estimand` and `focal`* in Details at [weightit()].
 #' @param ps a vector of propensity scores. If specified, `method` will be
 #'   ignored and set to `"glm"`.
-#' @param moments,int,subclass arguments to customize the weight estimation. See
-#'   [weightit()] for details.
 #' @param missing `character`; how missing data should be handled. The options
 #'   depend on the `method` used. If `NULL`, `covs` will be checked for `NA`
 #'   values, and if present, `missing` will be set to `"ind"`. If `""`, `covs`
@@ -44,23 +42,26 @@
 #' @param ... other arguments for functions called by `weightit.fit()` that
 #'   control aspects of fitting that are not covered by the above arguments.
 #'
-#' @returns A `weightit.fit` object with the following elements:
-#' \item{weights}{The estimated weights, one for each unit.} \item{treat}{The
-#' values of the treatment variable.} \item{estimand}{The estimand requested.}
+#' @returns
+#' A `weightit.fit` object with the following elements:
+#'
+#' \item{weights}{The estimated weights, one for each unit.}
+#' \item{treat}{The values of the treatment variable.}
+#' \item{estimand}{The estimand requested.}
 #' \item{method}{The weight estimation method specified.}
-#' \item{ps}{The estimated or provided propensity scores. Estimated propensity scores are
-#' returned for binary treatments and only when `method` is `"glm"`, `"gbm"`, `"cbps"`, `"ipt"`, `"super"`, or `"bart"`. The propensity score corresponds to the predicted probability of being treated; see section *`estimand` and `focal`* in Details at [weightit()] for how the treated group is determined.}
-#' \item{s.weights}{The provided sampling weights.} \item{focal}{The focal
-#' treatment level if the ATT or ATC was requested.} \item{fit.obj}{When
-#' `include.obj = TRUE`, the fit object.} \item{info}{Additional information
-#' about the fitting. See the individual methods pages for what is included.}
+#' \item{ps}{The estimated or provided propensity scores. Estimated propensity scores are returned for binary treatments and only when `method` is `"glm"`, `"gbm"`, `"cbps"`, `"ipt"`, `"super"`, or `"bart"`. The propensity score corresponds to the predicted probability of being treated; see section *`estimand` and `focal`* in Details at [weightit()] for how the treated group is determined.}
+#' \item{s.weights}{The provided sampling weights.}
+#' \item{focal}{The focal treatment level if the ATT or ATC was requested.}
+#' \item{fit.obj}{When `include.obj = TRUE`, the fit object.}
+#' \item{info}{Additional information about the fitting. See the individual methods pages for what is included.}
 #'
 #' The `weightit.fit` object does not have specialized `print()`, `summary()`,
 #' or `plot()` methods. It is simply a list containing the above components. Use
 #' [as.weightit()] to convert it to a `weightit` object, which does have these
 #' methods. See Examples.
 #'
-#' @details `weightit.fit()` is called by [weightit()] after the arguments to
+#' @details
+#' `weightit.fit()` is called by [weightit()] after the arguments to
 #' `weightit()` have been checked and processed. `weightit.fit()` dispatches the
 #' function used to actually estimate the weights, passing on the supplied
 #' arguments directly. `weightit.fit()` is not meant to be used by anyone other
@@ -85,14 +86,14 @@
 #' object is much smaller than a `weightit` object because the covariates are
 #' not returned alongside the weights.
 #'
-#' @seealso [weightit()], which you should use for estimating weights unless you
+#' @seealso
+#' [weightit()], which you should use for estimating weights unless you
 #' know better.
 #'
 #' [as.weightit()] for converting a `weightit.fit` object to a `weightit`
 #' object.
 #'
 #' @examples
-#'
 #' library("cobalt")
 #' data("lalonde", package = "cobalt")
 #'
@@ -113,20 +114,20 @@
 #' W1
 #' summary(W1)
 #' bal.tab(W1)
-#'
 
 #' @export
 weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.factor = NULL,
                          estimand = "ATE", focal = NULL, stabilize = FALSE,
-                         ps = NULL, moments = NULL, int = FALSE,
-                         subclass = NULL, missing = NULL,
-                         verbose = FALSE, include.obj = FALSE, ...) {
+                         ps = NULL, missing = NULL, verbose = FALSE, include.obj = FALSE, ...) {
 
   A <- list(...)
 
   #Checks
-  if (!check_if_call_from_fun(weightit) && !check_if_call_from_fun(weightitMSM)) {
-
+  if (check_if_call_from_fun(weightit) || check_if_call_from_fun(weightitMSM)) {
+    treat <- as.treat(treat)
+    treat.type <- get_treat_type(treat)
+  }
+  else {
     chk::chk_not_missing(covs, "`covs`")
     chk::chk_matrix(covs)
     chk::chk_numeric(covs)
@@ -144,7 +145,7 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
       .err("`treat` and `covs` must contain the same number of units")
     }
 
-    if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+    treat <- as.treat(treat, process = TRUE)
     treat.type <- get_treat_type(treat)
 
     .check_acceptable_method(method, msm = FALSE, force = FALSE)
@@ -169,7 +170,7 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     }
 
     if (is_null(s.weights)) {
-      s.weights <- rep.int(1.0, length(treat))
+      s.weights <- rep_with(1, treat)
     }
     else {
       .chk_basic_vector(s.weights)
@@ -183,7 +184,7 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     }
 
     if (is_null(by.factor)) {
-      by.factor <- factor(rep.int(1L, length(treat)), levels = 1L)
+      by.factor <- gl(1L, length(treat))
     }
     else {
       chk::chk_factor(by.factor)
@@ -217,34 +218,24 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     }
 
     #Check subclass
-    if (is_not_null(subclass)) {
-      .check_subclass(method, treat.type)
-    }
+    .check_subclass(...get("subclass"), method, treat.type)
 
     #Process moments and int
-    m.i.q <- .process_moments_int_quantile(moments = moments,
-                                           int = int,
-                                           quantile = A[["quantile"]],
-                                           method = method)
+    m.i.q <- .process_moments_int_quantile(method = method, ...)
 
-    moments <- m.i.q[["moments"]]
-    int <- m.i.q[["int"]]
-    A["quantile"] <- m.i.q["quantile"]
-  }
-  else {
-    if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
-    treat.type <- get_treat_type(treat)
+    A[c("moments", "int", "quantile")] <- m.i.q[c("moments", "int", "quantile")]
   }
 
   missing <- .process_missing2(missing, covs)
 
   out <- make_list(c("weights", "treat", "estimand", "method", "ps", "s.weights",
                      "focal", "missing", "fit.obj", "info"))
-  out$weights <- out$ps <- rep.int(NA_real_, length(treat))
+  out$weights <- out$ps <- rep_with(NA_real_, treat)
 
   if (include.obj) {
     fit.obj <- make_list(levels(by.factor))
   }
+
   info <- make_list(levels(by.factor))
 
   obj <- NULL
@@ -262,8 +253,9 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
     }
 
     fun <- switch(treat.type,
-                  "multi-category" = paste.(fun, "multi"),
-                  "continuous" = paste.(fun, "cont"),
+                  `multi-category` =,
+                  multinomial = paste.(fun, "multi"),
+                  continuous = paste.(fun, "cont"),
                   fun)
   }
 
@@ -273,10 +265,7 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
   A["estimand"] <- list(estimand)
   A["focal"] <- list(focal)
   A["stabilize"] <- list(stabilize)
-  A["subclass"] <- list(subclass)
   A["ps"] <- list(ps)
-  A["moments"] <- list(moments)
-  A["int"] <- list(int)
   A["missing"] <- list(missing)
   A["verbose"] <- list(verbose)
 
@@ -356,8 +345,7 @@ weightit.fit <- function(covs, treat, method = "glm", s.weights = NULL, by.facto
 
 weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = NULL, by.factor = NULL,
                             estimand = "ATE", focal = NULL, stabilize = FALSE,
-                            moments = NULL, int = FALSE,
-                            subclass = NULL, is.MSM.method = FALSE, missing = NULL,
+                            is.MSM.method = FALSE, missing = NULL,
                             verbose = FALSE, include.obj = FALSE, ...) {
 
   A <- list(...)
@@ -371,7 +359,6 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
     }
   }
   else {
-
     chk::chk_not_missing(covs.list, "`covs.list`")
     chk::chk_list(covs.list)
     for (i in seq_along(covs.list)) {
@@ -431,7 +418,7 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
     }
 
     if (is_null(by.factor)) {
-      by.factor <- factor(rep.int(1, n), levels = 1L)
+      by.factor <- gl(1L, n)
     }
     else {
       chk::chk_factor(by.factor)
@@ -442,19 +429,14 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
     }
 
     #Process moments and int
-    m.i.q <- .process_moments_int_quantile(moments = moments,
-                                           int = int,
-                                           quantile = A[["quantile"]],
-                                           method = method)
+    m.i.q <- .process_moments_int_quantile(method = method, ...)
 
-    moments <- m.i.q[["moments"]]
-    int <- m.i.q[["int"]]
-    A["quantile"] <- m.i.q["quantile"]
+    A[c("moments", "int", "quantile")] <- m.i.q[c("moments", "int", "quantile")]
   }
 
   out <- make_list(c("weights", "treat.list", "method", "s.weights", "missing",
                      "fit.obj", "info"))
-  out$weights <- rep.int(NA_real_, length(treat.list[[1L]]))
+  out$weights <- rep_with(NA_real_, treat.list[[1L]])
 
   if (include.obj) {
     fit.obj <- make_list(levels(by.factor))
@@ -465,14 +447,10 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
 
   .check_required_packages(method)
 
-  if (is.function(method)) {
-    fun <- "weightitMSM2user"
-  }
-  else {
-    fun <- {
-      if (is_null(method)) "weightitMSM2null"
-      else sprintf("weightitMSM2%s", method)
-    }
+  fun <- {
+    if (is_null(method)) "weightitMSM2null"
+    else if (is.function(method)) "weightitMSM2user"
+    else sprintf("weightitMSM2%s", method)
   }
 
   A["covs.list"] <- list(covs.list)
@@ -480,10 +458,7 @@ weightitMSM.fit <- function(covs.list, treat.list, method = "glm", s.weights = N
   A["s.weights"] <- list(s.weights)
   A["estimand"] <- list(estimand)
   A["focal"] <- list(focal)
-  A["moments"] <- list(moments)
-  A["int"] <- list(int)
   A["stabilize"] <- list(stabilize)
-  A["subclass"] <- list(subclass)
   A["missing"] <- list(missing)
   A["verbose"] <- list(verbose)
 

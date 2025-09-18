@@ -1,19 +1,47 @@
 WeightIt News and Updates
 ======
 
+# `WeightIt` 1.5.0
+
+* For `predict.ordinal_weightit()`, `type` can now be `"stdlv"` to request predictions on the scale of the standardized latent variable underlying the ordinal responses.
+
+* `moments` can now be supplied as a named vector with a different integer value for each covariate, e.g., `moments = c(x1 = 2, x2 = 3)` to balance just the first two moments of `x1` and the first three of `x2`.
+
+* With `method = "energy"`, a new `tols` argument can be set to request inexact balance on covariate moments.
+
+* Some arguments and documentation for them has changed, in particular `moments`, `int`, and `subclass`, which used to be named arguments of `weightit()` and are now to be supplied through `...`. They are documented only on the help pages of the specific methods that allow them.
+
+* The `covs` component of the `weightit()` output object now only includes the raw covariates, not any transformations. This will affect `cobalt::bal.tab()` output.
+
+* In `summary.weightit()`, a new argument, `weight.range` can be supplied to specify whether the range of weights in each group should be displayed.
+
+* Fixed a bug in which the output of `bread()` was off by a factor of -1. This doesn't affect its use in `sandwich::sandwich()`.
+
+* Fixed a bug in which `bag.fraction` for `method = "gbm"` with binary and multi-category treatments had a default of .5 instead of the stated 1.
+
+* Fixed bugs relating to `method = "optweight"`; sampling weights and the fractional weighted bootstrap can now be used with it.
+
+* Fixed bugs related to `coxph_weightit()` with aliased coefficients and multi-state models. Thanks to Mads Jeppe Tarp-Johansen.
+
+* Fixed a bug in which messages about assuming which treatment level was "treated" were printed many times, including when bootstrapping.
+
+* Fixed a bug in which CBPS for continuous treatments would not yield correct balance in the presence of some extreme density estimates.
+
+* Typo fixes in vignettes and documentation.
+
 # `WeightIt` 1.4.0
 
 * Entropy balancing works slightly differently when sampling weights are supplied. The negative entropy between the estimated weights and the product of the sampling weights and base weights (if any) is now the quantity minimized in the optimization. Previously, the negative entropy between the product of the sampling weights and estimated weights and the base weights was minimized. The new behavior ensures entropy balancing is consistent with mathematically equivalent methods when it ought to be (i.e., CBPS and IPT for the ATT) and prevents counter-intuitive results, like that the ESS after weighting could be larger than that before weighting. Note this will cause results to differ between this and previous versions of `WeightIt`.
 
 * With `method = "cbps"`, `estimand` can now be set to `"ATO"` for binary and multi-category treatments. For binary treatments with the default link, this will yield identical weights to using `method = "glm"` with `estimand = "ATO"`.
 
-* Two new links can be supplied with `method = "glm", `"cbps"`, and `"ipt"`: `"loglog"` for the log-log link and `"clog"` for the complementary log link. The `link` argument can also now be supplied as a `link-glm` object (e.g., the output of a call to `make.link()`). This allows for more flexibility in the link function used to estimate the propensity score.
+* Two new links can be supplied with `method = "glm"`, `"cbps"`, and `"ipt"`: `"loglog"` for the log-log link and `"clog"` for the complementary log link. The `link` argument can also now be supplied as a `link-glm` object (e.g., the output of a call to `make.link()`). This allows for more flexibility in the link function used to estimate the propensity score.
 
 * A new `solver` argument can be supplied to `weightit()` with `method = "ebal"` and with `method = "cbps"` with `over = FALSE` (the default); this argument controls whether to use `rootSolve::multiroot()` or `stats::optim()` solve the optimization problem for the weights. `multiroot()` is used by default when `rootSolve` is installed as it is quicker and more accurate.
 
 * For some methods, analytic formulas for the derivatives used in M-estimation are now used instead of relying on numeric differentiation. This increases speed and accuracy in computing standard errors that adjust for estimation of the weights. The formulas are benchmarked against numeric differentiation results.
 
-* Added new `method` argument to `calibrate()` to support isotonic regression calibration as described by [van der Laan el al. (2024)](http://arxiv.org/abs/2411.06342).
+* Added new `method` argument to `calibrate()` to support isotonic regression calibration as described by [van der Laan el al. (2024)](https://arxiv.org/abs/2411.06342).
 
 * Added clearer error and warning messages to several functions, most notably `glm_weightit()` and friends, when missing values are present in the model variables.
 
@@ -157,7 +185,7 @@ WeightIt News and Updates
 
 * Added a new function, `glm_weightit()` (along with wrapper `lm_weightit()`) and associated methods for fitting generalized linear models in the weighted sample, with the option of accounting for estimation of the weights in computing standard errors via M-estimation or two forms of bootstrapping. `glm_weightit()` also supports multinomial logistic regression in addition to all models supported by `glm()`. Cluster-robust standard errors are supported, and output is compatible with any functions that accept `glm()` objects. Not all weighting methods support M-estimation, but for those that do, a new component is added to the `weightit` output object. Currently, GLM propensity scores, entropy balancing, just-identified CBPS, and inverse probability tilting (described below) support M-estimation-based standard errors with `glm_weightit()`.
 
-* Added inverse probability tilting (IPT) as described by Graham, Pinto, and Egel (2012), which can be requested by setting `method = "ipt"`. Thus is similar to entropy balancing and CBPS in that it enforces exact balance and yields a propensity score, but has some theoretical advantages to both methods. IPT does not rely on any other packages and runs very quickly.
+* Added inverse probability tilting (IPT) as described by Graham, Pinto, and Egel (2012), which can be requested by setting `method = "ipt"`. This is similar to entropy balancing and CBPS in that it enforces exact balance and yields a propensity score, but has some theoretical advantages to both methods. IPT does not rely on any other packages and runs very quickly.
 
 * Estimating covariate balancing propensity score weights (i.e., `method = "cbps"`) no longer depends on the `CBPS` package. The default is now the just-identified versions of the method; the over-identified version can be requested by setting `over = TRUE`. The ATT for multi-category treatments is now supported, as are arbitrary numbers of treatment groups (`CBPS` only natively support up to 4 groups and only the ATE for multi-category treatments). For binary treatments, generalized linear models other than logistic regression are now supported (e.g., probit or Poisson regression).
 

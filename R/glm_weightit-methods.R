@@ -1,7 +1,8 @@
 #' Methods for `glm_weightit()` objects
 #' @name glm_weightit-methods
 #'
-#' @description This page documents methods for objects returned by
+#' @description
+#' This page documents methods for objects returned by
 #' [glm_weightit()], `lm_weightit()`, `ordinal_weightit()`,
 #' `multinom_weightit()`, and `coxph_weightit()`. `predict()` methods are
 #' described at [predict.glm_weightit()] and `anova()` methods are described at
@@ -46,17 +47,19 @@
 #'   supplied to `vcov`, e.g., `cluster`, `R`, or `fwb.args`. For `update()`,
 #'   additional arguments to the call or arguments with changed values. See
 #'   [glm_weightit()] for details.
-#' @param evaluate whether to evaluate the call (`TRUE`, the default) or just
+#' @param evaluate `logical`; whether to evaluate the call (`TRUE`, the default) or just
 #'   return it.
 #'
-#' @returns `summary()` returns a `summary.glm_weightit()` object, which has its
+#' @returns
+#' `summary()` returns a `summary.glm_weightit()` object, which has its
 #' own `print()` method. For `coxph_weightit()` objects, the `print()` and
 #' `summary()` methods are more like those for `glm` objects than for `coxph`
 #' objects.
 #'
 #' Otherwise, all methods return the same type of object as their generics.
 #'
-#' @details `vcov()` by default extracts the parameter covariance matrix already
+#' @details
+#' `vcov()` by default extracts the parameter covariance matrix already
 #' computed by the fitting function, and `summary()` and `confint()` uses this
 #' covariance matrix to compute standard errors and Wald confidence intervals
 #' (internally calling [confint.lm()]), respectively. Supplying arguments to
@@ -90,7 +93,8 @@
 #'
 #' `estfun()` extracts the empirical estimating functions for the fitted model, optionally accounting for the estimation of the weights (if available). This, along with `bread()`, is used by [sandwich::sandwich()] to compute the robust covariance matrix of the estimated coefficients. See [glm_weightit()] and `vcov()` above for more details.
 #'
-#' @seealso [glm_weightit()] for the page documenting `glm_weightit()`,
+#' @seealso
+#' [glm_weightit()] for the page documenting `glm_weightit()`,
 #' `lm_weightit()`, `ordinal_weightit()`, `multinom_weightit()`, and
 #' `coxph_weightit()`. [summary.glm()], [vcov()], [confint()] for the relevant
 #' methods pages. [predict.glm_weightit()] for computing predictions from the
@@ -99,7 +103,7 @@
 #' [sandwich::estfun()] and [sandwich::bread()] for the `estfun()` and `bread()` generics.
 #'
 #' @examples
-#' ## See more examples at ?glm_weightit
+#' ## See examples at ?glm_weightit
 
 #' @exportS3Method summary glm_weightit
 #' @rdname glm_weightit-methods
@@ -159,7 +163,7 @@ summary.glm_weightit <- function(object,
 
     if (is_null(covmat)) {
       ci <- FALSE
-      s.err <- rep.int(NA_real_, length(coef.p))
+      s.err <- rep_with(NA_real_, coef.p)
       pvalue <- tvalue <- s.err
     }
     else {
@@ -202,7 +206,7 @@ summary.glm_weightit <- function(object,
                               coefficients = coef.table, aliased = aliased,
                               dispersion = dispersion, df = c(object$rank, df.r, df.f),
                               cov.unscaled = covmat.unscaled, cov.scaled = covmat,
-                              cluster = attr(object, "cluster"),
+                              cluster = .attr(object, "cluster"),
                               transformed = !identity_transform))
 
   class(ans) <- c("summary.glm_weightit", "summary.glm")
@@ -250,7 +254,7 @@ summary.multinom_weightit <- function(object,
 
     if (is_null(covmat)) {
       ci <- FALSE
-      s.err <- rep.int(NA_real_, length(coef.p))
+      s.err <- rep_with(NA_real_, coef.p)
       pvalue <- tvalue <- s.err
     }
     else {
@@ -293,7 +297,7 @@ summary.multinom_weightit <- function(object,
                               coefficients = coef.table, aliased = aliased,
                               dispersion = dispersion, df = c(object$rank, df.r, df.f),
                               cov.unscaled = covmat.unscaled, cov.scaled = covmat,
-                              cluster = attr(object, "cluster"),
+                              cluster = .attr(object, "cluster"),
                               transformed = !identity_transform))
 
   class(ans) <- c("summary.glm_weightit", "summary.glm")
@@ -347,10 +351,6 @@ summary.coxph_weightit <- function(object,
     chk::chk_flag(ci)
   }
 
-  df.r <- object$df.residual
-
-  dispersion <- NaN
-
   if (is.null(transform)) transform <- base::identity
   else transform <- match.fun(transform)
 
@@ -369,11 +369,11 @@ summary.coxph_weightit <- function(object,
 
     if (is_null(covmat)) {
       ci <- FALSE
-      s.err <- rep.int(NA_real_, length(coef.p))
+      s.err <- rep_with(NA_real_, coef.p)
       pvalue <- tvalue <- s.err
     }
     else {
-      s.err <- sqrt(diag(covmat)[!aliased])
+      s.err <- sqrt(diag(covmat))
       tvalue <- coef.p / s.err
       pvalue <- 2 * pnorm(-abs(tvalue))
     }
@@ -382,10 +382,10 @@ summary.coxph_weightit <- function(object,
     dimnames(coef.table) <- list(names(coef.p), dn)
   }
   else {
-    coef.table <- matrix(NA_real_, 0L, 4L)
-    dimnames(coef.table) <- list(NULL, c("Estimate", "Std. Error",
-                                         "z value", "Pr(>|z|)"))
-    covmat <- matrix(NA_real_, 0L, 0L)
+    coef.table <- matrix(NA_real_, nrow = 0L, ncol = 4L)
+    colnames(coef.table) <- c("Estimate", "Std. Error", "z value", "Pr(>|z|)")
+
+    covmat <- matrix(NA_real_, nrow = 0L, ncol = 0L)
   }
 
   transformed_coefs <- transform(coef.table[, "Estimate"])
@@ -407,11 +407,10 @@ summary.coxph_weightit <- function(object,
 
   keep <- match(c("call", "terms", "family", "deviance", "aic", "contrasts", "df.residual",
                   "null.deviance", "df.null", "iter", "na.action", "vcov_type"), names(object), 0L)
-  ans <- c(object[keep], list(deviance.resid = residuals(object, type = "deviance"),
-                              coefficients = coef.table, aliased = aliased,
-                              dispersion = dispersion, df = c(object$rank, df.r, df.f),
-                              cov.unscaled = covmat.unscaled, cov.scaled = covmat,
-                              cluster = attr(object, "cluster"),
+  ans <- c(object[keep], list(coefficients = coef.table,
+                              aliased = aliased,
+                              cov.scaled = covmat,
+                              cluster = .attr(object, "cluster"),
                               transformed = !identity_transform))
 
   class(ans) <- c("summary.glm_weightit", "summary.glm")
@@ -428,7 +427,7 @@ print.summary.glm_weightit <- function(x, digits = max(3L, getOption("digits") -
   chk::chk_flag(call)
 
   if (call) {
-    cat0("\n", underline("Call:"), "\n", paste(deparse(x$call), sep = "\n", collapse = "\n"),
+    cat0("\n", .ul("Call:"), "\n", paste(deparse(x$call), sep = "\n", collapse = "\n"),
          "\n")
   }
 
@@ -437,20 +436,20 @@ print.summary.glm_weightit <- function(x, digits = max(3L, getOption("digits") -
     return(invisible(x))
   }
 
-  cat0("\n", underline(sprintf("Coefficients%s:",
-                               if (x$transformed) " (transformed)" else "")),
+  cat0("\n", .ul(sprintf("Coefficients%s:",
+                         if (x$transformed) " (transformed)" else "")),
        "\n")
 
   coefs <- x$coefficients
 
-  if (is_not_null(attr(x, "thresholds"))) {
-    coefs <- coefs[-match(attr(x, "thresholds"), rownames(x$coefficients)), , drop = FALSE]
+  if (is_not_null(.attr(x, "thresholds"))) {
+    coefs <- coefs[-match(.attr(x, "thresholds"), rownames(x$coefficients)), , drop = FALSE]
   }
 
   aliased <- x$aliased
   if (is_not_null(aliased) && any(aliased)) {
-    if (is_not_null(attr(x, "thresholds"))) {
-      aliased <- aliased[-match(attr(x, "thresholds"), names(aliased))]
+    if (is_not_null(.attr(x, "thresholds"))) {
+      aliased <- aliased[-match(.attr(x, "thresholds"), names(aliased))]
     }
 
     cn <- names(aliased)
@@ -464,14 +463,14 @@ print.summary.glm_weightit <- function(x, digits = max(3L, getOption("digits") -
                              signif.stars = signif.stars,
                              ...)
 
-  cat(italic(sprintf("Standard error: %s\n",
-                     .vcov_to_phrase(x$vcov_type,
-                                     is_not_null(x[["cluster"]])))))
+  cat(.it(sprintf("Standard error: %s\n",
+                  .vcov_to_phrase(x$vcov_type,
+                                  is_not_null(x[["cluster"]])))))
 
-  if (is_not_null(attr(x, "thresholds"))) {
-    thresholds <- x$coefficients[attr(x, "thresholds"), , drop = FALSE]
+  if (is_not_null(.attr(x, "thresholds"))) {
+    thresholds <- x$coefficients[.attr(x, "thresholds"), , drop = FALSE]
 
-    cat0("\n", underline(sprintf("Thresholds%s:", if (x$transformed) " (transformed)" else "")),
+    cat0("\n", .ul(sprintf("Thresholds%s:", if (x$transformed) " (transformed)" else "")),
          "\n")
 
     .printCoefmat_glm_weightit(thresholds, digits = digits,
@@ -488,27 +487,28 @@ print.summary.glm_weightit <- function(x, digits = max(3L, getOption("digits") -
 #' @rdname glm_weightit-methods
 print.glm_weightit <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 
-  cat0("\n", underline("Call:"), "\n",
+  cat0("\n", .ul("Call:"), "\n",
        paste(deparse(x$call), collapse = "\n"),
        "\n")
 
-  if (is_not_null(coef(x))) {
-    co <- x$contrasts
-    cat0("\n", underline(sprintf("Coefficients%s:",
-                                 if (is.character(co))
-                                   paste("  [contrasts: ", apply(cbind(names(co), co), 1L, paste, collapse = "="), "]")
-                                 else "")),
-         "\n")
+  if (is_null(x$coefficients)) {
+    cat("\nNo Coefficients\n\n")
+    return(invisible(x))
+  }
 
-    print.default(format(x$coefficients, digits = digits),
-                  print.gap = 2L, quote = FALSE)
-    cat(italic(sprintf("Standard error: %s\n",
-                       .vcov_to_phrase(x$vcov_type,
-                                       is_not_null(attr(x, "cluster"))))))
-  }
-  else {
-    cat("No coefficients\n\n")
-  }
+  co <- x$contrasts
+  cat0("\n", .ul(sprintf("Coefficients%s:",
+                         if (is.character(co))
+                           paste("  [contrasts: ", apply(cbind(names(co), co), 1L, paste, collapse = "="), "]")
+                         else "")),
+       "\n")
+
+  format(x$coefficients, digits = digits) |>
+    print.default(print.gap = 2L, quote = FALSE)
+
+  cat(.it(sprintf("Standard error: %s\n",
+                  .vcov_to_phrase(x$vcov_type,
+                                  is_not_null(.attr(x, "cluster"))))))
 
   invisible(x)
 }
@@ -534,9 +534,8 @@ print.coxph_weightit <- function(x, digits = max(3L, getOption("digits") - 3L), 
 vcov.glm_weightit <- function(object, complete = TRUE, vcov = NULL, ...) {
   chk::chk_flag(complete)
 
-  V <- .vcov_glm_weightit.internal(object, vcov. = vcov, ...)
-
-  V <- .modify_vcov_info(V)
+  V <- .vcov_glm_weightit.internal(object, vcov. = vcov, ...) |>
+    .modify_vcov_info()
 
   .vcov.aliased(is.na(object$coefficients), V,
                 complete = complete)
@@ -641,18 +640,18 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
   }
 
   if (is_null(W)) {
-    W <- rep.int(1, length(Y))
+    W <- rep_with(1, Y)
   }
 
   if (is_null(SW)) {
-    SW <- rep.int(1, length(Y))
+    SW <- rep_with(1, Y)
   }
 
-  offset <- if_null_then(x[["offset"]], rep.int(0, length(Y)))
+  offset <- if_null_then(x[["offset"]], rep_with(0, Y))
 
   if (any(aliased)) {
-    if (is_not_null(attr(x[["qr"]][["qr"]], "aliased"))) {
-      Xout <- Xout[, !attr(x[["qr"]][["qr"]], "aliased"), drop = FALSE]
+    if (is_not_null(.attr(x[["qr"]][["qr"]], "aliased"))) {
+      Xout <- Xout[, !.attr(x[["qr"]][["qr"]], "aliased"), drop = FALSE]
     }
     else {
       Xout <- make_full_rank(Xout, with.intercept = FALSE)
@@ -660,8 +659,8 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
     bout <- bout[!aliased]
   }
 
-  Mparts <- attr(x[["weightit"]], "Mparts", exact = TRUE)
-  Mparts.list <- attr(x[["weightit"]], "Mparts.list", exact = TRUE)
+  Mparts <- .attr(x[["weightit"]], "Mparts")
+  Mparts.list <- .attr(x[["weightit"]], "Mparts.list")
 
   if (is_not_null(Mparts) || is_not_null(Mparts.list)) {
     chk::chk_flag(asympt)
@@ -758,7 +757,7 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
     if (all(lengths(dw_dBtreat.list) > 0L)) {
       w.list <- c(lapply(seq_along(btreat.list), function(i) {
         wfun.list[[i]](btreat.list[[i]], Xtreat.list[[i]], A.list[[i]])
-      }), list(rep(1, length(A.list[[1L]]))))
+      }), list(rep_with(1, A.list[[1L]])))
 
       dw_dBtreat <- do.call("cbind", lapply(seq_along(btreat.list), function(i) {
         dw_dBtreat.list[[i]](btreat.list[[i]], Xtreat.list[[i]], A.list[[i]], SW) *
@@ -827,18 +826,18 @@ bread.glm_weightit <- function(x, ...) {
     }
 
     if (is_null(W)) {
-      W <- rep.int(1, length(Y))
+      W <- rep_with(1, Y)
     }
 
     if (is_null(SW)) {
-      SW <- rep.int(1, length(Y))
+      SW <- rep_with(1, Y)
     }
 
-    offset <- if_null_then(x[["offset"]], rep.int(0, length(Y)))
+    offset <- if_null_then(x[["offset"]], rep_with(0, Y))
 
     if (any(aliased)) {
-      if (is_not_null(attr(x[["qr"]][["qr"]], "aliased"))) {
-        Xout <- Xout[, !attr(x[["qr"]][["qr"]], "aliased"), drop = FALSE]
+      if (is_not_null(.attr(x[["qr"]][["qr"]], "aliased"))) {
+        Xout <- Xout[, !.attr(x[["qr"]][["qr"]], "aliased"), drop = FALSE]
       }
       else {
         Xout <- make_full_rank(Xout, with.intercept = FALSE)
@@ -855,7 +854,7 @@ bread.glm_weightit <- function(x, ...) {
     }, .x = bout)
   }
 
-  A1 <- .solve_hessian(H) * nobs(x)
+  A1 <- -nobs(x) * .solve_hessian(H)
 
   colnames(A1) <- rownames(A1) <- names(aliased)[!aliased]
 
@@ -880,11 +879,12 @@ tidy.glm_weightit <- function(x, conf.int = FALSE, conf.level = 0.95, exponentia
                ...)
 
   ret <- cbind(rownames(s$coefficients),
-               as.data.frame(s$coefficients))
-  names(ret) <- c("term", "estimate", "std.error", "statistic",
-                  "p.value")
+               as.data.frame(s$coefficients)) |>
+    setNames(c("term", "estimate", "std.error", "statistic",
+               "p.value"))
 
   class(ret) <- c("tbl_df", "tbl", "data.frame")
+
   ret
 }
 
@@ -941,7 +941,7 @@ update.glm_weightit <- function(object, formula. = NULL, ..., evaluate = TRUE) {
   refit <- TRUE
 
   update_call <- match.call(expand.dots = FALSE)
-  extras <- update_call$...
+  extras <- update_call[["..."]]
 
   if (is_not_null(formula.)) {
     extras$formula <- update(formula(object), formula.)
@@ -969,8 +969,8 @@ update.glm_weightit <- function(object, formula. = NULL, ..., evaluate = TRUE) {
       vn_in_call <- which(names(obj_call) %in% vcov_args & names(obj_call) %nin% names(extras))
 
       update_call <- as.call(c(as.list(update_call[c(1L, match("object", names(update_call)))]),
-                         as.list(extras[vn_in_extras]),
-                         as.list(obj_call[vn_in_call])))
+                               as.list(extras[vn_in_extras]),
+                               as.list(obj_call[vn_in_call])))
 
       if (any(names(extras) == "vcov")) {
         names(update_call)[names(update_call) == "vcov"] <- "vcov."
@@ -986,7 +986,7 @@ update.glm_weightit <- function(object, formula. = NULL, ..., evaluate = TRUE) {
       refit <- FALSE
     }
     else if (any(names(extras) %in% weightit_args)) {
-      if (any(names(extras) == "weightit")) {
+      if (utils::hasName(extras, "weightit")) {
         .err(sprintf("when `weightit` is supplied, %s cannot be supplied",
                      word_list(intersect(weightit_args, names(extras)), and.or = "and",
                                is.are = TRUE, quotes = "`")))
@@ -1022,9 +1022,8 @@ update.glm_weightit <- function(object, formula. = NULL, ..., evaluate = TRUE) {
           else object[["data"]]
         }
 
-        s.weights <- eval.parent(extras[["s.weights"]])
-
-        s.weights <- .process.s.weights(s.weights, data)
+        s.weights <- eval.parent(extras[["s.weights"]]) |>
+          .process.s.weights(data)
 
         if (is_not_null(s.weights)) {
           extras[["weightit"]] <- list(s.weights = s.weights,

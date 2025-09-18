@@ -1,7 +1,7 @@
 #' Create a `weightit` object manually
-#' @name as.weightit
 #'
-#' @description This function allows users to get the benefits of a `weightit`
+#' @description
+#' This function allows users to get the benefits of a `weightit`
 #' object when using weights not estimated with [weightit()] or [weightitMSM()].
 #' These benefits include diagnostics, plots, and direct compatibility with
 #' \pkg{cobalt} for assessing balance.
@@ -28,14 +28,13 @@
 #'   not necessary, but for use with \pkg{cobalt} it is.
 #' @param ps.list an optional list of `numeric` vectors of propensity scores at
 #'   each time point.
-#' @param ...  additional arguments. These must be named. They will be included
+#' @param \dots additional arguments. These must be named. They will be included
 #'   in the output object.
 #'
-#' @returns An object of class `weightit` (for `as.weightit()`) or `weightitMSM`
-#' (for `as.weightitMSM()`).
+#' @returns
+#' An object of class `weightit` (for `as.weightit()`) or `weightitMSM` (for `as.weightitMSM()`).
 #'
 #' @examples
-#'
 #' treat <- rbinom(500, 1, .3)
 #' weights <- rchisq(500, df = 2)
 #'
@@ -82,7 +81,7 @@ as.weightit.weightit.fit <- function(x, covs = NULL, ...) {
 as.weightit.default <- function(x, treat, covs = NULL, estimand = NULL,
                                 s.weights = NULL, ps = NULL, ...) {
 
-  if (!is.numeric(x) || is_not_null(dim(x))) {
+  if (!is.numeric(x) || length(dim(x)) > 1L) {
     .err("`x` must be a numeric vector of weights")
   }
 
@@ -93,7 +92,7 @@ as.weightit.default <- function(x, treat, covs = NULL, estimand = NULL,
     .err("`treat` and `x` must be the same length")
   }
 
-  if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
+  treat <- as.treat(treat, process = TRUE)
 
   if (is_not_null(covs)) {
     if (is.matrix(covs)) {
@@ -122,7 +121,7 @@ as.weightit.default <- function(x, treat, covs = NULL, estimand = NULL,
   }
 
   w.list <- list(weights = x,
-                 treat = assign_treat_type(treat),
+                 treat = treat,
                  covs = covs,
                  estimand = estimand,
                  s.weights = s.weights,
@@ -144,6 +143,29 @@ as.weightit.default <- function(x, treat, covs = NULL, estimand = NULL,
   w.list
 }
 
+# @exportS3Method as.weightit optweight
+# @rdname as.weightit
+.as.weightit.optweight <- function(x, ...) {
+  names(x)[names(x) == "weights"] <- "x"
+
+  x$method <- "optweight"
+  attr(x$method, "name") <- x$method
+  attr(x$method, "package") <- "optweight"
+
+  w <- do.call("as.weightit.default", x, quote = TRUE)
+
+  if (is_null(w$info)) {
+    w$info <- list(duals = w$duals)
+  }
+  else {
+    w$info$duals <- w$duals
+  }
+
+  w$duals <- NULL
+
+  w
+}
+
 #' @export
 #' @rdname as.weightit
 as.weightitMSM <- function(x, ...) {
@@ -155,7 +177,7 @@ as.weightitMSM <- function(x, ...) {
 as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = NULL,
                                    s.weights = NULL, ps.list = NULL, ...) {
 
-  if (!is.numeric(x) || is_not_null(dim(x))) {
+  if (!is.numeric(x) || length(dim(x)) > 1L) {
     .err("`x` must be a numeric vector of weights")
   }
 
@@ -163,7 +185,7 @@ as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = N
   chk::chk_list(treat.list)
 
   if (!all_apply(treat.list, is.atomic) ||
-      any_apply(treat.list, function(z) is_not_null(dim(z)))) {
+      any_apply(treat.list, function(z) length(dim(z)) > 1L)) {
     .err("`treat.list` must be a list of atomic vectors (i.e., numeric, logical, or character) or factors")
   }
 
@@ -176,9 +198,7 @@ as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = N
   }
 
   for (i in seq_along(treat.list)) {
-    if (!has_treat_type(treat.list[[i]])) {
-      treat.list[[i]] <- assign_treat_type(treat.list[[i]])
-    }
+    treat.list[[i]] <- as.treat(treat.list[[i]], process = TRUE)
   }
 
   chk::chk_null_or(covs.list, vld = chk::vld_list)
@@ -211,7 +231,7 @@ as.weightitMSM.default <- function(x, treat.list, covs.list = NULL, estimand = N
     }
 
     if (!all_apply(ps.list, is.numeric) ||
-        any_apply(ps.list, function(z) is_not_null(dim(z)))) {
+        any_apply(ps.list, function(z) length(dim(z)) > 1L)) {
       .err("`ps.list` must be a list of numeric vectors")
     }
 

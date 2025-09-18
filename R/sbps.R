@@ -1,6 +1,7 @@
 #' Subgroup Balancing Propensity Score
 #'
-#' @description Implements the subgroup balancing propensity score (SBPS), which
+#' @description
+#' Implements the subgroup balancing propensity score (SBPS), which
 #' is an algorithm that attempts to achieve balance in subgroups by sharing
 #' information from the overall sample and subgroups (Dong, Zhang, Zeng, & Li,
 #' 2020; DZZL). Each subgroup can use either weights estimated using the whole
@@ -32,7 +33,8 @@
 #'   number of subgroups, which can take a long time with many subgroups. If
 #'   unspecified, will default to `TRUE` if \eqn{R <= 8} and `FALSE` otherwise.
 #'
-#' @returns A `weightit.sbps` object, which inherits from `weightit`. This
+#' @returns
+#' A `weightit.sbps` object, which inherits from `weightit`. This
 #' contains all the information in `obj` with the weights, propensity scores,
 #' call, and possibly covariates updated from `sbps()`. In addition, the
 #' `prop.subgroup` component contains the values of the coefficients C for the
@@ -44,7 +46,8 @@
 #' to accurately reflect the performance of the weights in balancing the
 #' subgroups.
 #'
-#' @details The SBPS relies on two sets of weights: one estimated in the overall
+#' @details
+#' The SBPS relies on two sets of weights: one estimated in the overall
 #' sample and one estimated within each subgroup. The algorithm decides whether
 #' each subgroup should use the weights estimated in the overall sample or those
 #' estimated in the subgroup. There are 2^R permutations of overall and subgroup
@@ -77,12 +80,12 @@
 #'
 #' @seealso [weightit()], [summary.weightit()]
 #'
-#' @references Dong, J., Zhang, J. L., Zeng, S., & Li, F. (2020). Subgroup
-#' balancing propensity score. Statistical Methods in Medical Research, 29(3),
+#' @references
+#' Dong, J., Zhang, J. L., Zeng, S., & Li, F. (2020). Subgroup
+#' balancing propensity score. *Statistical Methods in Medical Research*, 29(3),
 #' 659–676. \doi{10.1177/0962280219870836}
 #'
 #' @examples
-#'
 #' library("cobalt")
 #' data("lalonde", package = "cobalt")
 #'
@@ -126,21 +129,21 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
   processed.moderator <- .process_by(moderator, data = clear_null(combined.data),
                                      treat = obj[["treat"]], treat.name = NULL,
                                      by.arg = "moderator")
-  moderator.factor <- attr(processed.moderator, "by.factor")
+  moderator.factor <- .attr(processed.moderator, "by.factor")
 
   if (is_not_null(obj2)) {
     if (!inherits(obj2, "weightit")) {
       .err("`obj2` must be a `weightit` object, ideally with a 'by' component")
     }
-    else if (is_not_null(obj2[["by"]])) {
-      if (is_not_null(obj[["by"]])) {
-        if (is_null(processed.moderator))
-          .err("cannot figure out moderator. Please supply a value to `moderator`")
-      }
-      else {
+
+    if (is_not_null(obj2[["by"]])) {
+      if (is_null(obj[["by"]])) {
         processed.moderator <- obj2[["by"]]
 
-        moderator.factor <- attr(processed.moderator, "by.factor")
+        moderator.factor <- .attr(processed.moderator, "by.factor")
+      }
+      else if (is_null(processed.moderator)) {
+        .err("cannot figure out moderator. Please supply a value to `moderator`")
       }
     }
     else if (is_null(processed.moderator)) {
@@ -163,7 +166,7 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
     obj2 <- eval(call, obj[["env"]])
   }
 
-  if ((is_null(obj[["ps"]]) || is_null(obj2[["ps"]])) && smooth) {
+  if (smooth && (is_null(obj[["ps"]]) || is_null(obj2[["ps"]]))) {
     .err("smooth SBPS can only be used with methods that produce a propensity score")
   }
 
@@ -171,9 +174,9 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
     formula <- obj[["formula"]]
   }
 
-  formula <- delete.response(terms(formula))
-
-  t.c <- get_covs_and_treat_from_formula(formula, combined.data)
+  t.c <- terms(formula) |>
+    delete.response() |>
+    get_covs_and_treat_from_formula2(combined.data)
 
   if (is_null(t.c[["reported.covs"]])) {
     .err("no covariates were found")
@@ -189,7 +192,8 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
   covs <- covs[, !same.as.moderator, drop = FALSE]
 
   bin.vars <- is_binary_col(covs)
-  s.d.denom <- get.s.d.denom.weightit(estimand = obj[["estimand"]], weights = obj[["weights"]],
+  s.d.denom <- get.s.d.denom.weightit(estimand = obj[["estimand"]],
+                                      weights = obj[["weights"]],
                                       treat = treat)
 
   R <- levels(moderator.factor)
@@ -222,7 +226,7 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
                                                                abs = TRUE, s.weights = s.weights[moderator.factor == g],
                                                                bin.vars = bin.vars)))
       }
-      else if (treat.type == "multi-category") {
+      else if (treat.type %in% c("multinomial", "multi-category")) {
         if (is_not_null(focal)) {
           bin.treat <- as.numeric(treat == focal)
           s.d.denom <- switch(estimand, ATT = "treated", ATC = "control", "all")
@@ -328,7 +332,7 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
                                                                abs = TRUE, s.weights = s.weights[moderator.factor == g],
                                                                bin.vars = bin.vars)))
       }
-      else if (treat.type == "multi-category") {
+      else if (treat.type %in% c("multinomial", "multi-category")) {
         if (is_not_null(focal)) {
           bin.treat <- as.numeric(treat == focal)
           s.d.denom <- switch(estimand, ATT = "treated", ATC = "control", "all")
@@ -436,6 +440,7 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
               F_try <- F_alt
             }
           }
+
           if (identical(s_try_prev, s_try)) {
             break
           }
@@ -455,14 +460,15 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
     }
 
     weights <- get_w(s_min, moderator.factor, w_o, w_s)
-    if (is_not_null(obj[["ps"]]) && is_not_null(obj2[["ps"]])) {
-      ps <- get_w(s_min, moderator.factor, obj[["ps"]], obj2[["ps"]])
+
+    ps <- {
+      if (is_null(obj[["ps"]]) || is_null(obj2[["ps"]])) NULL
+      else get_w(s_min, moderator.factor, obj[["ps"]], obj2[["ps"]])
     }
-    else ps <- NULL
   }
 
   out <- obj
-  out[["covs"]] <- t.c[["reported.covs"]]
+  out[["covs"]] <- t.c[["simple.covs"]]
   out[["weights"]] <- weights
   out[["ps"]] <- ps
   out[["moderator"]] <- processed.moderator
@@ -483,13 +489,13 @@ sbps <- function(obj, obj2 = NULL, moderator = NULL, formula = NULL, data = NULL
 summary.weightit.sbps <- function(object, top = 5L, ignore.s.weights = FALSE, ...) {
 
   sw_ <- {
-    if (ignore.s.weights || is_null(object$s.weights)) rep.int(1, length(object$weights))
+    if (ignore.s.weights || is_null(object$s.weights)) rep_with(1, object$weights)
     else object$s.weights
   }
   w_ <- object$weights * sw_
   t_ <- object$treat
   mod <- object$moderator
-  mod_factor <- attr(mod, "by.factor")
+  mod_factor <- .attr(mod, "by.factor")
   mod_levels <- levels(mod_factor)
   treat.type <- get_treat_type(object[["treat"]])
 
@@ -546,7 +552,7 @@ summary.weightit.sbps <- function(object, top = 5L, ignore.s.weights = FALSE, ..
       nn["Weighted", ] <- c(ESS(w[t == 0]),
                             ESS(w[t == 1]))
     }
-    else if (treat.type == "multi-category") {
+    else if (treat.type %in% c("multinomial", "multi-category")) {
       out$weight.range <- setNames(lapply(levels(t), function(x) c(min(w[w > 0 & t == x]),
                                                                    max(w[w > 0 & t == x]))),
                                    levels(t))
@@ -594,7 +600,7 @@ summary.weightit.sbps <- function(object, top = 5L, ignore.s.weights = FALSE, ..
 print.summary.weightit.sbps <- function(x, ...) {
   cat("Summary of weights:\n")
   cat("\n - Overall vs. subgroup proportion contribution:\n")
-  print.data.frame(round_df_char(attr(x, "prop.subgroup"), 2L))
+  print.data.frame(round_df_char(.attr(x, "prop.subgroup"), 2L))
 
   for (g in seq_along(x)) {
     cat(sprintf("\n - - - - - - - Subgroup %s - - - - - - -\n", names(x)[g]))
@@ -603,11 +609,11 @@ print.summary.weightit.sbps <- function(x, ...) {
     print.data.frame(round_df_char(text_box_plot(x[[g]]$weight.range, 28L), 4L), ...)
     df <- setNames(data.frame(unlist(lapply(names(x[[g]]$weight.top), function(j) c(" ", j))),
                               matrix(unlist(lapply(x[[g]]$weight.top, function(j) {
-                                c(names(j), rep.int("", top - length(j)),
-                                  round(j, 4L), rep.int("", top - length(j)))
+                                c(names(j), character(top - length(j)),
+                                  round(j, 4L), character(top - length(j)))
                               })),
                               byrow = TRUE, nrow = 2L * length(x[[g]]$weight.top))),
-                   rep.int("", 1L + top))
+                   character(1L + top))
     cat(sprintf("\n- Units with %s greatest weights by group:\n", top))
     print.data.frame(df, row.names = FALSE)
     cat("\n")
