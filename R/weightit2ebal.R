@@ -181,23 +181,17 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal,
     covs <- add_missing_indicators(covs)
   }
 
-  covs <- .apply_moments_int_quantile(covs,
-                                      moments = ...get("moments"),
-                                      int = ...get("int"),
-                                      quantile = ...get("quantile"),
-                                      s.weights = s.weights, focal = focal,
-                                      treat = treat)
+  covs <- covs |>
+    .apply_moments_int_quantile(moments = ...get("moments"),
+                                int = ...get("int"),
+                                quantile = ...get("quantile"),
+                                s.weights = s.weights, focal = focal,
+                                treat = treat) |>
+    .make_covs_closer_to_1() |>
+    .make_covs_full_rank()
 
-  for (i in seq_col(covs)) {
-    covs[, i] <- .make_closer_to_1(covs[, i])
-  }
-
-  colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
-  covs <- covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
-
-  bw <- if_null_then(...get("base.weights"),
-                     ...get("base.weight"),
-                     rep_with(1, treat))
+  bw <- ...get("base.weights") %or% ...get("base.weight") %or%
+    rep_with(1, treat)
 
   if (!is.numeric(bw) || length(bw) != length(treat)) {
     .err("the argument to `base.weight` must be a numeric vector with length equal to the number of units")
@@ -212,10 +206,8 @@ weightit2ebal <- function(covs, treat, s.weights, subset, estimand, focal,
   solver <- ...get("solver")
   if (is_null(solver)) {
     solver <- {
-      if (rlang::is_installed("rootSolve"))
-        "multiroot"
-      else
-        "optim"
+      if (rlang::is_installed("rootSolve")) "multiroot"
+      else "optim"
     }
   }
   else {
@@ -482,20 +474,15 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, verbose,
 
   treat <- .make_closer_to_1(treat)
 
-  t.mat <- matrix(treat, ncol = 1L, dimnames = list(NULL, "treat"))
-  t.mat <- .apply_moments_int_quantile(t.mat, moments = d.moments)
+  t.mat <- matrix(treat, ncol = 1L, dimnames = list(NULL, "treat")) |>
+    .apply_moments_int_quantile(moments = d.moments) |>
+    center_w(s.weights)
 
-  t.mat <- center_w(t.mat, s.weights)
-
-  bal.covs <- .apply_moments_int_quantile(covs,
-                                          moments = moments,
-                                          int = ...get("int"))
-
-  for (i in seq_col(bal.covs)) {
-    bal.covs[, i] <- .make_closer_to_1(bal.covs[, i])
-  }
-
-  bal.covs <- center_w(bal.covs, s.weights)
+  bal.covs <- covs |>
+    .apply_moments_int_quantile(moments = moments,
+                                int = ...get("int")) |>
+    .make_covs_closer_to_1() |>
+    center_w(s.weights)
 
   if (all(d.moments <= moments)) {
     C <- cbind(t.mat,
@@ -507,15 +494,11 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, verbose,
                      colnames(bal.covs))
   }
   else {
-    d.covs <- .apply_moments_int_quantile(covs,
-                                          moments = pmax(d.moments, moments),
-                                          int = ...get("int"))
-
-    for (i in seq_col(d.covs)) {
-      d.covs[, i] <- .make_closer_to_1(d.covs[, i])
-    }
-
-    d.covs <- center_w(d.covs, s.weights)
+    d.covs <- covs |>
+      .apply_moments_int_quantile(moments = pmax(d.moments, moments),
+                                  int = ...get("int")) |>
+      .make_covs_closer_to_1() |>
+      center_w(s.weights)
 
     C <- cbind(t.mat,
                d.covs,
@@ -526,8 +509,7 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, verbose,
                      colnames(bal.covs))
   }
 
-  colinear.covs.to.remove <- setdiff(colnames(C), colnames(make_full_rank(C)))
-  C <- C[, colnames(C) %nin% colinear.covs.to.remove, drop = FALSE]
+  C <- .make_covs_full_rank(C)
 
   eb <- function(C, s.weights, Q) {
     n <- nrow(C)
@@ -662,9 +644,9 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, verbose,
 #     covs <- add_missing_indicators(covs)
 #   }
 #
-#   bw <- if_null_then(...get("base.weights"),
-#                      ...get("base.weight"),
-#                      rep.int(1, length(treat)))
+#   bw <- ...get("base.weights") %or%
+#                      ...get("base.weight") %or%
+#                      rep.int(1, length(treat))
 #
 #   if (!is.numeric(bw) || length(bw) != length(treat)) {
 #     .err("the argument to `base.weight` must be a numeric vector with length equal to the number of units")
@@ -743,8 +725,7 @@ weightit2ebal.cont <- function(covs, treat, s.weights, subset, missing, verbose,
 #                      colnames(bal.covs))
 #   }
 #
-#   colinear.covs.to.remove <- setdiff(colnames(C), colnames(make_full_rank(C)))
-#   C <- C[, colnames(C) %nin% colinear.covs.to.remove, drop = FALSE]
+#   C <- .make_covs_full_rank(C)
 #
 #   eb <- function(C, s.weights, Q) {
 #     n <- nrow(C)

@@ -177,10 +177,10 @@ summary.glm_weightit <- function(object,
     dimnames(coef.table) <- list(names(coef.p), dn)
   }
   else {
-    coef.table <- matrix(NA_real_, 0L, 4L)
+    coef.table <- matrix(NA_real_, nrow = 0L, ncol = 4L)
     dimnames(coef.table) <- list(NULL, c("Estimate", "Std. Error",
                                          "z value", "Pr(>|z|)"))
-    covmat <- matrix(NA_real_, 0L, 0L)
+    covmat <- sq_matrix(n = 0L)
   }
 
   transformed_coefs <- transform(coef.table[, "Estimate"])
@@ -201,13 +201,19 @@ summary.glm_weightit <- function(object,
   }
 
   keep <- match(c("call", "terms", "family", "deviance", "aic", "contrasts", "df.residual",
-                  "null.deviance", "df.null", "iter", "na.action", "vcov_type"), names(object), 0L)
-  ans <- c(object[keep], list(deviance.resid = residuals(object, type = "deviance"),
-                              coefficients = coef.table, aliased = aliased,
-                              dispersion = dispersion, df = c(object$rank, df.r, df.f),
-                              cov.unscaled = covmat.unscaled, cov.scaled = covmat,
-                              cluster = .attr(object, "cluster"),
-                              transformed = !identity_transform))
+                  "null.deviance", "df.null", "iter", "na.action", "vcov_type"),
+                names(object), 0L)
+
+  ans <- c(object[keep],
+           list(deviance.resid = residuals(object, type = "deviance"),
+                coefficients = coef.table,
+                aliased = aliased,
+                dispersion = dispersion,
+                df = c(object$rank, df.r, df.f),
+                cov.unscaled = covmat.unscaled,
+                cov.scaled = covmat,
+                cluster = .attr(object, "cluster"),
+                transformed = !identity_transform))
 
   class(ans) <- c("summary.glm_weightit", "summary.glm")
 
@@ -268,10 +274,10 @@ summary.multinom_weightit <- function(object,
     dimnames(coef.table) <- list(names(coef.p), dn)
   }
   else {
-    coef.table <- matrix(NA_real_, 0L, 4L)
+    coef.table <- matrix(NA_real_, nrow = 0L, ncol = 4L)
     dimnames(coef.table) <- list(NULL, c("Estimate", "Std. Error",
                                          "z value", "Pr(>|z|)"))
-    covmat <- matrix(NA_real_, 0L, 0L)
+    covmat <- sq_matrix(n = 0L)
   }
 
   transformed_coefs <- transform(coef.table[, "Estimate"])
@@ -292,13 +298,19 @@ summary.multinom_weightit <- function(object,
   }
 
   keep <- match(c("call", "terms", "family", "deviance", "aic", "contrasts", "df.residual",
-                  "null.deviance", "df.null", "iter", "na.action", "vcov_type"), names(object), 0L)
-  ans <- c(object[keep], list(deviance.resid = residuals(object, type = "deviance"),
-                              coefficients = coef.table, aliased = aliased,
-                              dispersion = dispersion, df = c(object$rank, df.r, df.f),
-                              cov.unscaled = covmat.unscaled, cov.scaled = covmat,
-                              cluster = .attr(object, "cluster"),
-                              transformed = !identity_transform))
+                  "null.deviance", "df.null", "iter", "na.action", "vcov_type"),
+                names(object), 0L)
+
+  ans <- c(object[keep],
+           list(deviance.resid = residuals(object, type = "deviance"),
+                coefficients = coef.table,
+                aliased = aliased,
+                dispersion = dispersion,
+                df = c(object$rank, df.r, df.f),
+                cov.unscaled = covmat.unscaled,
+                cov.scaled = covmat,
+                cluster = .attr(object, "cluster"),
+                transformed = !identity_transform))
 
   class(ans) <- c("summary.glm_weightit", "summary.glm")
 
@@ -383,9 +395,10 @@ summary.coxph_weightit <- function(object,
   }
   else {
     coef.table <- matrix(NA_real_, nrow = 0L, ncol = 4L)
-    colnames(coef.table) <- c("Estimate", "Std. Error", "z value", "Pr(>|z|)")
+    colnames(coef.table) <- c("Estimate", "Std. Error",
+                              "z value", "Pr(>|z|)")
 
-    covmat <- matrix(NA_real_, nrow = 0L, ncol = 0L)
+    covmat <- sq_matrix(n = 0L)
   }
 
   transformed_coefs <- transform(coef.table[, "Estimate"])
@@ -406,12 +419,15 @@ summary.coxph_weightit <- function(object,
   }
 
   keep <- match(c("call", "terms", "family", "deviance", "aic", "contrasts", "df.residual",
-                  "null.deviance", "df.null", "iter", "na.action", "vcov_type"), names(object), 0L)
-  ans <- c(object[keep], list(coefficients = coef.table,
-                              aliased = aliased,
-                              cov.scaled = covmat,
-                              cluster = .attr(object, "cluster"),
-                              transformed = !identity_transform))
+                  "null.deviance", "df.null", "iter", "na.action", "vcov_type"),
+                names(object), 0L)
+
+  ans <- c(object[keep],
+           list(coefficients = coef.table,
+                aliased = aliased,
+                cov.scaled = covmat,
+                cluster = .attr(object, "cluster"),
+                transformed = !identity_transform))
 
   class(ans) <- c("summary.glm_weightit", "summary.glm")
 
@@ -534,11 +550,10 @@ print.coxph_weightit <- function(x, digits = max(3L, getOption("digits") - 3L), 
 vcov.glm_weightit <- function(object, complete = TRUE, vcov = NULL, ...) {
   chk::chk_flag(complete)
 
-  V <- .vcov_glm_weightit.internal(object, vcov. = vcov, ...) |>
-    .modify_vcov_info()
-
-  .vcov.aliased(is.na(object$coefficients), V,
-                complete = complete)
+  .vcov_glm_weightit.internal(object, vcov. = vcov, ...) |>
+    .modify_vcov_info() |>
+    .vcov.aliased(aliased = is.na(object$coefficients),
+                  complete = complete)
 }
 
 #' @exportS3Method stats::vcov multinom_weightit
@@ -567,9 +582,9 @@ confint.glm_weightit <- function(object, parm, level = 0.95, vcov = NULL, ...) {
 
   covmat <- .vcov_glm_weightit.internal(object, vcov. = vcov, ...)
 
-  object <- .set_vcov(object, covmat)
-
-  confint.lm(object, parm = parm, level = level, ...)
+  object |>
+    .set_vcov(covmat) |>
+    confint.lm(parm = parm, level = level, ...)
 }
 
 #' @exportS3Method stats::confint multinom_weightit
@@ -628,8 +643,8 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
   bout <- x[["coefficients"]]
   aliased <- is.na(bout)
 
-  Xout <- if_null_then(x[["x"]], model.matrix(x))
-  Y <- if_null_then(x[["y"]], model.response(model.frame(x)))
+  Xout <- x[["x"]] %or% model.matrix(x)
+  Y <- x[["y"]] %or% model.response(model.frame(x))
 
   if (is_not_null(x[["weightit"]])) {
     W <- x[["weightit"]][["weights"]]
@@ -647,7 +662,7 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
     SW <- rep_with(1, Y)
   }
 
-  offset <- if_null_then(x[["offset"]], rep_with(0, Y))
+  offset <- x[["offset"]] %or% rep_with(0, Y)
 
   if (any(aliased)) {
     if (is_not_null(.attr(x[["qr"]][["qr"]], "aliased"))) {
@@ -656,6 +671,7 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
     else {
       Xout <- make_full_rank(Xout, with.intercept = FALSE)
     }
+
     bout <- bout[!aliased]
   }
 
@@ -677,8 +693,7 @@ estfun.glm_weightit <- function(x, asympt = TRUE, ...) {
     x$psi(Bout, Xout, Y, w * SW, offset = offset)
   }
 
-  psi_b <- if_null_then(x[["gradient"]],
-                        psi_out(bout, W, Y, Xout, SW, offset))
+  psi_b <- x[["gradient"]] %or% psi_out(bout, W, Y, Xout, SW, offset)
 
   if (is_not_null(Mparts)) {
     # Mparts from weightit()
@@ -814,8 +829,8 @@ bread.glm_weightit <- function(x, ...) {
     H <- .get_hess_glm(x)
   }
   else {
-    Xout <- if_null_then(x[["x"]], model.matrix(x))
-    Y <- if_null_then(x[["y"]], model.response(model.frame(x)))
+    Xout <- x[["x"]] %or% model.matrix(x)
+    Y <- x[["y"]] %or% model.response(model.frame(x))
 
     if (is_not_null(x[["weightit"]])) {
       W <- x[["weightit"]][["weights"]]
@@ -833,7 +848,7 @@ bread.glm_weightit <- function(x, ...) {
       SW <- rep_with(1, Y)
     }
 
-    offset <- if_null_then(x[["offset"]], rep_with(0, Y))
+    offset <- x[["offset"]] %or% rep_with(0, Y)
 
     if (any(aliased)) {
       if (is_not_null(.attr(x[["qr"]][["qr"]], "aliased"))) {

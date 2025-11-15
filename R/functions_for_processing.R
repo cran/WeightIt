@@ -640,10 +640,7 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
 
   by.components <- data.frame(by)
 
-  names(by.components) <- {
-    if (is_not_null(colnames(by))) colnames(by)
-    else by.name
-  }
+  names(by.components) <- colnames(by) %or% by.name
 
   by.factor <- {
     if (is_null(by)) gl(1, n)
@@ -709,6 +706,16 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
   }
 }
 
+.make_covs_full_rank <- function(covs) {
+  if (ncol(covs) <= 1L) {
+    return(covs)
+  }
+
+  colinear.covs.to.remove <- setdiff(colnames(covs), colnames(make_full_rank(covs)))
+
+  covs[, colnames(covs) %nin% colinear.covs.to.remove, drop = FALSE]
+}
+
 .make_closer_to_1 <- function(x) {
   if (chk::vld_character_or_factor(x) || all_the_same(x)) {
     return(x)
@@ -719,6 +726,14 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
   }
 
   (x - mean_fast(x, TRUE)) / sd(x, na.rm = TRUE)
+}
+
+.make_covs_closer_to_1 <- function(covs) {
+  for (i in seq_col(covs)) {
+    covs[, i] <- .make_closer_to_1(covs[, i])
+  }
+
+  covs
 }
 
 .apply_moments_int_quantile <- function(d, moments = integer(), int = FALSE, quantile = list(),
@@ -735,7 +750,7 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
 
   binary.vars <- is_binary_col(d)
 
-  if (center && (int || !orthogonal_poly)) {
+  if (center && (int || !orthogonal_poly) && !all(binary.vars)) {
     d[, !binary.vars] <- center_w(d[, !binary.vars, drop = FALSE],
                                   s.weights)
   }
@@ -743,7 +758,7 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
   nd <- NCOL(d)
 
   # moments
-  default_moments <- if_null_then(.attr(moments, "moments_default"), 1L)
+  default_moments <- .attr(moments, "moments_default") %or% 1L
   poly <- setNames(rep.int(default_moments, nd),
                    colnames(d))
 
@@ -755,6 +770,7 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
     poly[in_poly_and_moments] <- moments[in_poly_and_moments]
   }
 
+  # Binary variables get no poly
   poly[binary.vars] <- pmin(poly[binary.vars], 1L)
 
   poly_terms <- poly_co.names <- make_list(colnames(d)[poly > 0L])
@@ -796,27 +812,32 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
   }
 
   # quantile
-  qu <- make_list(colnames(d)[!binary.vars])
-
-  if (length(quantile) == 1L && (is_null(names(quantile)) || !nzchar(names(quantile)))) {
-    qu[] <- quantile[rep.int(1L, sum(!binary.vars))]
+  if (all(binary.vars)) {
+    qu <- list()
   }
   else {
-    if (any(names(quantile) %in% colnames(d)[binary.vars])) {
-      .wrn("ignoring `quantile` constraints on binary and categorical variables")
+    qu <- make_list(colnames(d)[!binary.vars])
+
+    if (length(quantile) == 1L && (is_null(names(quantile)) || !nzchar(names(quantile)))) {
+      qu[] <- quantile[rep.int(1L, sum(!binary.vars))]
+    }
+    else {
+      if (any(names(quantile) %in% colnames(d)[binary.vars])) {
+        .wrn("ignoring `quantile` constraints on binary and categorical variables")
+      }
+
+      in_qu_and_quantile <- intersect(names(qu), names(quantile))
+      qu[in_qu_and_quantile] <- quantile[in_qu_and_quantile]
     }
 
-    in_qu_and_quantile <- intersect(names(qu), names(quantile))
-    qu[in_qu_and_quantile] <- quantile[in_qu_and_quantile]
-  }
-
-  qu <- clear_null(qu)
-
-  if (is_not_null(focal) && is_not_null(s.weights)) {
-    s.weights <- s.weights[treat == focal]
+    qu <- clear_null(qu)
   }
 
   if (is_not_null(qu)) {
+    if (is_not_null(focal) && is_not_null(s.weights)) {
+      s.weights <- s.weights[treat == focal]
+    }
+
     quantile_terms <- quantile_co.names <- make_list(names(qu))
 
     for (i in names(qu)) {
@@ -838,17 +859,16 @@ get_treated_level <- function(treat, estimand, focal = NULL) {
   }
 
   out <- do.call("cbind", c(poly_terms, int_terms, quantile_terms))
-  out_co.names <- c(unlist(poly_co.names), unlist(int_co.names), unlist(quantile_co.names))
+  colnames(out) <- c(unlist(poly_co.names), unlist(int_co.names), unlist(quantile_co.names))
 
   # Remove single values
-  if (is_not_null(out)) {
-    colnames(out) <- out_co.names
+  single_value <- apply(out, 2L, all_the_same)
 
-    single_value <- apply(out, 2L, all_the_same)
-    out <- out[, !single_value, drop = FALSE]
+  if (!any(single_value)) {
+    return(out)
   }
 
-  out
+  out[, !single_value, drop = FALSE]
 }
 
 get.s.d.denom.weightit <- function(s.d.denom = NULL, estimand = NULL, weights = NULL, treat = NULL, focal = NULL) {
@@ -1307,7 +1327,7 @@ stabilize_w <- function(weights, treat) {
     w[!between(ps, c(alpha.opt, 1 - alpha.opt))] <- 0
   }
 
-  names(w) <- if_null_then(names(treat), NULL)
+  names(w) <- names(treat) %or% NULL
 
   if (stabilize) {
     w <- stabilize_w(w, treat)
@@ -1372,7 +1392,7 @@ stabilize_w <- function(weights, treat) {
     w <- stabilize_w(w, treat)
   }
 
-  names(w) <- if_null_then(rownames(ps_mat), names(treat), NULL)
+  names(w) <- rownames(ps_mat) %or% names(treat) %or% NULL
 
   w
 }
@@ -1973,4 +1993,23 @@ generalized_inverse <- function(sigma, .try = TRUE) {
   }
 
   fit$coefficients
+}
+
+came_from_weightit <- function(obj) {
+  cl <- getCall(obj)
+
+  if (is_null(cl) || !is.call(cl)) {
+    return(FALSE)
+  }
+
+  env <- obj[["env"]] %or% globalenv()
+
+  fn <- try(eval(cl[[1L]], envir = env), silent = TRUE)
+
+  if (!is.function(fn)) {
+    return(FALSE)
+  }
+
+  identical(fn, weightit, ignore.environment = TRUE) ||
+    identical(fn, weightitMSM, ignore.environment = TRUE)
 }

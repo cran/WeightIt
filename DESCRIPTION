@@ -1,7 +1,7 @@
 Package: WeightIt
 Type: Package
 Title: Weighting for Covariate Balance in Observational Studies
-Version: 1.5.0
+Version: 1.5.1
 Authors@R: c(
     person("Noah", "Greifer", role=c("aut", "cre"), 
            email = "noah.greifer@gmail.com",
@@ -35,9 +35,9 @@ LazyData: true
 RoxygenNote: 7.3.3
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2025-09-17 15:01:31 UTC; NoahGreifer
+Packaged: 2025-11-15 15:28:54 UTC; NoahGreifer
 Author: Noah Greifer [aut, cre] (ORCID:
     <https://orcid.org/0000-0003-3067-7154>)
 Maintainer: Noah Greifer <noah.greifer@gmail.com>
 Repository: CRAN
-Date/Publication: 2025-09-18 05:10:41 UTC
+Date/Publication: 2025-11-15 17:40:02 UTC

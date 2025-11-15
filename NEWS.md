@@ -1,6 +1,20 @@
 WeightIt News and Updates
 ======
 
+# `WeightIt` 1.5.1
+
+* `calibrate()` with `method = "isoreg"` can now be used with sampling weights.
+
+* With `predict.ordinal_weightit()` and `predict.multinom_weightit()` with `type = "response"`, an optional `level` argument can be supplied to request predictions solely for the given outcome level.
+
+* When `vcov` is `"BS"` or `"FWB"` in `glm_weightit()`, etc., any call to `trim()` or `calibrate()` will be applied within each bootstrap replication.
+
+* Fixed a bug when using bootstrapping on `glm_weightit()`, etc., when the original call to `weightit()` was called as `WeightIt::weightit()`. (#85)
+
+* Fixed a bug when using `weightit()` with only categorical covariates. Thanks to @harshanperera85-commits and Pengfei Guo for pointing it out. (#86)
+
+* When a variable is manually excluded from a formula, e.g., `treat ~ . - re78`, that variable no longer is included in the covariate output.
+
 # `WeightIt` 1.5.0
 
 * For `predict.ordinal_weightit()`, `type` can now be `"stdlv"` to request predictions on the scale of the standardized latent variable underlying the ordinal responses.

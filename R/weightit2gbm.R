@@ -72,7 +72,7 @@
 #'
 #' The following additional arguments can be specified:
 #'   \describe{
-#'     \item{`criterion`}{A string describing the balance criterion used to select the best weights. See \pkgfun{cobalt}{bal.compute} for allowable options for each treatment type. In addition, to optimize the cross-validation error instead of balance, `criterion` can be set as `"cv{#}`", where `{#}` is replaced by a number representing the number of cross-validation folds used (e.g., `"cv5"` for 5-fold cross-validation). For binary and multi-category treatments, the default is `"smd.mean"`, which minimizes the average absolute standard mean difference among the covariates between treatment groups. For continuous treatments, the default is `"p.mean"`, which minimizes the average absolute Pearson correlation between the treatment and covariates.
+#'     \item{`criterion`}{A string describing the balance criterion used to select the best weights. See [cobalt::bal.compute()] for allowable options for each treatment type. In addition, to optimize the cross-validation error instead of balance, `criterion` can be set as `"cv{#}`", where `{#}` is replaced by a number representing the number of cross-validation folds used (e.g., `"cv5"` for 5-fold cross-validation). For binary and multi-category treatments, the default is `"smd.mean"`, which minimizes the average absolute standard mean difference among the covariates between treatment groups. For continuous treatments, the default is `"p.mean"`, which minimizes the average absolute Pearson correlation between the treatment and covariates.
 #'     }
 #'     \item{`trim.at`}{A number supplied to `at` in [trim()] which trims the weights from all the trees before choosing the best tree. This can be valuable when some weights are extreme, which occurs especially with continuous treatments. The default is 0 (i.e., no trimming).
 #'     }
@@ -299,16 +299,13 @@ weightit2gbm <- function(covs, treat, s.weights, estimand, focal, subset,
   if (!has_treat_type(treat)) treat <- assign_treat_type(treat)
   treat.type <- get_treat_type(treat)
 
-  for (i in seq_col(covs)) {
-    covs[, i] <- .make_closer_to_1(covs[, i])
-  }
-
   if (missing == "ind") {
     covs <- add_missing_indicators(covs, replace_with = NA)
   }
 
-  criterion <- if_null_then(...get("criterion"),
-                            ...get("stop.method"))
+  covs <- .make_covs_closer_to_1(covs)
+
+  criterion <- ...get("criterion") %or% ...get("stop.method")
 
   if (is_null(criterion)) {
     .wrn('no `criterion` was provided. Using "smd.mean"')
@@ -640,16 +637,13 @@ weightit2gbm.cont <- function(covs, treat, s.weights, estimand, focal, subset,
 
   missing <- .process_missing2(missing, covs)
 
-  for (i in seq_col(covs)) {
-    covs[, i] <- .make_closer_to_1(covs[, i])
-  }
-
   if (missing == "ind") {
     covs <- add_missing_indicators(covs, replace_with = NA)
   }
 
-  criterion <- if_null_then(...get("criterion"),
-                            ...get("stop.method"))
+  covs <- .make_covs_closer_to_1(covs)
+
+  criterion <- ...get("criterion") %or% ...get("stop.method")
 
   if (is_null(criterion)) {
     .wrn('no `criterion` was provided. Using "p.mean"')
